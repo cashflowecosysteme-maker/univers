@@ -199,9 +199,6 @@ async function handleCreateMember(request, env) {
   if (!prenom || !email || !password) {
     return json({ error: 'Prénom, courriel et mot de passe requis.' }, 400);
   }
-  if (!parentCode) {
-    return json({ error: 'Le code de rattachement est obligatoire.' }, 400);
-  }
   if (password.length < 6) {
     return json({ error: 'Mot de passe : minimum 6 caractères.' }, 400);
   }
@@ -211,11 +208,14 @@ async function handleCreateMember(request, env) {
   ).bind(email).first();
   if (existing) return json({ error: 'Ce courriel existe déjà.' }, 409);
 
-  const parent = await env.DB.prepare(
-    `SELECT id FROM users WHERE affiliate_code = ?`
-  ).bind(parentCode).first();
-  if (!parent) return json({ error: 'Code de rattachement introuvable.' }, 400);
-  const parentId = parent.id;
+  let parentId = null;
+  if (parentCode) {
+    const parent = await env.DB.prepare(
+      `SELECT id FROM users WHERE affiliate_code = ?`
+    ).bind(parentCode).first();
+    if (!parent) return json({ error: 'Code de rattachement introuvable.' }, 400);
+    parentId = parent.id;
+  }
 
   // Code unique
   let code = generateCode();
