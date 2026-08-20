@@ -1,12 +1,12 @@
 // ============================================================
 // NyXia — Univers (SuperAdmin central)
-// Cockpit unique pour piloter tous les portails + outils
+// Auth : secret ADMIN_INITIAL_PASSWORD uniquement
+// KV  : écritures UNIQUEMENT sous le préfixe univers:
+//       (aucune lecture/écriture de admin:credentials ni sessions Studio)
 // ============================================================
 
-const SESSION_TTL = 60 * 60 * 12; // 12 heures (équipe)
+const SESSION_TTL = 60 * 60 * 12; // 12 h
 const COOKIE_NAME = 'nyxia_univers';
-
-// ───────────── Helpers ─────────────
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -36,21 +36,20 @@ async function hashPassword(password, salt) {
 }
 
 async function verifyPassword(password, salt, hash) {
-  const computed = await hashPassword(password, salt);
-  return computed === hash;
+  return (await hashPassword(password, salt)) === hash;
 }
 
-function buildSessionCookie(token, maxAgeSeconds, requestUrl) {
+function buildSessionCookie(token, maxAge, requestUrl) {
   const parts = [
     COOKIE_NAME + '=' + token,
     'Path=/',
-    'Max-Age=' + maxAgeSeconds,
+    'Max-Age=' + maxAge,
     'HttpOnly',
     'Secure',
     'SameSite=Lax'
   ];
   try {
-    const host = requestUrl ? new URL(requestUrl).hostname : '';
+    const host = new URL(requestUrl).hostname;
     if (host === 'nyxia.top' || host.endsWith('.nyxia.top')) {
       parts.push('Domain=.nyxia.top');
     }
@@ -59,152 +58,135 @@ function buildSessionCookie(token, maxAgeSeconds, requestUrl) {
 }
 
 function clearSessionCookie(requestUrl) {
-  let domainPart = '';
+  let domain = '';
   try {
-    const host = requestUrl ? new URL(requestUrl).hostname : '';
+    const host = new URL(requestUrl).hostname;
     if (host === 'nyxia.top' || host.endsWith('.nyxia.top')) {
-      domainPart = '; Domain=.nyxia.top';
+      domain = '; Domain=.nyxia.top';
     }
   } catch (_) {}
-  return COOKIE_NAME + '=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax' + domainPart;
+  return COOKIE_NAME + '=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax' + domain;
 }
 
 function getTokenFromRequest(request) {
-  // 1. Header (frontend)
-  const headerToken = request.headers.get('X-Univers-Token');
-  if (headerToken) return headerToken;
-
-  // 2. Cookie partagé
-  const cookieHeader = request.headers.get('Cookie') || '';
-  const match = cookieHeader.match(new RegExp('(?:^|;\\s*)' + COOKIE_NAME + '=([^;]+)'));
-  if (match) return match[1];
-
-  return null;
+  const header = request.headers.get('X-Univers-Token');
+  if (header) return header;
+  const cookie = request.headers.get('Cookie') || '';
+  const m = cookie.match(/(?:^|;\s*)nyxia_univers=([^;]+)/);
+  return m ? m[1] : null;
 }
 
-async function getAdminCredentials(env) {
+// Credentials Univers UNIQUEMENT sous univers:admin:credentials
+// Jamais admin:credentials (réservé au Studio)
+async function getUniversCredentials(env) {
   const raw = await env.CASHFLOW_KV.get('univers:admin:credentials');
   if (raw) return JSON.parse(raw);
-
-  // Premier démarrage : mot de passe lu depuis la variable d'environnement
-  // Cloudflare → Worker → Variables / Secrets → ADMIN_INITIAL_PASSWORD
-  const initialPassword = env.ADMIN_INITIAL_PASSWORD;
-  if (!initialPassword || typeof initialPassword !== 'string' || initialPassword.length < 8) {
-    return null; // pas encore configuré
-  }
-
-  const salt = randomSalt();
-  const hash = await hashPassword(initialPassword, salt);
-  const creds = { salt, hash, mustChange: true };
-  await env.CASHFLOW_KV.put('univers:admin:credentials', JSON.stringify(creds));
-  return creds;
+  return null;
 }
 
 async function requireAdmin(request, env) {
   const token = getTokenFromRequest(request);
   if (!token) return false;
-  const raw = await env.CASHFLOW_KV.get(`univers:session:${token}`);
+  const raw = await env.CASHFLOW_KV.get('univers:session:' + token);
   return !!raw;
 }
 
-// ───────────── Handlers ─────────────
-
 async function handleLogin(request, env) {
-  const { password } = await request.json();
+  const body = await request.json();
+  const password = body.password;
   if (!password) return json({ error: 'Mot de passe requis.' }, 400);
 
-  const creds = await getAdminCredentials(env);
-  if (!creds) {
-    return json({
-      error: 'Mot de passe initial non configuré. Ajoute le secret ADMIN_INITIAL_PASSWORD dans Cloudflare (Variables / Secrets), puis réessaie.'
-    }, 503);
+  // 1) Si un hash Univers existe déjà → on le vérifie
+  let creds = await getUniversCredentials(env);
+  if (creds) {
+    const valid = await verifyPassword(password, creds.salt, creds.hash);
+    if (!valid) return json({ error: 'Mot de passe incorrect.' }, 401);
+  } else {
+    // 2) Sinon : premier login = secret Cloudflare ADMIN_INITIAL_PASSWORD
+    const initial = env.ADMIN_INITIAL_PASSWORD;
+    if (!initial || typeof initial !== 'string') {
+      return json({
+        error: 'Configure le secret ADMIN_INITIAL_PASSWORD dans Cloudflare (Worker → Variables / Secrets).'
+      }, 503);
+    }
+    if (password !== initial) {
+      return json({ error: 'Mot de passe incorrect.' }, 401);
+    }
+    // On enregistre le hash sous univers: UNIQUEMENT (n'affecte pas le Studio)
+    const salt = randomSalt();
+    const hash = await hashPassword(password, salt);
+    await env.CASHFLOW_KV.put('univers:admin:credentials', JSON.stringify({ salt, hash }));
   }
-  const valid = await verifyPassword(password, creds.salt, creds.hash);
-  if (!valid) return json({ error: 'Mot de passe incorrect.' }, 401);
 
   const token = randomToken();
   await env.CASHFLOW_KV.put(
-    `univers:session:${token}`,
-    JSON.stringify({ role: 'superadmin', connectedAt: new Date().toISOString() }),
+    'univers:session:' + token,
+    JSON.stringify({ role: 'superadmin', at: new Date().toISOString() }),
     { expirationTtl: SESSION_TTL }
   );
 
-  const response = json({
-    success: true,
-    token,
-    mustChangePassword: !!creds.mustChange
-  });
-  response.headers.append('Set-Cookie', buildSessionCookie(token, SESSION_TTL, request.url));
-  return response;
+  const res = json({ success: true, token });
+  res.headers.append('Set-Cookie', buildSessionCookie(token, SESSION_TTL, request.url));
+  return res;
 }
 
 async function handleLogout(request, env) {
   const token = getTokenFromRequest(request);
-  if (token) {
-    await env.CASHFLOW_KV.delete(`univers:session:${token}`);
-  }
-  const response = json({ success: true });
-  response.headers.append('Set-Cookie', clearSessionCookie(request.url));
-  return response;
+  if (token) await env.CASHFLOW_KV.delete('univers:session:' + token);
+  const res = json({ success: true });
+  res.headers.append('Set-Cookie', clearSessionCookie(request.url));
+  return res;
 }
 
 async function handleCheckAuth(request, env) {
   const token = getTokenFromRequest(request);
   if (!token) return json({ valid: false });
-
-  const raw = await env.CASHFLOW_KV.get(`univers:session:${token}`);
+  const raw = await env.CASHFLOW_KV.get('univers:session:' + token);
   if (!raw) return json({ valid: false });
-
-  const session = JSON.parse(raw);
-  return json({ valid: true, role: session.role });
+  return json({ valid: true, role: 'superadmin' });
 }
 
 async function handleChangePassword(request, env) {
-  if (!await requireAdmin(request, env)) return json({ error: 'Non autorisé.' }, 401);
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
 
   const { currentPassword, newPassword } = await request.json();
   if (!currentPassword || !newPassword) return json({ error: 'Champs requis.' }, 400);
-  if (newPassword.length < 10) return json({ error: 'Le nouveau mot de passe doit faire au moins 10 caractères.' }, 400);
+  if (newPassword.length < 10) return json({ error: 'Minimum 10 caractères.' }, 400);
 
-  const creds = await getAdminCredentials(env);
+  const creds = await getUniversCredentials(env);
+  if (!creds) return json({ error: 'Aucun mot de passe enregistré.' }, 400);
+
   const valid = await verifyPassword(currentPassword, creds.salt, creds.hash);
   if (!valid) return json({ error: 'Mot de passe actuel incorrect.' }, 401);
 
   const salt = randomSalt();
   const hash = await hashPassword(newPassword, salt);
-  await env.CASHFLOW_KV.put('univers:admin:credentials', JSON.stringify({ salt, hash, mustChange: false }));
-
+  // Écriture UNIQUEMENT sous univers:
+  await env.CASHFLOW_KV.put('univers:admin:credentials', JSON.stringify({ salt, hash }));
   return json({ success: true });
 }
-
-// ───────────── Router ─────────────
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // API
     try {
       if (path === '/api/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/logout' && request.method === 'POST') return await handleLogout(request, env);
       if (path === '/api/check-auth' && request.method === 'POST') return await handleCheckAuth(request, env);
       if (path === '/api/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
     } catch (e) {
-      console.error('API error', e);
+      console.error(e);
       return json({ error: 'Erreur serveur.' }, 500);
     }
 
-    // Assets (HTML, etc.)
     if (env.ASSETS) {
-      // Racine → index.html
       if (path === '/' || path === '') {
-        const asset = await env.ASSETS.fetch(new URL('/index.html', request.url));
-        return asset;
+        return env.ASSETS.fetch(new URL('/index.html', request.url));
       }
       return env.ASSETS.fetch(request);
     }
-
     return new Response('Not found', { status: 404 });
   }
 };
