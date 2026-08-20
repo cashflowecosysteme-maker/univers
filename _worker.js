@@ -13,6 +13,20 @@ function generateCode() {
   for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return s;
 }
+
+function randomSalt() {
+  return crypto.randomUUID();
+}
+async function hashPassword(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: enc.encode(salt), iterations: 100000, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function hashPasswordAffil(password) {
   const salt = crypto.randomUUID().replace(/-/g, '');
   const data = new TextEncoder().encode(salt + password);
@@ -313,6 +327,156 @@ async function handleDeleteProduct(request, env) {
   return json({ success: true });
 }
 
+
+// Portails configurables (KV univers:portals)
+async function getPortalsList(env) {
+  const raw = await env.CASHFLOW_KV.get('univers:portals');
+  if (raw) {
+    try { return JSON.parse(raw); } catch (_) {}
+  }
+  // Défaut initial
+  const defaults = [
+    { id: 'systemeprompt', name: 'Studio Prompt', active: true },
+    { id: 'cercles', name: 'Les Cercles', active: true },
+    { id: 'repertoire', name: 'Le Répertoire', active: true },
+    { id: 'affiliation', name: 'Affiliation', active: true },
+    { id: 'marketplace', name: 'Marketplace', active: true }
+  ];
+  await env.CASHFLOW_KV.put('univers:portals', JSON.stringify(defaults));
+  return defaults;
+}
+
+async function handleListPortals(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const portals = await getPortalsList(env);
+  return json({ portals });
+}
+
+async function handleSavePortals(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json();
+  let portals = body.portals;
+  if (!Array.isArray(portals)) return json({ error: 'Liste invalide.' }, 400);
+  portals = portals.map(p => ({
+    id: String(p.id || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, ''),
+    name: String(p.name || '').trim(),
+    active: p.active !== false
+  })).filter(p => p.id && p.name);
+  await env.CASHFLOW_KV.put('univers:portals', JSON.stringify(portals));
+  return json({ success: true, portals });
+}
+
+async function handleAddPortal(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json();
+  const id = String(body.id || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  const name = String(body.name || '').trim();
+  if (!id || !name) return json({ error: 'Identifiant et nom requis.' }, 400);
+  const portals = await getPortalsList(env);
+  if (portals.some(p => p.id === id)) return json({ error: 'Ce portail existe déjà.' }, 409);
+  portals.push({ id, name, active: true });
+  await env.CASHFLOW_KV.put('univers:portals', JSON.stringify(portals));
+  return json({ success: true, portals });
+}
+
+async function handleRemovePortal(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json();
+  const id = String(body.id || '').trim();
+  let portals = await getPortalsList(env);
+  portals = portals.filter(p => p.id !== id);
+  await env.CASHFLOW_KV.put('univers:portals', JSON.stringify(portals));
+  return json({ success: true, portals });
+}
+
+// Clients portails (même format KV que Studio : client:email)
+async function handleListPortalClients(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const list = await env.CASHFLOW_KV.list({ prefix: 'client:' });
+  const clients = [];
+  for (const key of list.keys || []) {
+    const raw = await env.CASHFLOW_KV.get(key.name);
+    if (!raw) continue;
+    try {
+      const c = JSON.parse(raw);
+      clients.push({
+        email: c.email || key.name.replace('client:', ''),
+        firstName: c.firstName || '',
+        lastName: c.lastName || '',
+        name: c.name || '',
+        products: c.products || [],
+        active: c.active !== false,
+        createdAt: c.createdAt || ''
+      });
+    } catch (_) {}
+  }
+  clients.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  return json({ clients });
+}
+
+async function handleCreatePortalClient(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json();
+  const email = (body.email || '').toLowerCase().trim();
+  const password = body.password || '';
+  const firstName = (body.firstName || body.prenom || '').trim();
+  const lastName = (body.lastName || '').trim();
+  const products = Array.isArray(body.products) ? body.products : [];
+
+  if (!email || !password) return json({ error: 'Courriel et mot de passe requis.' }, 400);
+  if (password.length < 6) return json({ error: 'Mot de passe : minimum 6 caractères.' }, 400);
+  if (!products.length) return json({ error: 'Sélectionne au moins un portail.' }, 400);
+
+  const existing = await env.CASHFLOW_KV.get('client:' + email);
+  if (existing) return json({ error: 'Ce courriel existe déjà.' }, 409);
+
+  // Hash compatible Studio Prompt (PBKDF2)
+  const salt = randomSalt();
+  const passwordHash = await hashPassword(password, salt);
+
+  const client = {
+    firstName,
+    lastName,
+    name: (firstName + ' ' + lastName).trim() || firstName,
+    email,
+    password,
+    passwordHash,
+    salt,
+    role: 'client',
+    products,
+    active: true,
+    createdAt: new Date().toISOString()
+  };
+  await env.CASHFLOW_KV.put('client:' + email, JSON.stringify(client));
+
+  // Si portail cercles/affiliation : créer aussi en D1 si pas déjà là
+  if (products.includes('cercles') || products.includes('affiliation')) {
+    try {
+      const exists = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+      if (!exists) {
+        const userId = generateId();
+        let code = generateCode();
+        const passwordHashAffil = await hashPasswordAffil(password);
+        await env.DB.prepare(
+          `INSERT INTO users (id, email, password_hash, full_name, role, affiliate_code, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 'affiliate', ?, datetime('now'), datetime('now'))`
+        ).bind(userId, email, passwordHashAffil, firstName || email.split('@')[0], code).run();
+      }
+    } catch (e) { console.error('D1 client', e); }
+  }
+
+  return json({ success: true, email, products });
+}
+
+async function handleDeletePortalClient(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json();
+  const email = (body.email || '').toLowerCase().trim();
+  if (!email) return json({ error: 'Email requis.' }, 400);
+  await env.CASHFLOW_KV.delete('client:' + email);
+  return json({ success: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -330,6 +494,13 @@ export default {
       if (path === '/api/products' && request.method === 'POST') return await handleCreateProduct(request, env);
       if (path === '/api/products/update' && request.method === 'POST') return await handleUpdateProduct(request, env);
       if (path === '/api/products/delete' && request.method === 'POST') return await handleDeleteProduct(request, env);
+      if (path === '/api/portals' && request.method === 'GET') return await handleListPortals(request, env);
+      if (path === '/api/portals' && request.method === 'POST') return await handleSavePortals(request, env);
+      if (path === '/api/portals/add' && request.method === 'POST') return await handleAddPortal(request, env);
+      if (path === '/api/portals/remove' && request.method === 'POST') return await handleRemovePortal(request, env);
+      if (path === '/api/portal-clients' && request.method === 'GET') return await handleListPortalClients(request, env);
+      if (path === '/api/portal-clients' && request.method === 'POST') return await handleCreatePortalClient(request, env);
+      if (path === '/api/portal-clients/delete' && request.method === 'POST') return await handleDeletePortalClient(request, env);
     } catch (e) {
       console.error(e);
       return json({ error: 'Erreur serveur.', detail: String(e.message || e) }, 500);
