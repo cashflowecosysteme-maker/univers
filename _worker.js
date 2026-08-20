@@ -86,10 +86,15 @@ async function getAdminCredentials(env) {
   const raw = await env.CASHFLOW_KV.get('univers:admin:credentials');
   if (raw) return JSON.parse(raw);
 
-  // Premier démarrage : mot de passe par défaut à changer immédiatement
-  // Mot de passe initial : "NyXiaUnivers2026!" (à changer dès la première connexion)
+  // Premier démarrage : mot de passe lu depuis la variable d'environnement
+  // Cloudflare → Worker → Variables / Secrets → ADMIN_INITIAL_PASSWORD
+  const initialPassword = env.ADMIN_INITIAL_PASSWORD;
+  if (!initialPassword || typeof initialPassword !== 'string' || initialPassword.length < 8) {
+    return null; // pas encore configuré
+  }
+
   const salt = randomSalt();
-  const hash = await hashPassword('NyXiaUnivers2026!', salt);
+  const hash = await hashPassword(initialPassword, salt);
   const creds = { salt, hash, mustChange: true };
   await env.CASHFLOW_KV.put('univers:admin:credentials', JSON.stringify(creds));
   return creds;
@@ -109,6 +114,11 @@ async function handleLogin(request, env) {
   if (!password) return json({ error: 'Mot de passe requis.' }, 400);
 
   const creds = await getAdminCredentials(env);
+  if (!creds) {
+    return json({
+      error: 'Mot de passe initial non configuré. Ajoute le secret ADMIN_INITIAL_PASSWORD dans Cloudflare (Variables / Secrets), puis réessaie.'
+    }, 503);
+  }
   const valid = await verifyPassword(password, creds.salt, creds.hash);
   if (!valid) return json({ error: 'Mot de passe incorrect.' }, 401);
 
