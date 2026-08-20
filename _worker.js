@@ -1,22 +1,17 @@
 // ============================================================
-// NyXia — Univers (SuperAdmin central)
-// Auth : secret ADMIN_INITIAL_PASSWORD uniquement
-// KV  : écritures UNIQUEMENT sous le préfixe univers:
-//       (aucune lecture/écriture de admin:credentials ni sessions Studio)
+// NyXia — Les Cercles (cercle.nyxia.top)
+// Worker + HTML — même D1 affiliation-pro-db, même KV
+// Vocabulaire visible : cercle, entraide, partage, marraine, ambassadeur
 // ============================================================
 
-const SESSION_TTL = 60 * 60 * 12; // 12 h
-const COOKIE_NAME = 'nyxia_univers';
+const SESSION_TTL = 60 * 60 * 24 * 7; // 7 jours
+const COOKIE_NAME = 'nyxia_cercle';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'Content-Type': 'application/json' }
   });
-}
-
-function randomSalt() {
-  return crypto.randomUUID();
 }
 
 function randomToken() {
@@ -39,7 +34,25 @@ async function verifyPassword(password, salt, hash) {
   return (await hashPassword(password, salt)) === hash;
 }
 
-function buildSessionCookie(token, maxAge, requestUrl) {
+// Compat : certains comptes Affiliation Pro peuvent avoir un hash différent.
+// On tente d'abord le format salt+hash stocké en JSON ou colonnes séparées.
+async function verifyUserPassword(password, user) {
+  if (!user || !user.password_hash) return false;
+  // Format systemeprompt-like: si password_hash contient "salt:hash"
+  if (user.password_hash.includes(':')) {
+    const [salt, hash] = user.password_hash.split(':');
+    return verifyPassword(password, salt, hash);
+  }
+  // Format Affiliation Pro (lib/auth) — souvent bcrypt ou autre.
+  // On compare en PBKDF2 si salt fourni dans une colonne, sinon échec contrôlé.
+  if (user.salt) {
+    return verifyPassword(password, user.salt, user.password_hash);
+  }
+  // Dernier recours : comparaison directe (à éviter, mais utile si hash déjà brut en test)
+  return password === user.password_hash;
+}
+
+function buildCookie(token, maxAge, requestUrl) {
   const parts = [
     COOKIE_NAME + '=' + token,
     'Path=/',
@@ -57,241 +70,246 @@ function buildSessionCookie(token, maxAge, requestUrl) {
   return parts.join('; ');
 }
 
-function clearSessionCookie(requestUrl) {
+function clearCookie(requestUrl) {
   let domain = '';
   try {
     const host = new URL(requestUrl).hostname;
-    if (host === 'nyxia.top' || host.endsWith('.nyxia.top')) {
-      domain = '; Domain=.nyxia.top';
-    }
+    if (host === 'nyxia.top' || host.endsWith('.nyxia.top')) domain = '; Domain=.nyxia.top';
   } catch (_) {}
   return COOKIE_NAME + '=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax' + domain;
 }
 
-function getTokenFromRequest(request) {
-  const header = request.headers.get('X-Univers-Token');
-  if (header) return header;
-  const cookie = request.headers.get('Cookie') || '';
-  const m = cookie.match(/(?:^|;\s*)nyxia_univers=([^;]+)/);
+function getToken(request) {
+  const h = request.headers.get('X-Cercle-Token');
+  if (h) return h;
+  const c = request.headers.get('Cookie') || '';
+  const m = c.match(/(?:^|;\s*)nyxia_cercle=([^;]+)/);
   return m ? m[1] : null;
 }
 
-// Credentials Univers UNIQUEMENT sous univers:admin:credentials
-// Jamais admin:credentials (réservé au Studio)
-async function getUniversCredentials(env) {
-  const raw = await env.CASHFLOW_KV.get('univers:admin:credentials');
-  if (raw) return JSON.parse(raw);
-  return null;
+async function getSession(request, env) {
+  const token = getToken(request);
+  if (!token) return null;
+  const raw = await env.CASHFLOW_KV.get('cercles:session:' + token);
+  if (!raw) return null;
+  return { token, ...JSON.parse(raw) };
 }
 
-async function requireAdmin(request, env) {
-  const token = getTokenFromRequest(request);
-  if (!token) return false;
-  const raw = await env.CASHFLOW_KV.get('univers:session:' + token);
-  return !!raw;
-}
+// ─── Auth ───
 
 async function handleLogin(request, env) {
-  const body = await request.json();
-  const password = body.password;
-  if (!password) return json({ error: 'Mot de passe requis.' }, 400);
+  const { email, password } = await request.json();
+  if (!email || !password) return json({ error: 'Courriel et mot de passe requis.' }, 400);
 
-  // Le secret Cloudflare fait TOUJOURS autorité.
-  // Aucune clé KV à supprimer de ton côté.
-  const initial = env.ADMIN_INITIAL_PASSWORD;
-  if (!initial || typeof initial !== 'string') {
+  const user = await env.DB.prepare(
+    `SELECT id, email, password_hash, full_name, role, affiliate_code, parent_id, status, created_at
+     FROM users WHERE email = ?`
+  ).bind(email.toLowerCase().trim()).first();
+
+  if (!user) return json({ error: 'Identifiants incorrects.' }, 401);
+
+  // status optionnel selon schéma
+  if (user.status === 'suspended') {
+    return json({ error: 'Ce compte est désactivé. Contacte l’équipe pour le réactiver.' }, 403);
+  }
+
+  // Vérification mot de passe
+  // Les comptes créés par Affiliation Pro utilisent leur propre hash (voir lib/auth du repo).
+  // On supporte : "salt:hash" PBKDF2, ou colonne salt séparée si présente.
+  let valid = false;
+  if (user.password_hash && user.password_hash.includes(':')) {
+    const [salt, hash] = user.password_hash.split(':');
+    valid = await verifyPassword(password, salt, hash);
+  } else {
+    // Tentative via une éventuelle colonne salt — sinon on lit le format stocké tel quel
+    const row = await env.DB.prepare(
+      `SELECT password_hash FROM users WHERE id = ?`
+    ).bind(user.id).first();
+    // Si le projet Affiliation Pro stocke un hash scrypt/bcrypt, la vérif native Worker
+    // nécessitera d'aligner l'algo. Pour l'instant PBKDF2 salt:hash et fallback.
+    valid = false;
+    if (row && row.password_hash) {
+      if (row.password_hash.includes(':')) {
+        const [s, h] = row.password_hash.split(':');
+        valid = await verifyPassword(password, s, h);
+      }
+    }
+  }
+
+  if (!valid) {
+    // Message neutre — on ne révèle pas la cause technique
     return json({
-      error: 'Configure le secret ADMIN_INITIAL_PASSWORD dans Cloudflare (Worker → Variables / Secrets).'
-    }, 503);
-  }
-  if (password !== initial) {
-    return json({ error: 'Mot de passe incorrect.' }, 401);
+      error: 'Identifiants incorrects. Si ton compte vient de l’ancien portail, l’équipe peut réaligner ton accès.'
+    }, 401);
   }
 
-  // Session uniquement (préfixe univers:) — n'écrase aucune clé Studio
   const token = randomToken();
+  const firstName = (user.full_name || '').trim().split(/\s+/)[0] || '';
   await env.CASHFLOW_KV.put(
-    'univers:session:' + token,
-    JSON.stringify({ role: 'superadmin', at: new Date().toISOString() }),
+    'cercles:session:' + token,
+    JSON.stringify({
+      userId: user.id,
+      email: user.email,
+      firstName,
+      role: user.role,
+      affiliateCode: user.affiliate_code
+    }),
     { expirationTtl: SESSION_TTL }
   );
 
-  const res = json({ success: true, token });
-  res.headers.append('Set-Cookie', buildSessionCookie(token, SESSION_TTL, request.url));
+  // last_login si la colonne existe (ignoré sinon)
+  try {
+    await env.DB.prepare(
+      `UPDATE users SET updated_at = datetime('now') WHERE id = ?`
+    ).bind(user.id).run();
+  } catch (_) {}
+
+  const res = json({
+    success: true,
+    token,
+    firstName,
+    affiliateCode: user.affiliate_code,
+    role: user.role
+  });
+  res.headers.append('Set-Cookie', buildCookie(token, SESSION_TTL, request.url));
   return res;
 }
 
 async function handleLogout(request, env) {
-  const token = getTokenFromRequest(request);
-  if (token) await env.CASHFLOW_KV.delete('univers:session:' + token);
+  const token = getToken(request);
+  if (token) await env.CASHFLOW_KV.delete('cercles:session:' + token);
   const res = json({ success: true });
-  res.headers.append('Set-Cookie', clearSessionCookie(request.url));
+  res.headers.append('Set-Cookie', clearCookie(request.url));
   return res;
 }
 
 async function handleCheckAuth(request, env) {
-  const token = getTokenFromRequest(request);
-  if (!token) return json({ valid: false });
-  const raw = await env.CASHFLOW_KV.get('univers:session:' + token);
-  if (!raw) return json({ valid: false });
-  return json({ valid: true, role: 'superadmin' });
-}
-
-async function handleChangePassword(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  // Le mot de passe est géré uniquement via le secret Cloudflare ADMIN_INITIAL_PASSWORD.
+  const session = await getSession(request, env);
+  if (!session) return json({ valid: false });
   return json({
-    error: 'Pour changer le mot de passe, modifie le secret ADMIN_INITIAL_PASSWORD dans Cloudflare (Worker → Variables / Secrets), puis reconnecte-toi.'
-  }, 400);
+    valid: true,
+    email: session.email,
+    firstName: session.firstName,
+    role: session.role,
+    affiliateCode: session.affiliateCode
+  });
 }
 
+// ─── Dashboard ───
 
-// ─── Membres (D1 partagée) ───
+async function handleDashboard(request, env) {
+  const session = await getSession(request, env);
+  if (!session) return json({ error: 'Session expirée.' }, 401);
 
-function generateId() {
-  return crypto.randomUUID();
-}
+  const userId = session.userId;
 
-function generateCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let s = '';
-  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
-}
+  // Profil
+  const profile = await env.DB.prepare(
+    `SELECT id, email, full_name, affiliate_code, role, parent_id, created_at
+     FROM users WHERE id = ?`
+  ).bind(userId).first();
 
-async function handleListMembers(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  if (!env.DB) return json({ error: 'Base D1 non liée.' }, 500);
+  if (!profile) return json({ error: 'Profil introuvable.' }, 404);
 
-  const rows = await env.DB.prepare(
-    `SELECT id, email, full_name, role, affiliate_code, parent_id, created_at, updated_at
-     FROM users
-     ORDER BY created_at DESC
-     LIMIT 200`
-  ).all();
+  const firstName = (profile.full_name || '').trim().split(/\s+/)[0] || session.firstName || '';
 
-  const members = (rows.results || []).map((u) => {
-    const prenom = (u.full_name || '').trim().split(/\s+/)[0] || '—';
+  // Enregistrement affilié (cercle)
+  const affiliate = await env.DB.prepare(
+    `SELECT id, affiliate_link, parent_affiliate_id, grandparent_affiliate_id,
+            total_earnings, total_referrals, status, created_at
+     FROM affiliates WHERE user_id = ? LIMIT 1`
+  ).bind(userId).first();
+
+  // Cercle direct (niveau 1) : users dont parent_id = moi
+  const l1 = await env.DB.prepare(
+    `SELECT id, email, full_name, affiliate_code, created_at
+     FROM users WHERE parent_id = ? ORDER BY created_at DESC`
+  ).bind(userId).all();
+
+  const l1Rows = l1.results || [];
+  const l1Ids = l1Rows.map(r => r.id);
+
+  // Niveau 2 : parent_id dans L1
+  let l2Rows = [];
+  if (l1Ids.length) {
+    const ph = l1Ids.map(() => '?').join(',');
+    const l2 = await env.DB.prepare(
+      `SELECT id, email, full_name, affiliate_code, parent_id, created_at
+       FROM users WHERE parent_id IN (${ph}) ORDER BY created_at DESC`
+    ).bind(...l1Ids).all();
+    l2Rows = l2.results || [];
+  }
+
+  const l2Ids = l2Rows.map(r => r.id);
+  let l3Rows = [];
+  if (l2Ids.length) {
+    const ph = l2Ids.map(() => '?').join(',');
+    const l3 = await env.DB.prepare(
+      `SELECT id, email, full_name, affiliate_code, parent_id, created_at
+       FROM users WHERE parent_id IN (${ph}) ORDER BY created_at DESC`
+    ).bind(...l2Ids).all();
+    l3Rows = l3.results || [];
+  }
+
+  // Lien de partage
+  const siteUrl = env.SITE_URL || 'https://cercle.nyxia.top';
+  const shareLink = profile.affiliate_code
+    ? `${siteUrl}/r/${profile.affiliate_code}`
+    : null;
+
+  // Messages (si table messages existe)
+  let messages = [];
+  try {
+    const msg = await env.DB.prepare(
+      `SELECT id, subject, content, read_at, created_at, sender_id
+       FROM messages
+       WHERE recipient_id = ? OR (is_broadcast = 1)
+       ORDER BY created_at DESC LIMIT 20`
+    ).bind(userId).all();
+    messages = msg.results || [];
+  } catch (_) {}
+
+  // Mise en forme : prénom uniquement côté visible
+  function mapMember(row) {
+    const prenom = (row.full_name || '').trim().split(/\s+/)[0] || '—';
     return {
-      id: u.id,
-      email: u.email,
+      id: row.id,
       prenom,
-      role: u.role,
-      code: u.affiliate_code,
-      parentId: u.parent_id,
-      depuis: u.created_at
+      code: row.affiliate_code,
+      depuis: row.created_at
     };
-  });
-
-  return json({ members });
-}
-
-async function handleCreateMember(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  if (!env.DB) return json({ error: 'Base D1 non liée.' }, 500);
-
-  const body = await request.json();
-  const prenom = (body.prenom || '').trim();
-  const email = (body.email || '').toLowerCase().trim();
-  const password = body.password || '';
-  const parentCode = (body.parentCode || '').trim().toUpperCase();
-
-  if (!prenom || !email || !password) {
-    return json({ error: 'Prénom, courriel et mot de passe requis.' }, 400);
-  }
-  if (password.length < 6) {
-    return json({ error: 'Mot de passe : minimum 6 caractères.' }, 400);
-  }
-
-  const existing = await env.DB.prepare(
-    `SELECT id FROM users WHERE email = ?`
-  ).bind(email).first();
-  if (existing) return json({ error: 'Ce courriel existe déjà.' }, 409);
-
-  let parentId = null;
-  if (parentCode) {
-    const parent = await env.DB.prepare(
-      `SELECT id FROM users WHERE affiliate_code = ?`
-    ).bind(parentCode).first();
-    if (!parent) return json({ error: 'Code de rattachement introuvable.' }, 400);
-    parentId = parent.id;
-  }
-
-  // Code unique
-  let code = generateCode();
-  for (let i = 0; i < 5; i++) {
-    const clash = await env.DB.prepare(
-      `SELECT id FROM users WHERE affiliate_code = ?`
-    ).bind(code).first();
-    if (!clash) break;
-    code = generateCode();
-  }
-
-  const salt = randomSalt();
-  const hash = await hashPassword(password, salt);
-  const passwordHash = salt + ':' + hash;
-  const userId = generateId();
-
-  await env.DB.prepare(
-    `INSERT INTO users (id, email, password_hash, full_name, role, affiliate_code, parent_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'affiliate', ?, ?, datetime('now'), datetime('now'))`
-  ).bind(userId, email, passwordHash, prenom, code, parentId).run();
-
-  // Enregistrement affiliates si programme actif
-  try {
-    const program = await env.DB.prepare(
-      `SELECT id FROM programs WHERE is_active = 1 LIMIT 1`
-    ).first();
-    if (program) {
-      let parentAffId = null;
-      let grandparentAffId = null;
-      if (parentId) {
-        const pAff = await env.DB.prepare(
-          `SELECT id, parent_affiliate_id FROM affiliates WHERE user_id = ? LIMIT 1`
-        ).bind(parentId).first();
-        if (pAff) {
-          parentAffId = pAff.id;
-          grandparentAffId = pAff.parent_affiliate_id || null;
-        }
-      }
-      const siteUrl = env.SITE_URL || 'https://cercle.nyxia.top';
-      const affId = generateId();
-      const link = siteUrl.replace('univers.', 'cercle.') + '/r/' + code;
-      await env.DB.prepare(
-        `INSERT INTO affiliates (id, program_id, user_id, affiliate_link, parent_affiliate_id, grandparent_affiliate_id, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'))`
-      ).bind(affId, program.id, userId, link, parentAffId, grandparentAffId).run();
-    }
-  } catch (e) {
-    console.error('affiliates insert', e);
   }
 
   return json({
-    success: true,
-    member: { id: userId, email, prenom, code }
+    profil: {
+      prenom: firstName,
+      code: profile.affiliate_code,
+      role: profile.role,
+      depuis: profile.created_at
+    },
+    lienPartage: shareLink,
+    cercle: {
+      direct: l1Rows.map(mapMember),
+      deuxieme: l2Rows.map(mapMember),
+      troisieme: l3Rows.map(mapMember),
+      totaux: {
+        direct: l1Rows.length,
+        deuxieme: l2Rows.length,
+        troisieme: l3Rows.length
+      }
+    },
+    // "ce qui revient" — montants techniques restés en coulisses dans total_earnings
+    // On expose un total neutre sans jargon
+    bilan: {
+      total: affiliate ? Number(affiliate.total_earnings || 0) : 0,
+      partageages: affiliate ? Number(affiliate.total_referrals || 0) : 0,
+      statut: affiliate ? affiliate.status : null
+    },
+    messages
   });
 }
 
-
-
-async function handleDeleteMember(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  if (!env.DB) return json({ error: 'Base D1 non liée.' }, 500);
-
-  const body = await request.json();
-  const id = (body.id || '').trim();
-  if (!id) return json({ error: 'Identifiant requis.' }, 400);
-
-  // Nettoyer affiliates liés
-  try {
-    await env.DB.prepare(`DELETE FROM affiliates WHERE user_id = ?`).bind(id).run();
-  } catch (e) {
-    console.error('delete affiliates', e);
-  }
-
-  await env.DB.prepare(`DELETE FROM users WHERE id = ?`).bind(id).run();
-  return json({ success: true });
-}
+// ─── Router ───
 
 export default {
   async fetch(request, env) {
@@ -302,18 +320,20 @@ export default {
       if (path === '/api/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/logout' && request.method === 'POST') return await handleLogout(request, env);
       if (path === '/api/check-auth' && request.method === 'POST') return await handleCheckAuth(request, env);
-      if (path === '/api/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
-      if (path === '/api/members' && request.method === 'GET') return await handleListMembers(request, env);
-      if (path === '/api/members' && request.method === 'POST') return await handleCreateMember(request, env);
-      if (path === '/api/members/delete' && request.method === 'POST') return await handleDeleteMember(request, env);
+      if (path === '/api/dashboard' && request.method === 'POST') return await handleDashboard(request, env);
+
+      // Redirection lien de partage /r/CODE → page d'accueil ou inscription (à brancher)
+      if (path.startsWith('/r/')) {
+        return Response.redirect(url.origin + '/login.html?ref=' + encodeURIComponent(path.slice(3)), 302);
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Cercles error', e);
       return json({ error: 'Erreur serveur.' }, 500);
     }
 
     if (env.ASSETS) {
       if (path === '/' || path === '') {
-        return env.ASSETS.fetch(new URL('/index.html', request.url));
+        return env.ASSETS.fetch(new URL('/login.html', request.url));
       }
       return env.ASSETS.fetch(request);
     }
