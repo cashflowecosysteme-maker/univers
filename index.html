@@ -68,6 +68,8 @@ td strong{color:#fff}
     <button class="module-tab" data-module="admins" onclick="switchModule('admins')">Admin commerçants</button>
     <button class="module-tab" data-module="promoteurs" onclick="switchModule('promoteurs')">Promoteurs</button>
     <button class="module-tab" data-module="produits" onclick="switchModule('produits')">Produits SuperAdmin</button>
+    <button class="module-tab" data-module="portails" onclick="switchModule('portails')">Portails</button>
+    <button class="module-tab" data-module="clients" onclick="switchModule('clients')">Clients portails</button>
     <button class="module-tab" data-module="outils" onclick="switchModule('outils')">Outils</button>
   </nav>
   <div class="main">
@@ -140,6 +142,45 @@ td strong{color:#fff}
         <div id="pr-list">—</div>
       </div>
     </div>
+    
+    <div class="module-panel" id="module-portails">
+      <div class="panel">
+        <h3>Ajouter un portail</h3>
+        <div class="grid2">
+          <div><label class="f">Identifiant technique *</label><input class="f" id="portal-id" placeholder="ex: mon-portail"></div>
+          <div><label class="f">Nom affiché *</label><input class="f" id="portal-name" placeholder="ex: Mon Portail"></div>
+        </div>
+        <button class="btn" style="margin-top:12px" onclick="addPortal()">Ajouter le portail</button>
+        <div class="msg" id="portal-msg"></div>
+      </div>
+      <div class="panel">
+        <h3>Portails inscrits</h3>
+        <p class="hint" style="margin-bottom:12px">Tu peux retirer un portail de la liste. Les clients déjà inscrits gardent leur historique.</p>
+        <div id="portal-list">—</div>
+      </div>
+    </div>
+    <div class="module-panel" id="module-clients">
+      <div class="panel">
+        <h3>Inscrire un client à un ou plusieurs portails</h3>
+        <div class="grid2">
+          <div><label class="f">Prénom *</label><input class="f" id="cl-prenom"></div>
+          <div><label class="f">Nom</label><input class="f" id="cl-nom"></div>
+          <div><label class="f">Courriel *</label><input class="f" type="email" id="cl-email"></div>
+          <div><label class="f">Mot de passe *</label><input class="f" id="cl-password" placeholder="Min. 6 caractères"></div>
+        </div>
+        <div style="margin-top:12px">
+          <label class="f">Portails d’accès *</label>
+          <div id="cl-portals-checks" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div>
+        </div>
+        <button class="btn" style="margin-top:14px" onclick="createPortalClient()">Créer le compte client</button>
+        <div class="msg" id="cl-msg"></div>
+      </div>
+      <div class="panel">
+        <h3>Clients inscrits</h3>
+        <div id="cl-list">—</div>
+      </div>
+    </div>
+
     <div class="module-panel" id="module-outils">
       <div class="panel">
         <h3>Outils d’équipe</h3>
@@ -151,6 +192,84 @@ td strong{color:#fff}
 <script src="/starry-bg.js" defer></script>
 <script>
 var TOKEN=null, TOKEN_KEY='nyxia_univers_token';
+
+async function loadPortals(){
+  try{
+    var out=await api('/api/portals','GET');
+    var list=out.data.portals||[];
+    window._portals=list;
+    var box=document.getElementById('portal-list');
+    if(!box) return;
+    if(!list.length){ box.textContent='Aucun portail.'; return; }
+    box.innerHTML='<table><tr><th>Identifiant</th><th>Nom</th><th>Actif</th><th></th></tr>'+list.map(function(p){
+      return '<tr><td>'+esc(p.id)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+(p.active!==false?'oui':'non')+'</td>'
+        +'<td><button class="btn btn-danger" type="button" onclick="removePortal(\\''+esc(p.id)+'\\')">Retirer</button></td></tr>';
+    }).join('')+'</table>';
+    // checkboxes clients
+    var checks=document.getElementById('cl-portals-checks');
+    if(checks){
+      checks.innerHTML=list.filter(function(p){return p.active!==false;}).map(function(p){
+        return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--t2)"><input type="checkbox" class="cl-portal-cb" value="'+esc(p.id)+'"> '+esc(p.name)+'</label>';
+      }).join('')||'<span class="hint">Ajoute d’abord un portail.</span>';
+    }
+  }catch(e){ var b=document.getElementById('portal-list'); if(b) b.textContent=e.message; }
+}
+async function addPortal(){
+  var id=document.getElementById('portal-id').value.trim();
+  var name=document.getElementById('portal-name').value.trim();
+  try{
+    var out=await api('/api/portals/add','POST',{id:id,name:name});
+    showMsg('portal-msg', out.data.success?'Portail ajouté.':(out.data.error||'Erreur'), !!out.data.success);
+    if(out.data.success){ document.getElementById('portal-id').value=''; document.getElementById('portal-name').value=''; loadPortals(); }
+  }catch(e){ showMsg('portal-msg', e.message, false); }
+}
+async function removePortal(id){
+  if(!confirm('Retirer ce portail de la liste ?')) return;
+  await api('/api/portals/remove','POST',{id:id});
+  loadPortals();
+}
+async function loadPortalClients(){
+  var box=document.getElementById('cl-list'); if(!box) return;
+  box.textContent='Chargement…';
+  try{
+    var out=await api('/api/portal-clients','GET');
+    var list=out.data.clients||[];
+    if(!list.length){ box.textContent='Aucun client.'; return; }
+    box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Portails</th><th>Depuis</th><th></th></tr>'+list.map(function(c){
+      return '<tr><td><strong>'+esc(c.firstName||c.name||'—')+'</strong></td><td>'+esc(c.email)+'</td><td>'+esc((c.products||[]).join(', '))+'</td><td>'+esc((c.createdAt||'').slice(0,10))+'</td>'
+        +'<td><button class="btn btn-danger" type="button" onclick="delPortalClient(\\''+esc(c.email)+'\\')">Supprimer</button></td></tr>';
+    }).join('')+'</table>';
+  }catch(e){ box.textContent=e.message; }
+}
+async function createPortalClient(){
+  var products=[];
+  document.querySelectorAll('.cl-portal-cb:checked').forEach(function(cb){ products.push(cb.value); });
+  var body={
+    firstName:document.getElementById('cl-prenom').value.trim(),
+    lastName:document.getElementById('cl-nom').value.trim(),
+    email:document.getElementById('cl-email').value.trim(),
+    password:document.getElementById('cl-password').value,
+    products:products
+  };
+  try{
+    var out=await api('/api/portal-clients','POST',body);
+    if(out.data.success){
+      showMsg('cl-msg','Client créé : '+body.email+' — MDP : '+body.password,true);
+      document.getElementById('cl-prenom').value='';
+      document.getElementById('cl-nom').value='';
+      document.getElementById('cl-email').value='';
+      document.getElementById('cl-password').value='';
+      document.querySelectorAll('.cl-portal-cb').forEach(function(cb){cb.checked=false;});
+      loadPortalClients();
+    } else showMsg('cl-msg', out.data.error||'Erreur', false);
+  }catch(e){ showMsg('cl-msg', e.message, false); }
+}
+async function delPortalClient(email){
+  if(!confirm('Supprimer ce client ?')) return;
+  await api('/api/portal-clients/delete','POST',{email:email});
+  loadPortalClients();
+}
+
 function switchModule(name){
   document.querySelectorAll('.module-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-module')===name);});
   document.querySelectorAll('.module-panel').forEach(function(p){p.classList.toggle('active',p.id==='module-'+name);});
@@ -158,6 +277,8 @@ function switchModule(name){
   if(name==='admins') loadMembers('admin','a-list');
   if(name==='promoteurs') loadMembers('affiliate','p-list');
   if(name==='produits') loadProducts();
+  if(name==='portails'){ loadPortals(); }
+  if(name==='clients'){ loadPortals(); loadPortalClients(); }
 }
 function showMsg(id,text,ok){var el=document.getElementById(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text;el.style.display='block';}
 async function api(path,method,body){
