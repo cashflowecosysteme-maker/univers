@@ -1,342 +1,643 @@
-// ============================================================
-// NyXia — Les Cercles (cercle.nyxia.top)
-// Worker + HTML — même D1 affiliation-pro-db, même KV
-// Vocabulaire visible : cercle, entraide, partage, marraine, ambassadeur
-// ============================================================
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" href="https://portail-prompts.nyxia.top/FavIcon.png">
+<title>NyXia · Univers</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg1: #0F1C3F;
+  --bg2: #1A2554;
+  --bg3: #2A3A6E;
+  --p: #7B5CFF;
+  --p2: #5A6CFF;
+  --p3: #4FA3FF;
+  --glow: rgba(123,92,255,0.4);
+  --t: #FFFFFF;
+  --t2: #D6D9F0;
+  --t3: #8891B8;
+  --green: #00E676;
+  --red: #ff6b6b;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg1);
+  color: var(--t);
+  line-height: 1.65;
+  overflow: hidden;
+}
 
-const SESSION_TTL = 60 * 60 * 24 * 7; // 7 jours
-const COOKIE_NAME = 'nyxia_cercle';
+canvas#starry-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.login-gate, .app { position: relative; z-index: 1; }
+.login-gate { background: transparent; }
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' }
+
+canvas#starry-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.login-gate, .app { position: relative; z-index: 1; }
+.login-gate { background: transparent; }
+
+button { font-family: 'Space Grotesk', sans-serif; cursor: pointer; }
+input, textarea, select { font-family: 'Outfit', sans-serif; }
+
+/* ═══ LOGIN GATE ═══ */
+.login-gate {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+}
+.login-gate.hidden { display: none; }
+.login-card {
+  width: 100%; max-width: 400px; margin: 20px;
+  background: var(--bg2);
+  border: 1px solid rgba(123,92,255,0.25);
+  border-radius: 24px; padding: 40px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+}
+.login-logo { text-align: center; margin-bottom: 28px; }
+.login-logo h2 {
+  font-family: 'Orbitron', monospace;
+  font-size: 22px; font-weight: 700;
+  background: linear-gradient(135deg, #a78bfa, var(--p3));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.login-logo p { font-size: 13px; color: var(--t3); margin-top: 8px; }
+.login-field { margin-bottom: 18px; }
+.login-field label {
+  display: block; font-size: 11px; font-weight: 700;
+  color: var(--t3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px;
+}
+.login-field input {
+  width: 100%; padding: 14px 16px; border-radius: 12px;
+  border: 1px solid rgba(123,92,255,0.25);
+  background: rgba(15,28,63,0.7); color: var(--t); font-size: 15px; outline: none;
+}
+.login-field input:focus { border-color: var(--p); box-shadow: 0 0 20px rgba(123,92,255,0.2); }
+.login-btn {
+  width: 100%; padding: 14px; border-radius: 12px; border: none;
+  background: linear-gradient(135deg, var(--p), var(--p2));
+  color: #fff; font-size: 14px; font-weight: 700; margin-top: 8px;
+  transition: transform .15s, box-shadow .15s;
+}
+.login-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(123,92,255,0.35); }
+.login-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.login-msg {
+  margin-top: 14px; padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; display: none;
+}
+.login-msg.error { display: block; background: rgba(255,107,107,0.12); color: var(--red); border: 1px solid rgba(255,107,107,0.25); }
+.login-msg.success { display: block; background: rgba(0,230,118,0.1); color: var(--green); border: 1px solid rgba(0,230,118,0.25); }
+
+/* ═══ APP ═══ */
+.app { display: none; height: 100%; flex-direction: column; }
+.app.visible { display: flex; }
+
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 24px;
+  background: rgba(15,28,63,0.85);
+  border-bottom: 1px solid rgba(123,92,255,0.15);
+  flex-shrink: 0;
+}
+.header-logo {
+  display: flex; align-items: center; gap: 12px;
+}
+.header-logo h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: 18px; font-weight: 700;
+  background: linear-gradient(135deg, #a78bfa, var(--p3));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.header-logo span { font-size: 12px; color: var(--t3); }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.btn-header {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(123,92,255,0.3);
+  background: rgba(123,92,255,0.1); color: var(--p3);
+  font-size: 12px; font-weight: 600; text-decoration: none;
+}
+.btn-header:hover { background: rgba(123,92,255,0.2); }
+.btn-logout {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(255,107,107,0.3);
+  background: rgba(255,107,107,0.1); color: var(--red);
+  font-size: 12px; font-weight: 600;
+}
+
+/* Module nav */
+.module-nav {
+  display: flex; gap: 4px; padding: 10px 20px 0;
+  background: rgba(15,28,63,0.5);
+  border-bottom: 1px solid rgba(123,92,255,0.12);
+  overflow-x: auto; flex-shrink: 0;
+}
+.module-tab {
+  padding: 10px 16px;
+  border-radius: 10px 10px 0 0;
+  border: 1px solid transparent; border-bottom: none;
+  background: transparent; color: var(--t3);
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap; transition: all .2s;
+}
+.module-tab:hover { color: var(--t2); background: rgba(123,92,255,0.08); }
+.module-tab.active {
+  color: #fff;
+  background: rgba(123,92,255,0.18);
+  border-color: rgba(123,92,255,0.3);
+}
+.module-tab .soon {
+  font-size: 9px; background: rgba(123,92,255,0.25); color: var(--p3);
+  padding: 2px 6px; border-radius: 6px; margin-left: 6px;
+}
+
+.main {
+  flex: 1; overflow-y: auto; padding: 24px;
+}
+.module-panel { display: none; }
+.module-panel.active { display: block; }
+
+.placeholder {
+  text-align: center; padding: 60px 24px; color: var(--t3);
+}
+.placeholder h3 {
+  font-family: 'Orbitron', monospace;
+  font-size: 18px; color: var(--t2); margin-bottom: 12px;
+}
+.placeholder p { max-width: 440px; margin: 0 auto 12px; font-size: 14px; line-height: 1.7; }
+.placeholder .hint { font-size: 12px; opacity: .7; }
+
+.outils-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.outil-card {
+  background: rgba(26,37,84,0.55);
+  border: 1px solid rgba(123,92,255,0.2);
+  border-radius: 16px; padding: 24px 20px;
+  text-decoration: none; color: var(--t2);
+  transition: all .2s; display: block;
+}
+.outil-card:hover {
+  border-color: rgba(123,92,255,0.45);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+}
+.outil-card .icon { font-size: 28px; margin-bottom: 12px; }
+.outil-card h4 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.outil-card p { font-size: 12px; color: var(--t3); margin: 0; line-height: 1.5; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,0.65);
+  display: none; align-items: center; justify-content: center;
+}
+.modal-overlay.visible { display: flex; }
+.modal {
+  background: var(--bg2); border: 1px solid rgba(123,92,255,0.25);
+  border-radius: 20px; padding: 28px; width: 100%; max-width: 400px; margin: 20px;
+}
+.modal h3 { font-size: 16px; margin-bottom: 16px; }
+.modal .field { margin-bottom: 14px; }
+.modal label { display: block; font-size: 11px; font-weight: 700; color: var(--t3); margin-bottom: 6px; text-transform: uppercase; }
+.modal input {
+  width: 100%; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid rgba(123,92,255,0.25); background: rgba(15,28,63,0.7);
+  color: var(--t); font-size: 14px; outline: none;
+}
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+.btn-primary {
+  flex: 1; padding: 12px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, var(--p), var(--p2));
+  color: #fff; font-weight: 700; font-size: 13px;
+}
+.btn-secondary {
+  flex: 1; padding: 12px; border-radius: 10px;
+  border: 1px solid rgba(123,92,255,0.3); background: transparent;
+  color: var(--t2); font-weight: 600; font-size: 13px;
+}
+.modal-msg { margin-top: 12px; font-size: 13px; display: none; }
+.modal-msg.error { display: block; color: var(--red); }
+.modal-msg.success { display: block; color: var(--green); }
+</style>
+</head>
+<body>
+<canvas id="starry-canvas"></canvas>
+
+<!-- ═══ LOGIN ═══ -->
+<div class="login-gate" id="loginGate">
+  <div class="login-card">
+    <div class="login-logo">
+      <h2>NyXia · Univers</h2>
+      <p>Espace réservé à l’équipe</p>
+    </div>
+    <div class="login-field">
+      <label>Mot de passe</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="btn-login" onclick="doLogin()">Entrer</button>
+    <div class="login-msg" id="login-msg"></div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div class="app" id="app">
+  <div class="header">
+    <div class="header-logo">
+      <h1>NyXia</h1>
+      <span>Univers</span>
+    </div>
+    <div class="header-right">
+      <button class="btn-header" onclick="openChangePwd()">Mot de passe</button>
+      <button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+    </div>
+  </div>
+
+  <nav class="module-nav">
+    <button class="module-tab active" data-module="membres" onclick="switchModule('membres')">Membres</button>
+    <button class="module-tab" data-module="produits" onclick="switchModule('produits')">Produits</button>
+    <button class="module-tab" data-module="cercles" onclick="switchModule('cercles')">Les Cercles</button>
+    <button class="module-tab" data-module="repertoire" onclick="switchModule('repertoire')">Le Répertoire</button>
+    <button class="module-tab" data-module="outils" onclick="switchModule('outils')">Outils</button>
+  </nav>
+
+  <div class="main">
+
+    <!-- Membres -->
+    <div class="module-panel active" id="module-membres">
+      <div class="panel" style="background:rgba(26,37,84,0.55);border:1px solid rgba(123,92,255,0.2);border-radius:16px;padding:20px;margin-bottom:20px">
+        <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:14px">Créer un compte</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Prénom *</label>
+            <input type="text" id="m-prenom" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Courriel *</label>
+            <input type="email" id="m-email" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Mot de passe *</label>
+            <input type="text" id="m-password" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px" placeholder="Min. 6 caractères">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Code de rattachement</label>
+            <input type="text" id="m-parent" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px" placeholder="Laisser vide = compte d’origine">
+          </div>
+        </div>
+        <button type="button" onclick="createMember()" style="margin-top:14px;padding:12px 18px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-weight:700;font-size:13px;cursor:pointer">Créer le compte</button>
+        <div id="m-msg" style="margin-top:12px;font-size:13px;display:none"></div>
+      </div>
+      <div class="panel" style="background:rgba(26,37,84,0.55);border:1px solid rgba(123,92,255,0.2);border-radius:16px;padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:15px;font-weight:700;color:#fff">Comptes</div>
+          <button type="button" onclick="loadMembers()" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(123,92,255,0.3);background:rgba(123,92,255,0.1);color:var(--p3);font-size:12px;cursor:pointer">Actualiser</button>
+        </div>
+        <div id="m-list" style="font-size:13px;color:var(--t3)">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Produits -->
+    <div class="module-panel" id="module-produits">
+      <div class="placeholder">
+        <h3>Produits</h3>
+        <p>Quels espaces chaque personne peut rejoindre : Studio Prompt, Les Cercles, Le Répertoire, et les prochains.</p>
+        <p class="hint">Attribution d’accès centralisée. Branchement à venir.</p>
+      </div>
+    </div>
+
+    <!-- Les Cercles -->
+    <div class="module-panel" id="module-cercles">
+      <div class="placeholder">
+        <h3>Les Cercles</h3>
+        <p>Vue d’ensemble des cercles d’entraide et de partage. Cercles direct / 2ᵉ / 3ᵉ, personnes jamais connectées, relances.</p>
+        <p class="hint">Module principal de la prochaine étape.</p>
+      </div>
+    </div>
+
+    <!-- Le Répertoire -->
+    <div class="module-panel" id="module-repertoire">
+      <div class="placeholder">
+        <h3>Le Répertoire</h3>
+        <p>Praticiennes, accompagnements et offres du réseau. Gestion centralisée.</p>
+        <p class="hint">À brancher après Les Cercles.</p>
+      </div>
+    </div>
+
+    <!-- Outils -->
+    <div class="module-panel" id="module-outils">
+      <div class="outils-grid">
+        <a class="outil-card" href="https://portail-prompts.nyxia.top/ingestion.html" target="_blank" rel="noopener">
+          <div class="icon">📚</div>
+          <h4>Ingestion</h4>
+          <p>Charger et indexer les livres et documents dans la base de connaissances.</p>
+        </a>
+        <a class="outil-card" href="https://portail-prompts.nyxia.top/pdf-to-markdown.html" target="_blank" rel="noopener">
+          <div class="icon">📄</div>
+          <h4>PDF → Markdown</h4>
+          <p>Convertir des PDF en Markdown propre pour l’ingestion.</p>
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal changement mot de passe -->
+<div class="modal-overlay" id="pwdModal">
+  <div class="modal">
+    <h3>Changer le mot de passe</h3>
+    <div class="field">
+      <label>Mot de passe actuel</label>
+      <input type="password" id="pwd-current">
+    </div>
+    <div class="field">
+      <label>Nouveau mot de passe</label>
+      <input type="password" id="pwd-new" placeholder="Min. 10 caractères">
+    </div>
+    <div class="field">
+      <label>Confirmation</label>
+      <input type="password" id="pwd-confirm">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="savePassword()">Enregistrer</button>
+      <button class="btn-secondary" onclick="closeChangePwd()">Annuler</button>
+    </div>
+    <div class="modal-msg" id="pwd-msg"></div>
+  </div>
+</div>
+
+<script>
+var TOKEN = null;
+var TOKEN_KEY = 'nyxia_univers_token';
+
+
+async function apiMembers(method, body) {
+  var opts = {
+    method: method,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Univers-Token': TOKEN || ''
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  var res = await fetch('/api/members', opts);
+  var data = await res.json();
+  if (res.status === 401) { doLogout(); throw new Error('Session expirée'); }
+  return { res: res, data: data };
+}
+
+function showMMsg(text, ok) {
+  var el = document.getElementById('m-msg');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.color = ok ? 'var(--green)' : 'var(--red)';
+  el.textContent = text;
+}
+
+async function loadMembers() {
+  var box = document.getElementById('m-list');
+  if (!box) return;
+  box.textContent = 'Chargement…';
+  try {
+    var out = await apiMembers('GET');
+    if (out.data.error) { box.textContent = out.data.error; return; }
+    var list = out.data.members || [];
+    if (!list.length) { box.textContent = 'Aucun compte pour le moment.'; return; }
+    box.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+      '<tr style="text-align:left;color:var(--t3);font-size:11px;text-transform:uppercase"><th style="padding:8px 6px">Prénom</th><th style="padding:8px 6px">Courriel</th><th style="padding:8px 6px">Code</th><th style="padding:8px 6px">Depuis</th><th style="padding:8px 6px"></th></tr>' +
+      list.map(function(m) {
+        return '<tr style="border-top:1px solid rgba(123,92,255,0.12)">' +
+          '<td style="padding:10px 6px;color:#fff">' + escapeHtml(m.prenom) + '</td>' +
+          '<td style="padding:10px 6px">' + escapeHtml(m.email) + '</td>' +
+          '<td style="padding:10px 6px">' + escapeHtml(m.code || '—') + '</td>' +
+          '<td style="padding:10px 6px">' + escapeHtml((m.depuis || '').slice(0, 10)) + '</td>' +
+          '<td style="padding:10px 6px"><button type="button" onclick="deleteMember(\'' + escapeHtml(m.id) + '\', \'' + escapeHtml(m.prenom) + '\')" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,107,107,0.35);background:rgba(255,107,107,0.12);color:var(--red);font-size:11px;cursor:pointer">Supprimer</button></td></tr>';
+      }).join('') + '</table></div>';
+  } catch (e) {
+    box.textContent = e.message || 'Erreur de chargement';
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, function(c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
   });
 }
 
-function randomToken() {
-  return crypto.randomUUID() + crypto.randomUUID();
-}
-
-async function hashPassword(password, salt) {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: enc.encode(salt), iterations: 100000, hash: 'SHA-256' },
-    keyMaterial, 256
-  );
-  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function verifyPassword(password, salt, hash) {
-  return (await hashPassword(password, salt)) === hash;
-}
-
-// Compat : certains comptes Affiliation Pro peuvent avoir un hash différent.
-// On tente d'abord le format salt+hash stocké en JSON ou colonnes séparées.
-async function verifyUserPassword(password, user) {
-  if (!user || !user.password_hash) return false;
-  // Format systemeprompt-like: si password_hash contient "salt:hash"
-  if (user.password_hash.includes(':')) {
-    const [salt, hash] = user.password_hash.split(':');
-    return verifyPassword(password, salt, hash);
-  }
-  // Format Affiliation Pro (lib/auth) — souvent bcrypt ou autre.
-  // On compare en PBKDF2 si salt fourni dans une colonne, sinon échec contrôlé.
-  if (user.salt) {
-    return verifyPassword(password, user.salt, user.password_hash);
-  }
-  // Dernier recours : comparaison directe (à éviter, mais utile si hash déjà brut en test)
-  return password === user.password_hash;
-}
-
-function buildCookie(token, maxAge, requestUrl) {
-  const parts = [
-    COOKIE_NAME + '=' + token,
-    'Path=/',
-    'Max-Age=' + maxAge,
-    'HttpOnly',
-    'Secure',
-    'SameSite=Lax'
-  ];
+async function deleteMember(id, prenom) {
+  if (!id) return;
+  if (!confirm('Supprimer le compte de ' + (prenom || 'cette personne') + ' ? Cette action est définitive.')) return;
   try {
-    const host = new URL(requestUrl).hostname;
-    if (host === 'nyxia.top' || host.endsWith('.nyxia.top')) {
-      parts.push('Domain=.nyxia.top');
+    var res = await fetch('/api/members/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Univers-Token': TOKEN || '' },
+      body: JSON.stringify({ id: id })
+    });
+    var data = await res.json();
+    if (res.status === 401) { doLogout(); return; }
+    if (data.success) {
+      showMMsg('Compte supprimé.', true);
+      loadMembers();
+    } else {
+      showMMsg(data.error || 'Suppression impossible.', false);
     }
-  } catch (_) {}
-  return parts.join('; ');
+  } catch (e) {
+    showMMsg(e.message || 'Erreur réseau', false);
+  }
 }
 
-function clearCookie(requestUrl) {
-  let domain = '';
+async function createMember() {
+  var prenom = document.getElementById('m-prenom').value.trim();
+  var email = document.getElementById('m-email').value.trim();
+  var password = document.getElementById('m-password').value;
+  var parentCode = document.getElementById('m-parent').value.trim();
+  if (!prenom || !email || !password) {
+    showMMsg('Prénom, courriel et mot de passe requis.', false);
+    return;
+  }
   try {
-    const host = new URL(requestUrl).hostname;
-    if (host === 'nyxia.top' || host.endsWith('.nyxia.top')) domain = '; Domain=.nyxia.top';
-  } catch (_) {}
-  return COOKIE_NAME + '=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax' + domain;
-}
-
-function getToken(request) {
-  const h = request.headers.get('X-Cercle-Token');
-  if (h) return h;
-  const c = request.headers.get('Cookie') || '';
-  const m = c.match(/(?:^|;\s*)nyxia_cercle=([^;]+)/);
-  return m ? m[1] : null;
-}
-
-async function getSession(request, env) {
-  const token = getToken(request);
-  if (!token) return null;
-  const raw = await env.CASHFLOW_KV.get('cercles:session:' + token);
-  if (!raw) return null;
-  return { token, ...JSON.parse(raw) };
-}
-
-// ─── Auth ───
-
-async function handleLogin(request, env) {
-  const { email, password } = await request.json();
-  if (!email || !password) return json({ error: 'Courriel et mot de passe requis.' }, 400);
-
-  const user = await env.DB.prepare(
-    `SELECT id, email, password_hash, full_name, role, affiliate_code, parent_id, status, created_at
-     FROM users WHERE email = ?`
-  ).bind(email.toLowerCase().trim()).first();
-
-  if (!user) return json({ error: 'Identifiants incorrects.' }, 401);
-
-  // status optionnel selon schéma
-  if (user.status === 'suspended') {
-    return json({ error: 'Ce compte est désactivé. Contacte l’équipe pour le réactiver.' }, 403);
-  }
-
-  // Vérification mot de passe
-  // Les comptes créés par Affiliation Pro utilisent leur propre hash (voir lib/auth du repo).
-  // On supporte : "salt:hash" PBKDF2, ou colonne salt séparée si présente.
-  let valid = false;
-  if (user.password_hash && user.password_hash.includes(':')) {
-    const [salt, hash] = user.password_hash.split(':');
-    valid = await verifyPassword(password, salt, hash);
-  } else {
-    // Tentative via une éventuelle colonne salt — sinon on lit le format stocké tel quel
-    const row = await env.DB.prepare(
-      `SELECT password_hash FROM users WHERE id = ?`
-    ).bind(user.id).first();
-    // Si le projet Affiliation Pro stocke un hash scrypt/bcrypt, la vérif native Worker
-    // nécessitera d'aligner l'algo. Pour l'instant PBKDF2 salt:hash et fallback.
-    valid = false;
-    if (row && row.password_hash) {
-      if (row.password_hash.includes(':')) {
-        const [s, h] = row.password_hash.split(':');
-        valid = await verifyPassword(password, s, h);
-      }
+    var out = await apiMembers('POST', { prenom: prenom, email: email, password: password, parentCode: parentCode });
+    if (out.data.success) {
+      showMMsg('Compte créé : ' + (out.data.member && out.data.member.prenom ? out.data.member.prenom : '') + ' — code ' + (out.data.member && out.data.member.code ? out.data.member.code : ''), true);
+      document.getElementById('m-prenom').value = '';
+      document.getElementById('m-email').value = '';
+      document.getElementById('m-password').value = '';
+      document.getElementById('m-parent').value = '';
+      loadMembers();
+    } else {
+      showMMsg(out.data.error || 'Erreur', false);
     }
+  } catch (e) {
+    showMMsg(e.message || 'Erreur réseau', false);
   }
-
-  if (!valid) {
-    // Message neutre — on ne révèle pas la cause technique
-    return json({
-      error: 'Identifiants incorrects. Si ton compte vient de l’ancien portail, l’équipe peut réaligner ton accès.'
-    }, 401);
-  }
-
-  const token = randomToken();
-  const firstName = (user.full_name || '').trim().split(/\s+/)[0] || '';
-  await env.CASHFLOW_KV.put(
-    'cercles:session:' + token,
-    JSON.stringify({
-      userId: user.id,
-      email: user.email,
-      firstName,
-      role: user.role,
-      affiliateCode: user.affiliate_code
-    }),
-    { expirationTtl: SESSION_TTL }
-  );
-
-  // last_login si la colonne existe (ignoré sinon)
-  try {
-    await env.DB.prepare(
-      `UPDATE users SET updated_at = datetime('now') WHERE id = ?`
-    ).bind(user.id).run();
-  } catch (_) {}
-
-  const res = json({
-    success: true,
-    token,
-    firstName,
-    affiliateCode: user.affiliate_code,
-    role: user.role
-  });
-  res.headers.append('Set-Cookie', buildCookie(token, SESSION_TTL, request.url));
-  return res;
 }
 
-async function handleLogout(request, env) {
-  const token = getToken(request);
-  if (token) await env.CASHFLOW_KV.delete('cercles:session:' + token);
-  const res = json({ success: true });
-  res.headers.append('Set-Cookie', clearCookie(request.url));
-  return res;
-}
-
-async function handleCheckAuth(request, env) {
-  const session = await getSession(request, env);
-  if (!session) return json({ valid: false });
-  return json({
-    valid: true,
-    email: session.email,
-    firstName: session.firstName,
-    role: session.role,
-    affiliateCode: session.affiliateCode
-  });
-}
-
-// ─── Dashboard ───
-
-async function handleDashboard(request, env) {
-  const session = await getSession(request, env);
-  if (!session) return json({ error: 'Session expirée.' }, 401);
-
-  const userId = session.userId;
-
-  // Profil
-  const profile = await env.DB.prepare(
-    `SELECT id, email, full_name, affiliate_code, role, parent_id, created_at
-     FROM users WHERE id = ?`
-  ).bind(userId).first();
-
-  if (!profile) return json({ error: 'Profil introuvable.' }, 404);
-
-  const firstName = (profile.full_name || '').trim().split(/\s+/)[0] || session.firstName || '';
-
-  // Enregistrement affilié (cercle)
-  const affiliate = await env.DB.prepare(
-    `SELECT id, affiliate_link, parent_affiliate_id, grandparent_affiliate_id,
-            total_earnings, total_referrals, status, created_at
-     FROM affiliates WHERE user_id = ? LIMIT 1`
-  ).bind(userId).first();
-
-  // Cercle direct (niveau 1) : users dont parent_id = moi
-  const l1 = await env.DB.prepare(
-    `SELECT id, email, full_name, affiliate_code, created_at
-     FROM users WHERE parent_id = ? ORDER BY created_at DESC`
-  ).bind(userId).all();
-
-  const l1Rows = l1.results || [];
-  const l1Ids = l1Rows.map(r => r.id);
-
-  // Niveau 2 : parent_id dans L1
-  let l2Rows = [];
-  if (l1Ids.length) {
-    const ph = l1Ids.map(() => '?').join(',');
-    const l2 = await env.DB.prepare(
-      `SELECT id, email, full_name, affiliate_code, parent_id, created_at
-       FROM users WHERE parent_id IN (${ph}) ORDER BY created_at DESC`
-    ).bind(...l1Ids).all();
-    l2Rows = l2.results || [];
-  }
-
-  const l2Ids = l2Rows.map(r => r.id);
-  let l3Rows = [];
-  if (l2Ids.length) {
-    const ph = l2Ids.map(() => '?').join(',');
-    const l3 = await env.DB.prepare(
-      `SELECT id, email, full_name, affiliate_code, parent_id, created_at
-       FROM users WHERE parent_id IN (${ph}) ORDER BY created_at DESC`
-    ).bind(...l2Ids).all();
-    l3Rows = l3.results || [];
-  }
-
-  // Lien de partage
-  const siteUrl = env.SITE_URL || 'https://cercle.nyxia.top';
-  const shareLink = profile.affiliate_code
-    ? `${siteUrl}/r/${profile.affiliate_code}`
-    : null;
-
-  // Messages (si table messages existe)
-  let messages = [];
-  try {
-    const msg = await env.DB.prepare(
-      `SELECT id, subject, content, read_at, created_at, sender_id
-       FROM messages
-       WHERE recipient_id = ? OR (is_broadcast = 1)
-       ORDER BY created_at DESC LIMIT 20`
-    ).bind(userId).all();
-    messages = msg.results || [];
-  } catch (_) {}
-
-  // Mise en forme : prénom uniquement côté visible
-  function mapMember(row) {
-    const prenom = (row.full_name || '').trim().split(/\s+/)[0] || '—';
-    return {
-      id: row.id,
-      prenom,
-      code: row.affiliate_code,
-      depuis: row.created_at
-    };
-  }
-
-  return json({
-    profil: {
-      prenom: firstName,
-      code: profile.affiliate_code,
-      role: profile.role,
-      depuis: profile.created_at
-    },
-    lienPartage: shareLink,
-    cercle: {
-      direct: l1Rows.map(mapMember),
-      deuxieme: l2Rows.map(mapMember),
-      troisieme: l3Rows.map(mapMember),
-      totaux: {
-        direct: l1Rows.length,
-        deuxieme: l2Rows.length,
-        troisieme: l3Rows.length
-      }
-    },
-    // "ce qui revient" — montants techniques restés en coulisses dans total_earnings
-    // On expose un total neutre sans jargon
-    bilan: {
-      total: affiliate ? Number(affiliate.total_earnings || 0) : 0,
-      partageages: affiliate ? Number(affiliate.total_referrals || 0) : 0,
-      statut: affiliate ? affiliate.status : null
-    },
-    messages
-  });
-}
-
-// ─── Router ───
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    try {
-      if (path === '/api/login' && request.method === 'POST') return await handleLogin(request, env);
-      if (path === '/api/logout' && request.method === 'POST') return await handleLogout(request, env);
-      if (path === '/api/check-auth' && request.method === 'POST') return await handleCheckAuth(request, env);
-      if (path === '/api/dashboard' && request.method === 'POST') return await handleDashboard(request, env);
-
-      // Redirection lien de partage /r/CODE → page d'accueil ou inscription (à brancher)
-      if (path.startsWith('/r/')) {
-        return Response.redirect(url.origin + '/login.html?ref=' + encodeURIComponent(path.slice(3)), 302);
-      }
-    } catch (e) {
-      console.error('Cercles error', e);
-      return json({ error: 'Erreur serveur.' }, 500);
-    }
-
-    if (env.ASSETS) {
-      if (path === '/' || path === '') {
-        return env.ASSETS.fetch(new URL('/login.html', request.url));
-      }
-      return env.ASSETS.fetch(request);
-    }
-    return new Response('Not found', { status: 404 });
-  }
+// Charger la liste quand on ouvre Membres / après login
+var _origSwitch = switchModule;
+switchModule = function(name) {
+  _origSwitch(name);
+  if (name === 'membres') loadMembers();
 };
+
+function switchModule(name) {
+  document.querySelectorAll('.module-tab').forEach(function(t) {
+    t.classList.toggle('active', t.getAttribute('data-module') === name);
+  });
+  document.querySelectorAll('.module-panel').forEach(function(p) {
+    p.classList.toggle('active', p.id === 'module-' + name);
+  });
+}
+
+function showLoginMsg(text, type) {
+  var el = document.getElementById('login-msg');
+  el.textContent = text;
+  el.className = 'login-msg ' + type;
+}
+
+async function doLogin() {
+  var password = document.getElementById('login-password').value;
+  var btn = document.getElementById('btn-login');
+  if (!password) {
+    showLoginMsg('Saisis le mot de passe.', 'error');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Connexion…';
+  try {
+    var res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await res.json();
+    if (data.success && data.token) {
+      TOKEN = data.token;
+      sessionStorage.setItem(TOKEN_KEY, TOKEN);
+      document.getElementById('loginGate').classList.add('hidden');
+      document.getElementById('app').classList.add('visible');
+      loadMembers();
+      if (data.mustChangePassword) {
+        openChangePwd();
+        showPwdMsg('Pour la sécurité, change le mot de passe initial.', 'error');
+      }
+    } else {
+      showLoginMsg(data.error || 'Mot de passe incorrect.', 'error');
+    }
+  } catch (e) {
+    showLoginMsg('Impossible de joindre le serveur.', 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Entrer';
+}
+
+async function doLogout() {
+  try {
+    await fetch('/api/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Univers-Token': TOKEN || '' },
+      body: JSON.stringify({ token: TOKEN })
+    });
+  } catch (_) {}
+  TOKEN = null;
+  sessionStorage.removeItem(TOKEN_KEY);
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('loginGate').classList.remove('hidden');
+  document.getElementById('login-password').value = '';
+}
+
+function openChangePwd() {
+  document.getElementById('pwd-current').value = '';
+  document.getElementById('pwd-new').value = '';
+  document.getElementById('pwd-confirm').value = '';
+  document.getElementById('pwd-msg').className = 'modal-msg';
+  document.getElementById('pwdModal').classList.add('visible');
+}
+function closeChangePwd() {
+  document.getElementById('pwdModal').classList.remove('visible');
+}
+function showPwdMsg(text, type) {
+  var el = document.getElementById('pwd-msg');
+  el.textContent = text;
+  el.className = 'modal-msg ' + type;
+}
+
+async function savePassword() {
+  var current = document.getElementById('pwd-current').value;
+  var neu = document.getElementById('pwd-new').value;
+  var confirm = document.getElementById('pwd-confirm').value;
+  if (!current || !neu || !confirm) {
+    showPwdMsg('Tous les champs sont requis.', 'error');
+    return;
+  }
+  if (neu.length < 10) {
+    showPwdMsg('Le nouveau mot de passe doit faire au moins 10 caractères.', 'error');
+    return;
+  }
+  if (neu !== confirm) {
+    showPwdMsg('Les mots de passe ne correspondent pas.', 'error');
+    return;
+  }
+  try {
+    var res = await fetch('/api/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Univers-Token': TOKEN || ''
+      },
+      body: JSON.stringify({ currentPassword: current, newPassword: neu })
+    });
+    var data = await res.json();
+    if (data.success) {
+      showPwdMsg('Mot de passe modifié.', 'success');
+      setTimeout(closeChangePwd, 1500);
+    } else {
+      showPwdMsg(data.error || 'Erreur.', 'error');
+    }
+  } catch (e) {
+    showPwdMsg('Impossible de joindre le serveur.', 'error');
+  }
+}
+
+// Auto-check session au chargement
+(async function init() {
+  var saved = sessionStorage.getItem(TOKEN_KEY);
+  if (!saved) return;
+  try {
+    var res = await fetch('/api/check-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Univers-Token': saved },
+      body: JSON.stringify({})
+    });
+    var data = await res.json();
+    if (data.valid) {
+      TOKEN = saved;
+      document.getElementById('loginGate').classList.add('hidden');
+      document.getElementById('app').classList.add('visible');
+      loadMembers();
+    } else {
+      sessionStorage.removeItem(TOKEN_KEY);
+    }
+  } catch (_) {}
+})();
+
+// Entrée clavier
+document.getElementById('login-password').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+</script>
+<script src="/starry-bg.js" defer></script>
+</body>
+</html>
