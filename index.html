@@ -293,8 +293,8 @@ input, textarea, select { font-family: 'Outfit', sans-serif; }
             <input type="text" id="m-password" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px" placeholder="Min. 6 caractères">
           </div>
           <div>
-            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Code de rattachement (optionnel)</label>
-            <input type="text" id="m-parent" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px" placeholder="Code cercle de la personne qui ouvre">
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Code de rattachement *</label>
+            <input type="text" id="m-parent" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px" placeholder="Code obligatoire">
           </div>
         </div>
         <button type="button" onclick="createMember()" style="margin-top:14px;padding:12px 18px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-weight:700;font-size:13px;cursor:pointer">Créer le compte</button>
@@ -417,13 +417,14 @@ async function loadMembers() {
     var list = out.data.members || [];
     if (!list.length) { box.textContent = 'Aucun compte pour le moment.'; return; }
     box.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
-      '<tr style="text-align:left;color:var(--t3);font-size:11px;text-transform:uppercase"><th style="padding:8px 6px">Prénom</th><th style="padding:8px 6px">Courriel</th><th style="padding:8px 6px">Code</th><th style="padding:8px 6px">Depuis</th></tr>' +
+      '<tr style="text-align:left;color:var(--t3);font-size:11px;text-transform:uppercase"><th style="padding:8px 6px">Prénom</th><th style="padding:8px 6px">Courriel</th><th style="padding:8px 6px">Code</th><th style="padding:8px 6px">Depuis</th><th style="padding:8px 6px"></th></tr>' +
       list.map(function(m) {
         return '<tr style="border-top:1px solid rgba(123,92,255,0.12)">' +
           '<td style="padding:10px 6px;color:#fff">' + escapeHtml(m.prenom) + '</td>' +
           '<td style="padding:10px 6px">' + escapeHtml(m.email) + '</td>' +
           '<td style="padding:10px 6px">' + escapeHtml(m.code || '—') + '</td>' +
-          '<td style="padding:10px 6px">' + escapeHtml((m.depuis || '').slice(0, 10)) + '</td></tr>';
+          '<td style="padding:10px 6px">' + escapeHtml((m.depuis || '').slice(0, 10)) + '</td>' +
+          '<td style="padding:10px 6px"><button type="button" onclick="deleteMember(\'' + escapeHtml(m.id) + '\', \'' + escapeHtml(m.prenom) + '\')" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,107,107,0.35);background:rgba(255,107,107,0.12);color:var(--red);font-size:11px;cursor:pointer">Supprimer</button></td></tr>';
       }).join('') + '</table></div>';
   } catch (e) {
     box.textContent = e.message || 'Erreur de chargement';
@@ -436,6 +437,28 @@ function escapeHtml(s) {
   });
 }
 
+async function deleteMember(id, prenom) {
+  if (!id) return;
+  if (!confirm('Supprimer le compte de ' + (prenom || 'cette personne') + ' ? Cette action est définitive.')) return;
+  try {
+    var res = await fetch('/api/members/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Univers-Token': TOKEN || '' },
+      body: JSON.stringify({ id: id })
+    });
+    var data = await res.json();
+    if (res.status === 401) { doLogout(); return; }
+    if (data.success) {
+      showMMsg('Compte supprimé.', true);
+      loadMembers();
+    } else {
+      showMMsg(data.error || 'Suppression impossible.', false);
+    }
+  } catch (e) {
+    showMMsg(e.message || 'Erreur réseau', false);
+  }
+}
+
 async function createMember() {
   var prenom = document.getElementById('m-prenom').value.trim();
   var email = document.getElementById('m-email').value.trim();
@@ -443,6 +466,10 @@ async function createMember() {
   var parentCode = document.getElementById('m-parent').value.trim();
   if (!prenom || !email || !password) {
     showMMsg('Prénom, courriel et mot de passe requis.', false);
+    return;
+  }
+  if (!parentCode) {
+    showMMsg('Le code de rattachement est obligatoire.', false);
     return;
   }
   try {
