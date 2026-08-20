@@ -1,4 +1,4 @@
-name = "univers-nyxia"
+name = "univers"
 main = "_worker.js"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
