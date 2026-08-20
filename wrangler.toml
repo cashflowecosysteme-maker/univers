@@ -7,12 +7,12 @@ compatibility_flags = ["nodejs_compat"]
 directory = "."
 binding = "ASSETS"
 
-# Même KV que Studio Prompt (systemeprompt) → GARDIENNE_KV
+# Même KV que Studio (GARDIENNE_KV) — on n'écrit QUE sous le préfixe univers:
 [[kv_namespaces]]
 binding = "CASHFLOW_KV"
 id = "106db6da016d49d2b480452f19bad695"
 
-# Même D1 que Affiliation Pro + Marketplace → affiliation-pro-db
+# Même D1 que Affiliation / Répertoire
 [[d1_databases]]
 binding = "DB"
 database_name = "affiliation-pro-db"
