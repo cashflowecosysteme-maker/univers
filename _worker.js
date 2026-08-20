@@ -145,6 +145,134 @@ async function handleChangePassword(request, env) {
   }, 400);
 }
 
+
+// ─── Membres (D1 partagée) ───
+
+function generateId() {
+  return crypto.randomUUID();
+}
+
+function generateCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+async function handleListMembers(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'Base D1 non liée.' }, 500);
+
+  const rows = await env.DB.prepare(
+    `SELECT id, email, full_name, role, affiliate_code, parent_id, created_at, updated_at
+     FROM users
+     ORDER BY created_at DESC
+     LIMIT 200`
+  ).all();
+
+  const members = (rows.results || []).map((u) => {
+    const prenom = (u.full_name || '').trim().split(/\s+/)[0] || '—';
+    return {
+      id: u.id,
+      email: u.email,
+      prenom,
+      role: u.role,
+      code: u.affiliate_code,
+      parentId: u.parent_id,
+      depuis: u.created_at
+    };
+  });
+
+  return json({ members });
+}
+
+async function handleCreateMember(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'Base D1 non liée.' }, 500);
+
+  const body = await request.json();
+  const prenom = (body.prenom || '').trim();
+  const email = (body.email || '').toLowerCase().trim();
+  const password = body.password || '';
+  const parentCode = (body.parentCode || '').trim().toUpperCase();
+
+  if (!prenom || !email || !password) {
+    return json({ error: 'Prénom, courriel et mot de passe requis.' }, 400);
+  }
+  if (password.length < 6) {
+    return json({ error: 'Mot de passe : minimum 6 caractères.' }, 400);
+  }
+
+  const existing = await env.DB.prepare(
+    `SELECT id FROM users WHERE email = ?`
+  ).bind(email).first();
+  if (existing) return json({ error: 'Ce courriel existe déjà.' }, 409);
+
+  let parentId = null;
+  if (parentCode) {
+    const parent = await env.DB.prepare(
+      `SELECT id FROM users WHERE affiliate_code = ?`
+    ).bind(parentCode).first();
+    if (!parent) return json({ error: 'Code de rattachement introuvable.' }, 400);
+    parentId = parent.id;
+  }
+
+  // Code unique
+  let code = generateCode();
+  for (let i = 0; i < 5; i++) {
+    const clash = await env.DB.prepare(
+      `SELECT id FROM users WHERE affiliate_code = ?`
+    ).bind(code).first();
+    if (!clash) break;
+    code = generateCode();
+  }
+
+  const salt = randomSalt();
+  const hash = await hashPassword(password, salt);
+  const passwordHash = salt + ':' + hash;
+  const userId = generateId();
+
+  await env.DB.prepare(
+    `INSERT INTO users (id, email, password_hash, full_name, role, affiliate_code, parent_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'affiliate', ?, ?, datetime('now'), datetime('now'))`
+  ).bind(userId, email, passwordHash, prenom, code, parentId).run();
+
+  // Enregistrement affiliates si programme actif
+  try {
+    const program = await env.DB.prepare(
+      `SELECT id FROM programs WHERE is_active = 1 LIMIT 1`
+    ).first();
+    if (program) {
+      let parentAffId = null;
+      let grandparentAffId = null;
+      if (parentId) {
+        const pAff = await env.DB.prepare(
+          `SELECT id, parent_affiliate_id FROM affiliates WHERE user_id = ? LIMIT 1`
+        ).bind(parentId).first();
+        if (pAff) {
+          parentAffId = pAff.id;
+          grandparentAffId = pAff.parent_affiliate_id || null;
+        }
+      }
+      const siteUrl = env.SITE_URL || 'https://cercle.nyxia.top';
+      const affId = generateId();
+      const link = siteUrl.replace('univers.', 'cercle.') + '/r/' + code;
+      await env.DB.prepare(
+        `INSERT INTO affiliates (id, program_id, user_id, affiliate_link, parent_affiliate_id, grandparent_affiliate_id, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'))`
+      ).bind(affId, program.id, userId, link, parentAffId, grandparentAffId).run();
+    }
+  } catch (e) {
+    console.error('affiliates insert', e);
+  }
+
+  return json({
+    success: true,
+    member: { id: userId, email, prenom, code }
+  });
+}
+
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -155,6 +283,8 @@ export default {
       if (path === '/api/logout' && request.method === 'POST') return await handleLogout(request, env);
       if (path === '/api/check-auth' && request.method === 'POST') return await handleCheckAuth(request, env);
       if (path === '/api/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
+      if (path === '/api/members' && request.method === 'GET') return await handleListMembers(request, env);
+      if (path === '/api/members' && request.method === 'POST') return await handleCreateMember(request, env);
     } catch (e) {
       console.error(e);
       return json({ error: 'Erreur serveur.' }, 500);
