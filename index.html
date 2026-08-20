@@ -30,6 +30,26 @@ body {
   line-height: 1.65;
   overflow: hidden;
 }
+
+canvas#starry-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.login-gate, .app { position: relative; z-index: 1; }
+.login-gate { background: transparent; }
+
+
+canvas#starry-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.login-gate, .app { position: relative; z-index: 1; }
+.login-gate { background: transparent; }
+
 button { font-family: 'Space Grotesk', sans-serif; cursor: pointer; }
 input, textarea, select { font-family: 'Outfit', sans-serif; }
 
@@ -37,7 +57,7 @@ input, textarea, select { font-family: 'Outfit', sans-serif; }
 .login-gate {
   position: fixed; inset: 0; z-index: 9999;
   display: flex; align-items: center; justify-content: center;
-  background: var(--bg1);
+  background: transparent;
 }
 .login-gate.hidden { display: none; }
 .login-card {
@@ -214,6 +234,7 @@ input, textarea, select { font-family: 'Outfit', sans-serif; }
 </style>
 </head>
 <body>
+<canvas id="starry-canvas"></canvas>
 
 <!-- ═══ LOGIN ═══ -->
 <div class="login-gate" id="loginGate">
@@ -302,16 +323,6 @@ input, textarea, select { font-family: 'Outfit', sans-serif; }
           <div class="icon">📄</div>
           <h4>PDF → Markdown</h4>
           <p>Convertir des PDF en Markdown propre pour l’ingestion.</p>
-        </a>
-        <a class="outil-card" href="https://portail-prompts.nyxia.top/studio-prompt.html" target="_blank" rel="noopener">
-          <div class="icon">✨</div>
-          <h4>Studio Prompt</h4>
-          <p>Créer et peaufiner des prompts pour les agents.</p>
-        </a>
-        <a class="outil-card" href="https://portail-prompts.nyxia.top/superadmin.html" target="_blank" rel="noopener">
-          <div class="icon">🛠️</div>
-          <h4>Studio — Comptes</h4>
-          <p>Gestion des comptes du portail Studio Prompt (existant).</p>
         </a>
         <a class="outil-card" href="https://portail-prompts.nyxia.top/dashbord.html" target="_blank" rel="noopener">
           <div class="icon">🏠</div>
@@ -496,5 +507,6 @@ document.getElementById('login-password').addEventListener('keydown', function(e
   if (e.key === 'Enter') doLogin();
 });
 </script>
+<script src="/starry-bg.js" defer></script>
 </body>
 </html>
