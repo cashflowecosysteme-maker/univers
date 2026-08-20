@@ -277,10 +277,35 @@ input, textarea, select { font-family: 'Outfit', sans-serif; }
 
     <!-- Membres -->
     <div class="module-panel active" id="module-membres">
-      <div class="placeholder">
-        <h3>Membres</h3>
-        <p>Base unique de toutes les personnes qui ont accès à un ou plusieurs espaces NyXia. Création, accès, suspension, historique de connexion.</p>
-        <p class="hint">Ce module sera branché à l’étape suivante (base partagée).</p>
+      <div class="panel" style="background:rgba(26,37,84,0.55);border:1px solid rgba(123,92,255,0.2);border-radius:16px;padding:20px;margin-bottom:20px">
+        <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:14px">Créer un compte</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Prénom *</label>
+            <input type="text" id="m-prenom" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Courriel *</label>
+            <input type="email" id="m-email" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Mot de passe *</label>
+            <input type="text" id="m-password" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px" placeholder="Min. 6 caractères">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:6px">Code de rattachement (optionnel)</label>
+            <input type="text" id="m-parent" style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,0.25);background:rgba(15,28,63,0.7);color:#fff;font-size:14px" placeholder="Code cercle de la personne qui ouvre">
+          </div>
+        </div>
+        <button type="button" onclick="createMember()" style="margin-top:14px;padding:12px 18px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-weight:700;font-size:13px;cursor:pointer">Créer le compte</button>
+        <div id="m-msg" style="margin-top:12px;font-size:13px;display:none"></div>
+      </div>
+      <div class="panel" style="background:rgba(26,37,84,0.55);border:1px solid rgba(123,92,255,0.2);border-radius:16px;padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:15px;font-weight:700;color:#fff">Comptes</div>
+          <button type="button" onclick="loadMembers()" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(123,92,255,0.3);background:rgba(123,92,255,0.1);color:var(--p3);font-size:12px;cursor:pointer">Actualiser</button>
+        </div>
+        <div id="m-list" style="font-size:13px;color:var(--t3)">Chargement…</div>
       </div>
     </div>
 
@@ -358,6 +383,92 @@ input, textarea, select { font-family: 'Outfit', sans-serif; }
 var TOKEN = null;
 var TOKEN_KEY = 'nyxia_univers_token';
 
+
+async function apiMembers(method, body) {
+  var opts = {
+    method: method,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Univers-Token': TOKEN || ''
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  var res = await fetch('/api/members', opts);
+  var data = await res.json();
+  if (res.status === 401) { doLogout(); throw new Error('Session expirée'); }
+  return { res: res, data: data };
+}
+
+function showMMsg(text, ok) {
+  var el = document.getElementById('m-msg');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.color = ok ? 'var(--green)' : 'var(--red)';
+  el.textContent = text;
+}
+
+async function loadMembers() {
+  var box = document.getElementById('m-list');
+  if (!box) return;
+  box.textContent = 'Chargement…';
+  try {
+    var out = await apiMembers('GET');
+    if (out.data.error) { box.textContent = out.data.error; return; }
+    var list = out.data.members || [];
+    if (!list.length) { box.textContent = 'Aucun compte pour le moment.'; return; }
+    box.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+      '<tr style="text-align:left;color:var(--t3);font-size:11px;text-transform:uppercase"><th style="padding:8px 6px">Prénom</th><th style="padding:8px 6px">Courriel</th><th style="padding:8px 6px">Code</th><th style="padding:8px 6px">Depuis</th></tr>' +
+      list.map(function(m) {
+        return '<tr style="border-top:1px solid rgba(123,92,255,0.12)">' +
+          '<td style="padding:10px 6px;color:#fff">' + escapeHtml(m.prenom) + '</td>' +
+          '<td style="padding:10px 6px">' + escapeHtml(m.email) + '</td>' +
+          '<td style="padding:10px 6px">' + escapeHtml(m.code || '—') + '</td>' +
+          '<td style="padding:10px 6px">' + escapeHtml((m.depuis || '').slice(0, 10)) + '</td></tr>';
+      }).join('') + '</table></div>';
+  } catch (e) {
+    box.textContent = e.message || 'Erreur de chargement';
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, function(c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+  });
+}
+
+async function createMember() {
+  var prenom = document.getElementById('m-prenom').value.trim();
+  var email = document.getElementById('m-email').value.trim();
+  var password = document.getElementById('m-password').value;
+  var parentCode = document.getElementById('m-parent').value.trim();
+  if (!prenom || !email || !password) {
+    showMMsg('Prénom, courriel et mot de passe requis.', false);
+    return;
+  }
+  try {
+    var out = await apiMembers('POST', { prenom: prenom, email: email, password: password, parentCode: parentCode });
+    if (out.data.success) {
+      showMMsg('Compte créé : ' + (out.data.member && out.data.member.prenom ? out.data.member.prenom : '') + ' — code ' + (out.data.member && out.data.member.code ? out.data.member.code : ''), true);
+      document.getElementById('m-prenom').value = '';
+      document.getElementById('m-email').value = '';
+      document.getElementById('m-password').value = '';
+      document.getElementById('m-parent').value = '';
+      loadMembers();
+    } else {
+      showMMsg(out.data.error || 'Erreur', false);
+    }
+  } catch (e) {
+    showMMsg(e.message || 'Erreur réseau', false);
+  }
+}
+
+// Charger la liste quand on ouvre Membres / après login
+var _origSwitch = switchModule;
+switchModule = function(name) {
+  _origSwitch(name);
+  if (name === 'membres') loadMembers();
+};
+
 function switchModule(name) {
   document.querySelectorAll('.module-tab').forEach(function(t) {
     t.classList.toggle('active', t.getAttribute('data-module') === name);
@@ -394,6 +505,7 @@ async function doLogin() {
       sessionStorage.setItem(TOKEN_KEY, TOKEN);
       document.getElementById('loginGate').classList.add('hidden');
       document.getElementById('app').classList.add('visible');
+      loadMembers();
       if (data.mustChangePassword) {
         openChangePwd();
         showPwdMsg('Pour la sécurité, change le mot de passe initial.', 'error');
@@ -491,6 +603,7 @@ async function savePassword() {
       TOKEN = saved;
       document.getElementById('loginGate').classList.add('hidden');
       document.getElementById('app').classList.add('visible');
+      loadMembers();
     } else {
       sessionStorage.removeItem(TOKEN_KEY);
     }
