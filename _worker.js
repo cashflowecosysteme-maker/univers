@@ -96,28 +96,19 @@ async function handleLogin(request, env) {
   const password = body.password;
   if (!password) return json({ error: 'Mot de passe requis.' }, 400);
 
-  // 1) Si un hash Univers existe déjà → on le vérifie
-  let creds = await getUniversCredentials(env);
-  if (creds) {
-    const valid = await verifyPassword(password, creds.salt, creds.hash);
-    if (!valid) return json({ error: 'Mot de passe incorrect.' }, 401);
-  } else {
-    // 2) Sinon : premier login = secret Cloudflare ADMIN_INITIAL_PASSWORD
-    const initial = env.ADMIN_INITIAL_PASSWORD;
-    if (!initial || typeof initial !== 'string') {
-      return json({
-        error: 'Configure le secret ADMIN_INITIAL_PASSWORD dans Cloudflare (Worker → Variables / Secrets).'
-      }, 503);
-    }
-    if (password !== initial) {
-      return json({ error: 'Mot de passe incorrect.' }, 401);
-    }
-    // On enregistre le hash sous univers: UNIQUEMENT (n'affecte pas le Studio)
-    const salt = randomSalt();
-    const hash = await hashPassword(password, salt);
-    await env.CASHFLOW_KV.put('univers:admin:credentials', JSON.stringify({ salt, hash }));
+  // Le secret Cloudflare fait TOUJOURS autorité.
+  // Aucune clé KV à supprimer de ton côté.
+  const initial = env.ADMIN_INITIAL_PASSWORD;
+  if (!initial || typeof initial !== 'string') {
+    return json({
+      error: 'Configure le secret ADMIN_INITIAL_PASSWORD dans Cloudflare (Worker → Variables / Secrets).'
+    }, 503);
+  }
+  if (password !== initial) {
+    return json({ error: 'Mot de passe incorrect.' }, 401);
   }
 
+  // Session uniquement (préfixe univers:) — n'écrase aucune clé Studio
   const token = randomToken();
   await env.CASHFLOW_KV.put(
     'univers:session:' + token,
@@ -148,22 +139,10 @@ async function handleCheckAuth(request, env) {
 
 async function handleChangePassword(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-
-  const { currentPassword, newPassword } = await request.json();
-  if (!currentPassword || !newPassword) return json({ error: 'Champs requis.' }, 400);
-  if (newPassword.length < 10) return json({ error: 'Minimum 10 caractères.' }, 400);
-
-  const creds = await getUniversCredentials(env);
-  if (!creds) return json({ error: 'Aucun mot de passe enregistré.' }, 400);
-
-  const valid = await verifyPassword(currentPassword, creds.salt, creds.hash);
-  if (!valid) return json({ error: 'Mot de passe actuel incorrect.' }, 401);
-
-  const salt = randomSalt();
-  const hash = await hashPassword(newPassword, salt);
-  // Écriture UNIQUEMENT sous univers:
-  await env.CASHFLOW_KV.put('univers:admin:credentials', JSON.stringify({ salt, hash }));
-  return json({ success: true });
+  // Le mot de passe est géré uniquement via le secret Cloudflare ADMIN_INITIAL_PASSWORD.
+  return json({
+    error: 'Pour changer le mot de passe, modifie le secret ADMIN_INITIAL_PASSWORD dans Cloudflare (Worker → Variables / Secrets), puis reconnecte-toi.'
+  }, 400);
 }
 
 export default {
