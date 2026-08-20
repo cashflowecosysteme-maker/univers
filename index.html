@@ -184,7 +184,19 @@ td strong{color:#fff}
     <div class="module-panel" id="module-outils">
       <div class="panel">
         <h3>Outils d’équipe</h3>
-        <p class="hint"><a href="https://portail-prompts.nyxia.top/ingestion.html" target="_blank" style="color:var(--p3)">Ingestion</a> · <a href="https://portail-prompts.nyxia.top/pdf-to-markdown.html" target="_blank" style="color:var(--p3)">PDF → Markdown</a></p>
+        <p class="hint" style="margin-bottom:16px">Raccourcis vers les outils techniques (pas des dashboards produit).</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
+          <a href="https://portail-prompts.nyxia.top/ingestion.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;background:rgba(15,28,63,0.7);border:1px solid rgba(123,92,255,0.25);border-radius:16px;padding:20px;transition:border-color .15s,transform .15s" onmouseover="this.style.borderColor='rgba(123,92,255,0.55)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(123,92,255,0.25)';this.style.transform='none'">
+            <div style="font-size:28px;margin-bottom:10px">📥</div>
+            <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Ingestion</div>
+            <div style="font-size:12px;color:var(--t3);line-height:1.5">Importer et préparer les contenus pour les agents.</div>
+          </a>
+          <a href="https://portail-prompts.nyxia.top/pdf-to-markdown.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;background:rgba(15,28,63,0.7);border:1px solid rgba(123,92,255,0.25);border-radius:16px;padding:20px;transition:border-color .15s,transform .15s" onmouseover="this.style.borderColor='rgba(123,92,255,0.55)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(123,92,255,0.25)';this.style.transform='none'">
+            <div style="font-size:28px;margin-bottom:10px">📄</div>
+            <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">PDF → Markdown</div>
+            <div style="font-size:12px;color:var(--t3);line-height:1.5">Convertir des PDF en Markdown propre pour l’ingestion.</div>
+          </a>
+        </div>
       </div>
     </div>
   </div>
@@ -203,7 +215,7 @@ async function loadPortals(){
     if(!list.length){ box.textContent='Aucun portail.'; return; }
     box.innerHTML='<table><tr><th>Identifiant</th><th>Nom</th><th>Actif</th><th></th></tr>'+list.map(function(p){
       return '<tr><td>'+esc(p.id)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+(p.active!==false?'oui':'non')+'</td>'
-        +'<td><button class="btn btn-danger" type="button" onclick="removePortal(\\''+esc(p.id)+'\\')">Retirer</button></td></tr>';
+        +'<td><button class="btn btn-danger" type="button" onclick="removePortal(\''+esc(p.id)+'\')">Retirer</button></td></tr>';
     }).join('')+'</table>';
     // checkboxes clients
     var checks=document.getElementById('cl-portals-checks');
@@ -237,7 +249,7 @@ async function loadPortalClients(){
     if(!list.length){ box.textContent='Aucun client.'; return; }
     box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Portails</th><th>Depuis</th><th></th></tr>'+list.map(function(c){
       return '<tr><td><strong>'+esc(c.firstName||c.name||'—')+'</strong></td><td>'+esc(c.email)+'</td><td>'+esc((c.products||[]).join(', '))+'</td><td>'+esc((c.createdAt||'').slice(0,10))+'</td>'
-        +'<td><button class="btn btn-danger" type="button" onclick="delPortalClient(\\''+esc(c.email)+'\\')">Supprimer</button></td></tr>';
+        +'<td><button class="btn btn-danger" type="button" onclick="delPortalClient(\''+esc(c.email)+'\')">Supprimer</button></td></tr>';
     }).join('')+'</table>';
   }catch(e){ box.textContent=e.message; }
 }
