@@ -199,6 +199,9 @@ async function handleCreateMember(request, env) {
   if (!prenom || !email || !password) {
     return json({ error: 'Prénom, courriel et mot de passe requis.' }, 400);
   }
+  if (!parentCode) {
+    return json({ error: 'Le code de rattachement est obligatoire.' }, 400);
+  }
   if (password.length < 6) {
     return json({ error: 'Mot de passe : minimum 6 caractères.' }, 400);
   }
@@ -208,14 +211,11 @@ async function handleCreateMember(request, env) {
   ).bind(email).first();
   if (existing) return json({ error: 'Ce courriel existe déjà.' }, 409);
 
-  let parentId = null;
-  if (parentCode) {
-    const parent = await env.DB.prepare(
-      `SELECT id FROM users WHERE affiliate_code = ?`
-    ).bind(parentCode).first();
-    if (!parent) return json({ error: 'Code de rattachement introuvable.' }, 400);
-    parentId = parent.id;
-  }
+  const parent = await env.DB.prepare(
+    `SELECT id FROM users WHERE affiliate_code = ?`
+  ).bind(parentCode).first();
+  if (!parent) return json({ error: 'Code de rattachement introuvable.' }, 400);
+  const parentId = parent.id;
 
   // Code unique
   let code = generateCode();
@@ -273,6 +273,26 @@ async function handleCreateMember(request, env) {
 }
 
 
+
+async function handleDeleteMember(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'Base D1 non liée.' }, 500);
+
+  const body = await request.json();
+  const id = (body.id || '').trim();
+  if (!id) return json({ error: 'Identifiant requis.' }, 400);
+
+  // Nettoyer affiliates liés
+  try {
+    await env.DB.prepare(`DELETE FROM affiliates WHERE user_id = ?`).bind(id).run();
+  } catch (e) {
+    console.error('delete affiliates', e);
+  }
+
+  await env.DB.prepare(`DELETE FROM users WHERE id = ?`).bind(id).run();
+  return json({ success: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -285,6 +305,7 @@ export default {
       if (path === '/api/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
       if (path === '/api/members' && request.method === 'GET') return await handleListMembers(request, env);
       if (path === '/api/members' && request.method === 'POST') return await handleCreateMember(request, env);
+      if (path === '/api/members/delete' && request.method === 'POST') return await handleDeleteMember(request, env);
     } catch (e) {
       console.error(e);
       return json({ error: 'Erreur serveur.' }, 500);
