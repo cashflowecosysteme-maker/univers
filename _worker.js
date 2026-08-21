@@ -246,6 +246,36 @@ async function ensureCategory(env) {
   return cat.id;
 }
 
+
+async function handleStats(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'DB absente' }, 500);
+  async function cnt(sql) {
+    try {
+      const r = await env.DB.prepare(sql).first();
+      return Number((r && r.c) || 0);
+    } catch (_) { return 0; }
+  }
+  const products_total = await cnt(`SELECT COUNT(*) as c FROM marketplace_products`);
+  const products_active = await cnt(`SELECT COUNT(*) as c FROM marketplace_products WHERE status='active' OR status='published'`);
+  const products_draft = await cnt(`SELECT COUNT(*) as c FROM marketplace_products WHERE status='draft'`);
+  const users_total = await cnt(`SELECT COUNT(*) as c FROM users`);
+  const affiliates_total = await cnt(`SELECT COUNT(*) as c FROM users WHERE role='affiliate'`);
+  const admins_total = await cnt(`SELECT COUNT(*) as c FROM users WHERE role='admin'`);
+  let portal_clients = 0;
+  try {
+    if (env.CASHFLOW_KV) {
+      const list = await env.CASHFLOW_KV.list({ prefix: 'client:' });
+      portal_clients = (list.keys || []).length;
+    }
+  } catch (_) {}
+  return json({
+    success: true,
+    products_total, products_active, products_draft,
+    users_total, affiliates_total, admins_total, portal_clients
+  });
+}
+
 async function handleListProducts(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const rows = await env.DB.prepare(
@@ -569,6 +599,7 @@ export default {
       if (path === '/api/members' && request.method === 'GET') return await handleListMembers(request, env);
       if (path === '/api/members' && request.method === 'POST') return await handleCreateMember(request, env);
       if (path === '/api/members/delete' && request.method === 'POST') return await handleDeleteMember(request, env);
+      if (path === '/api/stats' && (request.method === 'GET' || request.method === 'POST')) return await handleStats(request, env);
       if (path === '/api/products' && request.method === 'GET') return await handleListProducts(request, env);
       if (path === '/api/products' && request.method === 'POST') return await handleCreateProduct(request, env);
       if (path === '/api/products/update' && request.method === 'POST') return await handleUpdateProduct(request, env);
