@@ -257,7 +257,14 @@ async function handleListProducts(request, env) {
   return json({ products: rows.results || [] });
 }
 
+async function ensureMarketplaceBillingColumns(env) {
+  if (!env.DB) return;
+  try { await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN price_monthly REAL DEFAULT 0`).run(); } catch (_) {}
+  try { await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN billing_type TEXT DEFAULT 'one_time'`).run(); } catch (_) {}
+}
+
 async function handleCreateProduct(request, env) {
+  await ensureMarketplaceBillingColumns(env);
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const body = await request.json();
   const title = (body.title || '').trim();
