@@ -7,16 +7,15 @@ compatibility_flags = ["nodejs_compat"]
 directory = "."
 binding = "ASSETS"
 
-# Même KV que Studio (GARDIENNE_KV) — on n'écrit QUE sous le préfixe univers:
 [[kv_namespaces]]
 binding = "CASHFLOW_KV"
 id = "106db6da016d49d2b480452f19bad695"
 
-# Même D1 que Affiliation / Répertoire
+# NOUVELLE D1 dédiée — isolée d'Affiliation Pro
 [[d1_databases]]
 binding = "DB"
-database_name = "affiliation-pro-db"
-database_id = "0b22a4ba-4d5f-404d-b2e0-4838de6b1822"
+database_name = "nyxia-cercles-db"
+database_id = "a21fd813-06fa-41f1-b744-07bf1c5c7951"
 
 [vars]
 SITE_URL = "https://univers.nyxia.top"
