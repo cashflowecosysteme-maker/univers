@@ -19,15 +19,15 @@ canvas#starry-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
 .login-card input{width:100%;padding:14px;border-radius:12px;border:1px solid rgba(123,92,255,.25);background:rgba(15,28,63,.7);color:#fff;margin-bottom:14px}
 .login-card button{width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-weight:700;cursor:pointer}
 .login-msg{margin-top:12px;font-size:13px;display:none}.login-msg.error{display:block;color:var(--red)}
-.app{display:none;height:100%;flex-direction:column;position:relative;z-index:1}
-.app.visible{display:flex}
+.app{display:none;height:100%;max-height:100vh;flex-direction:column;position:relative;z-index:1;min-height:0}
+.app.visible{display:flex;flex-direction:column;height:100%;max-height:100vh;min-height:0}
 .header{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid rgba(123,92,255,.15);background:rgba(15,28,63,.85)}
 .header h1{font-family:Orbitron,monospace;font-size:18px;background:linear-gradient(135deg,#a78bfa,var(--p3));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .btn-out{padding:8px 12px;border-radius:8px;border:1px solid rgba(255,107,107,.3);background:rgba(255,107,107,.1);color:var(--red);font-size:12px;cursor:pointer}
 .module-nav{display:flex;gap:4px;padding:10px 16px 0;overflow-x:auto;border-bottom:1px solid rgba(123,92,255,.12);background:rgba(15,28,63,.5)}
 .module-tab{padding:10px 14px;border:none;border-radius:10px 10px 0 0;background:transparent;color:var(--t3);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .module-tab.active{background:rgba(123,92,255,.18);color:#fff}
-.main{flex:1;overflow-y:auto;overflow-x:hidden;padding:20px;min-height:0;-webkit-overflow-scrolling:touch}
+.main{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:20px;-webkit-overflow-scrolling:touch}
 .module-panel{display:none}.module-panel.active{display:block}
 .panel{background:rgba(26,37,84,.55);border:1px solid rgba(123,92,255,.2);border-radius:16px;padding:18px;margin-bottom:16px}
 .panel h3{font-size:15px;color:#fff;margin-bottom:12px;font-family:Space Grotesk,sans-serif}
@@ -123,11 +123,6 @@ td strong{color:#fff}
     </div>
     <div class="module-panel" id="module-produits">
       <div class="panel">
-        <h3>Produits (tous vendeurs)</h3>
-        <p class="hint" style="margin-bottom:10px">Tu vois tout. Les brouillons Admin attendent ta validation.</p>
-        <div id="pr-list">—</div>
-      </div>
-      <div class="panel">
         <h3>Créer un produit SuperAdmin</h3>
         <div class="grid2">
           <div><label class="f">Titre *</label><input class="f" id="pr-title"></div>
@@ -138,16 +133,16 @@ td strong{color:#fff}
               <option value="both">Unique + abonnement mensuel</option>
             </select>
           </div>
-          <div><label class="f">Prix unique ($)</label><input class="f" type="number" id="pr-price" step="0.01" placeholder="0 si abo seulement"></div>
-          <div><label class="f">Abonnement mensuel ($)</label><input class="f" type="number" id="pr-price-month" step="0.01" placeholder="0 si pas d’abo"></div>
+          <div><label class="f">Prix unique ($)</label><input class="f" type="number" id="pr-price" step="0.01"></div>
+          <div><label class="f">Abonnement mensuel ($)</label><input class="f" type="number" id="pr-price-month" step="0.01"></div>
           <div style="grid-column:1/-1"><label class="f">Description courte</label><input class="f" id="pr-desc"></div>
           <div><label class="f">Lien d’offre</label><input class="f" id="pr-link" placeholder="https://..."></div>
           <div><label class="f">Image (URL)</label><input class="f" id="pr-img"></div>
-          <div style="grid-column:1/-1"><label class="f">Guide de promotion</label><textarea class="f" id="pr-promo-guide" rows="3" placeholder="Publications prêtes, angles, message type…"></textarea></div>
+          <div style="grid-column:1/-1"><label class="f">Guide de promotion</label><textarea class="f" id="pr-promo-guide" rows="3" placeholder="Publications, angles, message type…"></textarea></div>
           <div><label class="f">Cercle — type</label>
             <select class="f" id="pr-join-type"><option value="free">Gratuit</option><option value="paid">Payant</option></select>
           </div>
-          <div><label class="f">Lien Rejoindre le cercle</label><input class="f" id="pr-join-url" placeholder="https://..."></div>
+          <div><label class="f">Lien Rejoindre le cercle (auto si vide)</label><input class="f" id="pr-join-url" placeholder="Auto : répertoire + code"></div>
           <div><label class="f">% cercle 1</label><input class="f" type="number" id="pr-n1" placeholder="défaut programme"></div>
           <div><label class="f">% cercle 2</label><input class="f" type="number" id="pr-n2"></div>
           <div><label class="f">% cercle 3</label><input class="f" type="number" id="pr-n3"></div>
@@ -155,8 +150,12 @@ td strong{color:#fff}
         <button class="btn" style="margin-top:12px" onclick="createProduct()">Publier le produit</button>
         <div class="msg" id="pr-msg"></div>
       </div>
+      <div class="panel">
+        <h3>Produits (tous vendeurs)</h3>
+        <div id="pr-list">—</div>
+      </div>
     </div>
-
+    
     <div class="module-panel" id="module-portails">
       <div class="panel">
         <h3>Ajouter un portail</h3>
@@ -379,13 +378,13 @@ async function createProduct(){
     title:document.getElementById('pr-title').value.trim(),
     description:document.getElementById('pr-desc').value.trim(),
     price:document.getElementById('pr-price').value,
-    price_monthly:document.getElementById('pr-price-month').value,
-    billing_type:document.getElementById('pr-billing').value,
+    price_monthly:(document.getElementById('pr-price-month')&&document.getElementById('pr-price-month').value)||0,
+    billing_type:(document.getElementById('pr-billing')&&document.getElementById('pr-billing').value)||'one_time',
     affiliateLink:document.getElementById('pr-link').value.trim(),
     imageUrl:document.getElementById('pr-img').value.trim(),
-    promo_guide:document.getElementById('pr-promo-guide').value.trim(),
-    join_type:document.getElementById('pr-join-type').value,
-    join_url:document.getElementById('pr-join-url').value.trim(),
+    promo_guide:(document.getElementById('pr-promo-guide')&&document.getElementById('pr-promo-guide').value||'').trim(),
+    join_type:(document.getElementById('pr-join-type')&&document.getElementById('pr-join-type').value)||'free',
+    join_url:(document.getElementById('pr-join-url')&&document.getElementById('pr-join-url').value||'').trim(),
     status:'active'
   };
   var n1=document.getElementById('pr-n1').value,n2=document.getElementById('pr-n2').value,n3=document.getElementById('pr-n3').value;
@@ -393,7 +392,7 @@ async function createProduct(){
   try{
     var out=await api('/api/products','POST',body);
     showMsg('pr-msg',out.data.success?'Produit publié.':(out.data.error||'Erreur'),!!out.data.success);
-    if(out.data.success){loadProducts();var el=document.getElementById('pr-list');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
+    if(out.data.success)loadProducts();
   }catch(e){showMsg('pr-msg',e.message,false);}
 }
 async function loadProducts(){
@@ -404,12 +403,11 @@ async function loadProducts(){
     if(!list.length){box.textContent='Aucun produit.';return;}
     box.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th align="left">Titre</th><th>Prix</th><th>%</th><th>Statut</th><th>Origine</th><th></th></tr>'+list.map(function(p){
       var st=p.status||'';
-      var pending=(st==='draft')?' (en attente)':'';
       var origin=(p.seller_id==null||p.seller_id===''||p.seller_id==='superadmin'||p.seller_id==='SUPERADMIN')?'Super Admin':(p.seller_name||'Admin Cercle');
       var btnSt=(st==='active'||st==='published')
         ? '<button class="btn btn-ghost" type="button" onclick="setProductStatus(\''+esc(p.id)+'\',\'draft\')">Brouillon</button> '
         : '<button class="btn btn-ghost" type="button" onclick="setProductStatus(\''+esc(p.id)+'\',\'active\')">Publier / valider</button> ';
-      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(p.price)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+pending+'</td><td>'+esc(origin)+'</td><td style="white-space:nowrap">'+btnSt+'<button class="btn btn-danger" type="button" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
+      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(p.price)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+(st==='draft'?' (attente)':'')+'</td><td>'+esc(origin)+'</td><td style="white-space:nowrap">'+btnSt+'<button class="btn btn-danger" type="button" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
     }).join('')+'</table>';
   }catch(e){box.textContent=e.message;}
 }
