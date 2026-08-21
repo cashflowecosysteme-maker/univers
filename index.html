@@ -385,11 +385,16 @@ async function loadProducts(){
     var list=out.data.products||[];
     if(!list.length){box.textContent='Aucun produit.';return;}
     box.innerHTML='<table><tr><th>Titre</th><th>Prix</th><th>%</th><th>Statut</th><th>Vendeur</th><th></th></tr>'+list.map(function(p){
-      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(p.price)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(p.status)+'</td><td>'+esc(p.seller_name||'SuperAdmin')+'</td><td><button class="btn btn-danger" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
+      var st=p.status||'';
+      var btnSt=(st==='active'||st==='published')
+        ? '<button class="btn btn-ghost" onclick="setProductStatus(\''+esc(p.id)+'\',\'draft\')">Brouillon</button> '
+        : '<button class="btn btn-ghost" onclick="setProductStatus(\''+esc(p.id)+'\',\'active\')">Publier</button> ';
+      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(p.price)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+'</td><td>'+esc(p.seller_name||'SuperAdmin')+'</td><td>'+btnSt+'<button class="btn btn-danger" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
     }).join('')+'</table>';
   }catch(e){box.textContent=e.message;}
 }
-async function delProduct(id){if(!confirm('Supprimer ce produit ?'))return;await api('/api/products/delete','POST',{id:id});loadProducts();}
+async function setProductStatus(id,status){try{await api('/api/products/update','POST',{id:id,status:status});loadProducts();}catch(e){alert(e.message||e);}}
+async function delProduct(id){if(!confirm('Supprimer ce produit ?'))return;try{await api('/api/products/delete','POST',{id:id});loadProducts();}catch(e){alert(e.message||e);}}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
 (async function(){
   var saved=sessionStorage.getItem(TOKEN_KEY);if(!saved)return;
