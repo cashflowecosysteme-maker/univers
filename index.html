@@ -126,7 +126,15 @@ td strong{color:#fff}
         <h3>Créer un produit SuperAdmin</h3>
         <div class="grid2">
           <div><label class="f">Titre *</label><input class="f" id="pr-title"></div>
-          <div><label class="f">Prix</label><input class="f" type="number" id="pr-price" step="0.01"></div>
+          <div><label class="f">Type de tarif</label>
+            <select class="f" id="pr-billing">
+              <option value="one_time">Paiement unique</option>
+              <option value="subscription">Abonnement mensuel</option>
+              <option value="both">Unique + abonnement mensuel</option>
+            </select>
+          </div>
+          <div><label class="f">Prix unique ($)</label><input class="f" type="number" id="pr-price" step="0.01" placeholder="0 si abo seulement"></div>
+          <div><label class="f">Abonnement mensuel ($)</label><input class="f" type="number" id="pr-price-month" step="0.01" placeholder="0 si pas d’abo"></div>
           <div style="grid-column:1/-1"><label class="f">Description courte</label><input class="f" id="pr-desc"></div>
           <div><label class="f">Lien d’offre</label><input class="f" id="pr-link" placeholder="https://..."></div>
           <div><label class="f">Image (URL)</label><input class="f" id="pr-img"></div>
@@ -361,7 +369,7 @@ async function delMember(id,role){
   loadMembers(role,role==='admin'?'a-list':'p-list');
 }
 async function createProduct(){
-  var body={title:document.getElementById('pr-title').value.trim(),description:document.getElementById('pr-desc').value.trim(),price:document.getElementById('pr-price').value,affiliateLink:document.getElementById('pr-link').value.trim(),imageUrl:document.getElementById('pr-img').value.trim(),status:'active'};
+  var body={title:document.getElementById('pr-title').value.trim(),description:document.getElementById('pr-desc').value.trim(),price:document.getElementById('pr-price').value,price_monthly:document.getElementById('pr-price-month').value,billing_type:document.getElementById('pr-billing').value,affiliateLink:document.getElementById('pr-link').value.trim(),imageUrl:document.getElementById('pr-img').value.trim(),status:'active'};
   var n1=document.getElementById('pr-n1').value,n2=document.getElementById('pr-n2').value,n3=document.getElementById('pr-n3').value;
   if(n1!=='')body.n1=Number(n1);if(n2!=='')body.n2=Number(n2);if(n3!=='')body.n3=Number(n3);
   try{
