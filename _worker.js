@@ -269,17 +269,24 @@ async function handleCreateProduct(request, env) {
   const catId = await ensureCategory(env);
   const id = generateId();
   const status = body.status === 'draft' ? 'draft' : 'active';
+  const billing = ['one_time','subscription','both'].includes(String(body.billing_type || ''))
+    ? String(body.billing_type) : 'one_time';
+  const priceMonthly = Number(body.price_monthly || body.priceMonthly || 0) || 0;
+  try { await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN price_monthly REAL DEFAULT 0`).run(); } catch (_) {}
+  try { await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN billing_type TEXT DEFAULT 'one_time'`).run(); } catch (_) {}
   await env.DB.prepare(
     `INSERT INTO marketplace_products
-     (id, seller_id, category_id, title, description_short, description_long, image_url, price,
+     (id, seller_id, category_id, title, description_short, description_long, image_url, price, price_monthly, billing_type,
       commission_n1, commission_n2, commission_n3, affiliate_link, status, created_at, updated_at)
-     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
   ).bind(
     id, catId, title,
     (body.description || '').trim(),
     (body.descriptionLong || '').trim() || null,
     (body.imageUrl || '').trim() || null,
     Number(body.price) || 0,
+    priceMonthly,
+    billing,
     n1, n2, n3,
     (body.affiliateLink || '').trim() || null,
     status
