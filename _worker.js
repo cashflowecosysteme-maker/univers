@@ -34,45 +34,6 @@ async function hashPasswordAffil(password) {
   const hashHex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
   return `$sha256$${salt}$${hashHex}`;
 }
-
-async function ensureSchema(env) {
-  if (!env.DB) return;
-  await env.DB.batch([
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY, email TEXT NOT NULL, password_hash TEXT NOT NULL,
-      full_name TEXT, role TEXT NOT NULL DEFAULT 'affiliate', affiliate_code TEXT UNIQUE,
-      parent_id TEXT, paypal_email TEXT, webhook_secret TEXT, created_at TEXT, updated_at TEXT
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS programs (
-      id TEXT PRIMARY KEY, name TEXT, description TEXT,
-      commission_l1 REAL DEFAULT 25, commission_l2 REAL DEFAULT 10, commission_l3 REAL DEFAULT 5,
-      owner_id TEXT, is_active INTEGER DEFAULT 1, created_at TEXT
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketplace_categories (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, slug TEXT, icon TEXT,
-      sort_order INTEGER DEFAULT 0, active INTEGER DEFAULT 1, created_at TEXT
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketplace_products (
-      id TEXT PRIMARY KEY, seller_id TEXT, category_id INTEGER, title TEXT NOT NULL,
-      description_short TEXT, description_long TEXT, image_url TEXT, price REAL DEFAULT 0,
-      commission_n1 REAL, commission_n2 REAL, commission_n3 REAL, affiliate_link TEXT,
-      promo_code TEXT, status TEXT DEFAULT 'draft', created_at TEXT, updated_at TEXT
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS affiliates (
-      id TEXT PRIMARY KEY, program_id TEXT, user_id TEXT, affiliate_link TEXT,
-      parent_affiliate_id TEXT, grandparent_affiliate_id TEXT, status TEXT DEFAULT 'active',
-      total_earnings REAL DEFAULT 0, total_referrals INTEGER DEFAULT 0, created_at TEXT
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS portals (
-      id TEXT PRIMARY KEY, name TEXT NOT NULL, active INTEGER DEFAULT 1, created_at TEXT
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS portal_clients (
-      id TEXT PRIMARY KEY, email TEXT, full_name TEXT, password_hash TEXT, portal_ids TEXT, created_at TEXT
-    )`)
-  ]);
-}
-
-
 function buildSessionCookie(token, maxAge, requestUrl) {
   const parts = [COOKIE_NAME + '=' + token, 'Path=/', 'Max-Age=' + maxAge, 'HttpOnly', 'Secure', 'SameSite=Lax'];
   try {
@@ -217,8 +178,8 @@ async function handleCreateMember(request, env) {
   if (!prenom || !email || !password) return json({ error: 'Prénom, courriel et mot de passe requis.' }, 400);
   if (password.length < 6) return json({ error: 'Mot de passe : minimum 6 caractères.' }, 400);
 
-  // Même courriel autorisé sur un autre rôle / produit / rattachement
-
+  const existing = await env.DB.prepare(`SELECT id FROM users WHERE email = ?`).bind(email).first();
+  if (existing) return json({ error: 'Ce courriel existe déjà.' }, 409);
 
   let parentId = null;
   if (parentCode) {
@@ -466,10 +427,59 @@ async function handleCreatePortalClient(request, env) {
   if (password.length < 6) return json({ error: 'Mot de passe : minimum 6 caractères.' }, 400);
   if (!products.length) return json({ error: 'Sélectionne au moins un portail.' }, 400);
 
-  const existing = await env.CASHFLOW_KV.get('client:' + email);
-  if (existing) return json({ error: 'Ce courriel existe déjà.' }, 409);
+  const existingRaw = await env.CASHFLOW_KV.get('client:' + email);
 
-  // Hash compatible Studio Prompt (PBKDF2)
+  // 1 courriel = 1 client : on AJOUTE des portails/produits, on ne refuse pas
+  if (existingRaw) {
+    const client = JSON.parse(existingRaw);
+    const current = Array.isArray(client.products) ? client.products.slice() : [];
+    const added = [];
+    for (const p of products) {
+      if (!current.map(String).includes(String(p))) {
+        current.push(p);
+        added.push(p);
+      }
+    }
+    client.products = current;
+    if (firstName) client.firstName = firstName;
+    if (lastName) client.lastName = lastName;
+    if (firstName || lastName) client.name = (firstName + ' ' + lastName).trim() || firstName;
+    if (password && password.length >= 6) {
+      const salt = randomSalt();
+      client.salt = salt;
+      client.passwordHash = await hashPassword(password, salt);
+      client.password = password;
+    }
+    client.active = true;
+    client.updatedAt = new Date().toISOString();
+    await env.CASHFLOW_KV.put('client:' + email, JSON.stringify(client));
+
+    if (current.includes('cercles') || current.includes('affiliation')) {
+      try {
+        const exists = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+        if (!exists) {
+          const userId = generateId();
+          let code = generateCode();
+          const passwordHashAffil = await hashPasswordAffil(password || crypto.randomUUID().slice(0, 10));
+          await env.DB.prepare(
+            `INSERT INTO users (id, email, password_hash, full_name, role, affiliate_code, created_at, updated_at)
+             VALUES (?, ?, ?, ?, 'affiliate', ?, datetime('now'), datetime('now'))`
+          ).bind(userId, email, passwordHashAffil, firstName || email.split('@')[0], code).run();
+        }
+      } catch (e) { console.error('D1 client', e); }
+    }
+
+    return json({
+      success: true,
+      email,
+      products: client.products,
+      added,
+      merged: true,
+      message: added.length ? 'Client existant : portail(s) ajouté(s).' : 'Déjà inscrit à ces portails.'
+    });
+  }
+
+  // Nouveau client
   const salt = randomSalt();
   const passwordHash = await hashPassword(password, salt);
 
@@ -488,7 +498,6 @@ async function handleCreatePortalClient(request, env) {
   };
   await env.CASHFLOW_KV.put('client:' + email, JSON.stringify(client));
 
-  // Si portail cercles/affiliation : créer aussi en D1 si pas déjà là
   if (products.includes('cercles') || products.includes('affiliation')) {
     try {
       const exists = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
@@ -504,7 +513,7 @@ async function handleCreatePortalClient(request, env) {
     } catch (e) { console.error('D1 client', e); }
   }
 
-  return json({ success: true, email, products });
+  return json({ success: true, email, products, merged: false });
 }
 
 async function handleDeletePortalClient(request, env) {
@@ -518,8 +527,6 @@ async function handleDeletePortalClient(request, env) {
 
 export default {
   async fetch(request, env) {
-    try { await ensureSchema(env); } catch (e) { console.error("schema", e); }
-
     const url = new URL(request.url);
     const path = url.pathname;
     try {
