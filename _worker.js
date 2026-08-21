@@ -138,6 +138,34 @@ async function handleSaveProgram(request, env) {
 }
 
 // ─── Membres (Admin + Promoteurs) ───
+
+async function handleRegenerateCode(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'DB absente' }, 500);
+  const body = await request.json().catch(() => ({}));
+  const id = (body.id || '').trim();
+  if (!id) return json({ error: 'Id membre requis.' }, 400);
+  const user = await env.DB.prepare(`SELECT id, email, role, affiliate_code FROM users WHERE id = ?`).bind(id).first();
+  if (!user) return json({ error: 'Membre introuvable.' }, 404);
+
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let newCode = '';
+  for (let attempt = 0; attempt < 40; attempt++) {
+    newCode = '';
+    const buf = crypto.getRandomValues(new Uint8Array(8));
+    for (let i = 0; i < 8; i++) newCode += chars[buf[i] % chars.length];
+    const exists = await env.DB.prepare(`SELECT id FROM users WHERE affiliate_code = ? AND id != ?`).bind(newCode, id).first();
+    if (!exists) break;
+  }
+  if (!newCode) newCode = ('N' + crypto.randomUUID().replace(/-/g, '')).slice(0, 10).toUpperCase();
+
+  await env.DB.prepare(
+    `UPDATE users SET affiliate_code = ?, updated_at = datetime('now') WHERE id = ?`
+  ).bind(newCode, id).run();
+
+  return json({ success: true, id, email: user.email, role: user.role, old_code: user.affiliate_code, code: newCode });
+}
+
 async function handleListMembers(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const url = new URL(request.url);
@@ -599,6 +627,7 @@ export default {
       if (path === '/api/members' && request.method === 'GET') return await handleListMembers(request, env);
       if (path === '/api/members' && request.method === 'POST') return await handleCreateMember(request, env);
       if (path === '/api/members/delete' && request.method === 'POST') return await handleDeleteMember(request, env);
+      if (path === '/api/members/regenerate-code' && request.method === 'POST') return await handleRegenerateCode(request, env);
       if (path === '/api/stats' && (request.method === 'GET' || request.method === 'POST')) return await handleStats(request, env);
       if (path === '/api/products' && request.method === 'GET') return await handleListProducts(request, env);
       if (path === '/api/products' && request.method === 'POST') return await handleCreateProduct(request, env);
