@@ -74,6 +74,17 @@ td strong{color:#fff}
   </nav>
   <div class="main">
     <div class="module-panel active" id="module-pourcentages">
+      <div class="panel" id="sa-stats">
+        <h3>Vue d’ensemble</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:12px">
+          <div style="background:rgba(15,28,63,.6);border:1px solid rgba(123,92,255,.2);border-radius:12px;padding:12px"><div style="font-size:11px;color:var(--t3)">Produits</div><div style="font-size:20px;color:#fff;font-weight:700" id="sa-p-total">—</div></div>
+          <div style="background:rgba(15,28,63,.6);border:1px solid rgba(123,92,255,.2);border-radius:12px;padding:12px"><div style="font-size:11px;color:var(--t3)">Publiés</div><div style="font-size:20px;color:var(--green);font-weight:700" id="sa-p-active">—</div></div>
+          <div style="background:rgba(15,28,63,.6);border:1px solid rgba(123,92,255,.2);border-radius:12px;padding:12px"><div style="font-size:11px;color:var(--t3)">Brouillons</div><div style="font-size:20px;color:#F4C842;font-weight:700" id="sa-p-draft">—</div></div>
+          <div style="background:rgba(15,28,63,.6);border:1px solid rgba(123,92,255,.2);border-radius:12px;padding:12px"><div style="font-size:11px;color:var(--t3)">Admins</div><div style="font-size:20px;color:#fff;font-weight:700" id="sa-admins">—</div></div>
+          <div style="background:rgba(15,28,63,.6);border:1px solid rgba(123,92,255,.2);border-radius:12px;padding:12px"><div style="font-size:11px;color:var(--t3)">Promoteurs</div><div style="font-size:20px;color:#fff;font-weight:700" id="sa-aff">—</div></div>
+          <div style="background:rgba(15,28,63,.6);border:1px solid rgba(123,92,255,.2);border-radius:12px;padding:12px"><div style="font-size:11px;color:var(--t3)">Clients portails</div><div style="font-size:20px;color:#fff;font-weight:700" id="sa-clients">—</div></div>
+        </div>
+      </div>
       <div class="panel">
         <h3>Pourcentages des 3 cercles</h3>
         <p class="hint" style="margin-bottom:14px">Ces valeurs s’appliquent au programme principal et servent de base aux produits.</p>
@@ -303,7 +314,7 @@ async function delPortalClient(email){
 function switchModule(name){
   document.querySelectorAll('.module-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-module')===name);});
   document.querySelectorAll('.module-panel').forEach(function(p){p.classList.toggle('active',p.id==='module-'+name);});
-  if(name==='pourcentages') loadProgram();
+  if(name==='pourcentages'){ loadProgram(); loadStats(); }
   if(name==='admins') loadMembers('admin','a-list');
   if(name==='promoteurs') loadMembers('affiliate','p-list');
   if(name==='produits') loadProducts();
@@ -333,6 +344,18 @@ async function doLogout(){
   try{await api('/api/logout','POST',{});}catch(e){}
   TOKEN=null;sessionStorage.removeItem(TOKEN_KEY);
   document.getElementById('app').classList.remove('visible');document.getElementById('loginGate').classList.remove('hidden');
+}
+async function loadStats(){
+  try{
+    var out=await api('/api/stats','GET');
+    var d=out.data||out;
+    if(document.getElementById('sa-p-total')) document.getElementById('sa-p-total').textContent=d.products_total||0;
+    if(document.getElementById('sa-p-active')) document.getElementById('sa-p-active').textContent=d.products_active||0;
+    if(document.getElementById('sa-p-draft')) document.getElementById('sa-p-draft').textContent=d.products_draft||0;
+    if(document.getElementById('sa-admins')) document.getElementById('sa-admins').textContent=d.admins_total||0;
+    if(document.getElementById('sa-aff')) document.getElementById('sa-aff').textContent=d.affiliates_total||0;
+    if(document.getElementById('sa-clients')) document.getElementById('sa-clients').textContent=d.portal_clients||0;
+  }catch(e){}
 }
 async function loadProgram(){
   try{
@@ -424,7 +447,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
   try{
     var res=await fetch('/api/check-auth',{method:'POST',headers:{'Content-Type':'application/json','X-Univers-Token':saved},body:'{}'});
     var data=await res.json();
-    if(data.valid){TOKEN=saved;document.getElementById('loginGate').classList.add('hidden');document.getElementById('app').classList.add('visible');loadProgram();}
+    if(data.valid){TOKEN=saved;document.getElementById('loginGate').classList.add('hidden');document.getElementById('app').classList.add('visible');loadProgram();loadStats();}
   }catch(e){}
 })();
 document.getElementById('login-password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
