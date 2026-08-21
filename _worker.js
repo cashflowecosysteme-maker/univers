@@ -285,7 +285,7 @@ async function handleCreateProduct(request, env) {
     `INSERT INTO marketplace_products
      (id, seller_id, category_id, title, description_short, description_long, image_url, price, price_monthly, billing_type,
       commission_n1, commission_n2, commission_n3, affiliate_link, status, created_at, updated_at)
-     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+     VALUES (?, 'superadmin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
   ).bind(
     id, catId, title,
     (body.description || '').trim(),
