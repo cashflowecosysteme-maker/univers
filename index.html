@@ -384,12 +384,14 @@ async function loadProducts(){
     var out=await api('/api/products','GET');
     var list=out.data.products||[];
     if(!list.length){box.textContent='Aucun produit.';return;}
-    box.innerHTML='<table><tr><th>Titre</th><th>Prix</th><th>%</th><th>Statut</th><th>Vendeur</th><th></th></tr>'+list.map(function(p){
+    box.innerHTML='<table><tr><th>Titre</th><th>Prix</th><th>%</th><th>Statut</th><th>Origine</th><th>Actions</th></tr>'+list.map(function(p){
       var st=p.status||'';
+      var origin=(p.seller_id==null||p.seller_id===''||p.seller_id==='superadmin'||p.seller_id==='SUPERADMIN')?'Super Admin':(p.seller_name||'Admin Cercle');
       var btnSt=(st==='active'||st==='published')
-        ? '<button class="btn btn-ghost" onclick="setProductStatus(\''+esc(p.id)+'\',\'draft\')">Brouillon</button> '
-        : '<button class="btn btn-ghost" onclick="setProductStatus(\''+esc(p.id)+'\',\'active\')">Publier</button> ';
-      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(p.price)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+'</td><td>'+esc(p.seller_name||'SuperAdmin')+'</td><td>'+btnSt+'<button class="btn btn-danger" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
+        ? '<button class="btn btn-ghost" type="button" onclick="setProductStatus(\''+esc(p.id)+'\',\'draft\')">Brouillon</button> '
+        : '<button class="btn btn-ghost" type="button" onclick="setProductStatus(\''+esc(p.id)+'\',\'active\')">Publier / valider</button> ';
+      var btnDel='<button class="btn btn-danger" type="button" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button>';
+      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(p.price)+(p.price_monthly?(' + '+esc(p.price_monthly)+'/mois'):'')+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+'</td><td>'+esc(origin)+'</td><td style="white-space:nowrap">'+btnSt+btnDel+'</td></tr>';
     }).join('')+'</table>';
   }catch(e){box.textContent=e.message;}
 }
