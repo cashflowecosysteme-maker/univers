@@ -275,7 +275,7 @@ async function handleCreateProduct(request, env) {
   const n3 = body.n3 != null ? Number(body.n3) : (prog ? Number(prog.commission_l3) : 5);
   const catId = await ensureCategory(env);
   const id = generateId();
-  const status = body.status === 'draft' ? 'draft' : 'active';
+  const status = (body.status === 'draft') ? 'draft' : 'active';
   const billing = ['one_time','subscription','both'].includes(String(body.billing_type || ''))
     ? String(body.billing_type) : 'one_time';
   const priceMonthly = Number(body.price_monthly || body.priceMonthly || 0) || 0;
