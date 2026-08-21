@@ -298,6 +298,19 @@ async function handleCreateProduct(request, env) {
     (body.affiliateLink || '').trim() || null,
     status
   ).run();
+  try {
+    await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN promo_guide TEXT`).run();
+  } catch (_) {}
+  try { await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN join_url TEXT`).run(); } catch (_) {}
+  try { await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN join_type TEXT DEFAULT 'free'`).run(); } catch (_) {}
+  try {
+    await env.DB.prepare(`UPDATE marketplace_products SET promo_guide = ?, join_url = ?, join_type = ? WHERE id = ?`).bind(
+      (body.promo_guide || '').trim() || null,
+      (body.join_url || '').trim() || null,
+      body.join_type || 'free',
+      id
+    ).run();
+  } catch (e) { console.error(e); }
   return json({ success: true, id });
 }
 
