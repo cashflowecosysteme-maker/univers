@@ -304,9 +304,13 @@ async function handleCreateProduct(request, env) {
   try { await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN join_url TEXT`).run(); } catch (_) {}
   try { await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN join_type TEXT DEFAULT 'free'`).run(); } catch (_) {}
   try {
+    let joinUrl = (body.join_url || '').trim();
+    if (!joinUrl) {
+      joinUrl = 'https://repertoire.nyxia.top/?product=' + encodeURIComponent(id) + '&ref=NYXIA';
+    }
     await env.DB.prepare(`UPDATE marketplace_products SET promo_guide = ?, join_url = ?, join_type = ? WHERE id = ?`).bind(
       (body.promo_guide || '').trim() || null,
-      (body.join_url || '').trim() || null,
+      joinUrl,
       body.join_type || 'free',
       id
     ).run();
