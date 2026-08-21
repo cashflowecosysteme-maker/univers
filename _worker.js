@@ -39,7 +39,7 @@ async function ensureSchema(env) {
   if (!env.DB) return;
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+      id TEXT PRIMARY KEY, email TEXT NOT NULL, password_hash TEXT NOT NULL,
       full_name TEXT, role TEXT NOT NULL DEFAULT 'affiliate', affiliate_code TEXT UNIQUE,
       parent_id TEXT, paypal_email TEXT, webhook_secret TEXT, created_at TEXT, updated_at TEXT
     )`),
@@ -217,8 +217,8 @@ async function handleCreateMember(request, env) {
   if (!prenom || !email || !password) return json({ error: 'Prénom, courriel et mot de passe requis.' }, 400);
   if (password.length < 6) return json({ error: 'Mot de passe : minimum 6 caractères.' }, 400);
 
-  const existing = await env.DB.prepare(`SELECT id FROM users WHERE email = ?`).bind(email).first();
-  if (existing) return json({ error: 'Ce courriel existe déjà.' }, 409);
+  // Même courriel autorisé sur un autre rôle / produit / rattachement
+
 
   let parentId = null;
   if (parentCode) {
