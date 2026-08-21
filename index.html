@@ -19,7 +19,7 @@ canvas#starry-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
 .login-card input{width:100%;padding:14px;border-radius:12px;border:1px solid rgba(123,92,255,.25);background:rgba(15,28,63,.7);color:#fff;margin-bottom:14px}
 .login-card button{width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-weight:700;cursor:pointer}
 .login-msg{margin-top:12px;font-size:13px;display:none}.login-msg.error{display:block;color:var(--red)}
-.app{display:none;height:100%;max-height:100vh;flex-direction:column;position:relative;z-index:1;min-height:0}
+.app{display:none;height:100%;flex-direction:column;position:relative;z-index:1}
 .app.visible{display:flex}
 .header{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid rgba(123,92,255,.15);background:rgba(15,28,63,.85)}
 .header h1{font-family:Orbitron,monospace;font-size:18px;background:linear-gradient(135deg,#a78bfa,var(--p3));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -29,7 +29,7 @@ canvas#starry-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
 .module-tab.active{background:rgba(123,92,255,.18);color:#fff}
 .main{flex:1;overflow-y:auto;overflow-x:hidden;padding:20px;min-height:0;-webkit-overflow-scrolling:touch}
 .module-panel{display:none}.module-panel.active{display:block}
-.panel{background:rgba(26,37,84,.55);border:1px solid rgba(123,92,255,.2);border-radius:16px;padding:18px;margin-bottom:16px}#pr-list{overflow-x:auto;max-width:100%}#pr-list table{width:100%;border-collapse:collapse;font-size:13px}#pr-list th,#pr-list td{padding:8px 10px;border-bottom:1px solid rgba(123,92,255,.12);text-align:left;color:var(--t2)}#pr-list th{color:var(--t3);font-size:11px;text-transform:uppercase}
+.panel{background:rgba(26,37,84,.55);border:1px solid rgba(123,92,255,.2);border-radius:16px;padding:18px;margin-bottom:16px}
 .panel h3{font-size:15px;color:#fff;margin-bottom:12px;font-family:Space Grotesk,sans-serif}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:700px){.grid2{grid-template-columns:1fr}}
@@ -124,6 +124,7 @@ td strong{color:#fff}
     <div class="module-panel" id="module-produits">
       <div class="panel">
         <h3>Produits (tous vendeurs)</h3>
+        <p class="hint" style="margin-bottom:10px">Tu vois tout. Les brouillons Admin attendent ta validation.</p>
         <div id="pr-list">—</div>
       </div>
       <div class="panel">
@@ -155,5 +156,275 @@ td strong{color:#fff}
         <div class="msg" id="pr-msg"></div>
       </div>
     </div>
-    
+
     <div class="module-panel" id="module-portails">
+      <div class="panel">
+        <h3>Ajouter un portail</h3>
+        <div class="grid2">
+          <div><label class="f">Identifiant technique *</label><input class="f" id="portal-id" placeholder="ex: mon-portail"></div>
+          <div><label class="f">Nom affiché *</label><input class="f" id="portal-name" placeholder="ex: Mon Portail"></div>
+        </div>
+        <button class="btn" style="margin-top:12px" onclick="addPortal()">Ajouter le portail</button>
+        <div class="msg" id="portal-msg"></div>
+      </div>
+      <div class="panel">
+        <h3>Portails inscrits</h3>
+        <p class="hint" style="margin-bottom:12px">Tu peux retirer un portail de la liste. Les clients déjà inscrits gardent leur historique.</p>
+        <div id="portal-list">—</div>
+      </div>
+    </div>
+    <div class="module-panel" id="module-clients">
+      <div class="panel">
+        <h3>Inscrire un client à un ou plusieurs portails</h3>
+        <div class="grid2">
+          <div><label class="f">Prénom *</label><input class="f" id="cl-prenom"></div>
+          <div><label class="f">Nom</label><input class="f" id="cl-nom"></div>
+          <div><label class="f">Courriel *</label><input class="f" type="email" id="cl-email"></div>
+          <div><label class="f">Mot de passe *</label><input class="f" id="cl-password" placeholder="Min. 6 caractères"></div>
+        </div>
+        <div style="margin-top:12px">
+          <label class="f">Portails d’accès *</label>
+          <div id="cl-portals-checks" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div>
+        </div>
+        <button class="btn" style="margin-top:14px" onclick="createPortalClient()">Créer le compte client</button>
+        <div class="msg" id="cl-msg"></div>
+      </div>
+      <div class="panel">
+        <h3>Clients inscrits</h3>
+        <div id="cl-list">—</div>
+      </div>
+    </div>
+
+    <div class="module-panel" id="module-outils">
+      <div class="panel">
+        <h3>Outils d’équipe</h3>
+        <p class="hint" style="margin-bottom:16px">Raccourcis vers les outils techniques (pas des dashboards produit).</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
+          <a href="https://portail-prompts.nyxia.top/ingestion.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;background:rgba(15,28,63,0.7);border:1px solid rgba(123,92,255,0.25);border-radius:16px;padding:20px;transition:border-color .15s,transform .15s" onmouseover="this.style.borderColor='rgba(123,92,255,0.55)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(123,92,255,0.25)';this.style.transform='none'">
+            <div style="font-size:28px;margin-bottom:10px">📥</div>
+            <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Ingestion</div>
+            <div style="font-size:12px;color:var(--t3);line-height:1.5">Importer et préparer les contenus pour les agents.</div>
+          </a>
+          <a href="https://portail-prompts.nyxia.top/pdf-to-markdown.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;background:rgba(15,28,63,0.7);border:1px solid rgba(123,92,255,0.25);border-radius:16px;padding:20px;transition:border-color .15s,transform .15s" onmouseover="this.style.borderColor='rgba(123,92,255,0.55)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(123,92,255,0.25)';this.style.transform='none'">
+            <div style="font-size:28px;margin-bottom:10px">📄</div>
+            <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">PDF → Markdown</div>
+            <div style="font-size:12px;color:var(--t3);line-height:1.5">Convertir des PDF en Markdown propre pour l’ingestion.</div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/starry-bg.js" defer></script>
+<script>
+var TOKEN=null, TOKEN_KEY='nyxia_univers_token';
+
+async function loadPortals(){
+  try{
+    var out=await api('/api/portals','GET');
+    var list=out.data.portals||[];
+    window._portals=list;
+    var box=document.getElementById('portal-list');
+    if(!box) return;
+    if(!list.length){ box.textContent='Aucun portail.'; return; }
+    box.innerHTML='<table><tr><th>Identifiant</th><th>Nom</th><th>Actif</th><th></th></tr>'+list.map(function(p){
+      return '<tr><td>'+esc(p.id)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+(p.active!==false?'oui':'non')+'</td>'
+        +'<td><button class="btn btn-danger" type="button" onclick="removePortal(\''+esc(p.id)+'\')">Retirer</button></td></tr>';
+    }).join('')+'</table>';
+    // checkboxes clients
+    var checks=document.getElementById('cl-portals-checks');
+    if(checks){
+      checks.innerHTML=list.filter(function(p){return p.active!==false;}).map(function(p){
+        return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--t2)"><input type="checkbox" class="cl-portal-cb" value="'+esc(p.id)+'"> '+esc(p.name)+'</label>';
+      }).join('')||'<span class="hint">Ajoute d’abord un portail.</span>';
+    }
+  }catch(e){ var b=document.getElementById('portal-list'); if(b) b.textContent=e.message; }
+}
+async function addPortal(){
+  var id=document.getElementById('portal-id').value.trim();
+  var name=document.getElementById('portal-name').value.trim();
+  try{
+    var out=await api('/api/portals/add','POST',{id:id,name:name});
+    showMsg('portal-msg', out.data.success?'Portail ajouté.':(out.data.error||'Erreur'), !!out.data.success);
+    if(out.data.success){ document.getElementById('portal-id').value=''; document.getElementById('portal-name').value=''; loadPortals(); }
+  }catch(e){ showMsg('portal-msg', e.message, false); }
+}
+async function removePortal(id){
+  if(!confirm('Retirer ce portail de la liste ?')) return;
+  await api('/api/portals/remove','POST',{id:id});
+  loadPortals();
+}
+async function loadPortalClients(){
+  var box=document.getElementById('cl-list'); if(!box) return;
+  box.textContent='Chargement…';
+  try{
+    var out=await api('/api/portal-clients','GET');
+    var list=out.data.clients||[];
+    if(!list.length){ box.textContent='Aucun client.'; return; }
+    box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Portails</th><th>Depuis</th><th></th></tr>'+list.map(function(c){
+      return '<tr><td><strong>'+esc(c.firstName||c.name||'—')+'</strong></td><td>'+esc(c.email)+'</td><td>'+esc((c.products||[]).join(', '))+'</td><td>'+esc((c.createdAt||'').slice(0,10))+'</td>'
+        +'<td><button class="btn btn-danger" type="button" onclick="delPortalClient(\''+esc(c.email)+'\')">Supprimer</button></td></tr>';
+    }).join('')+'</table>';
+  }catch(e){ box.textContent=e.message; }
+}
+async function createPortalClient(){
+  var products=[];
+  document.querySelectorAll('.cl-portal-cb:checked').forEach(function(cb){ products.push(cb.value); });
+  var body={
+    firstName:document.getElementById('cl-prenom').value.trim(),
+    lastName:document.getElementById('cl-nom').value.trim(),
+    email:document.getElementById('cl-email').value.trim(),
+    password:document.getElementById('cl-password').value,
+    products:products
+  };
+  try{
+    var out=await api('/api/portal-clients','POST',body);
+    if(out.data.success){
+      showMsg('cl-msg','Client créé : '+body.email+' — MDP : '+body.password,true);
+      document.getElementById('cl-prenom').value='';
+      document.getElementById('cl-nom').value='';
+      document.getElementById('cl-email').value='';
+      document.getElementById('cl-password').value='';
+      document.querySelectorAll('.cl-portal-cb').forEach(function(cb){cb.checked=false;});
+      loadPortalClients();
+    } else showMsg('cl-msg', out.data.error||'Erreur', false);
+  }catch(e){ showMsg('cl-msg', e.message, false); }
+}
+async function delPortalClient(email){
+  if(!confirm('Supprimer ce client ?')) return;
+  await api('/api/portal-clients/delete','POST',{email:email});
+  loadPortalClients();
+}
+
+function switchModule(name){
+  document.querySelectorAll('.module-tab').forEach(function(t){t.classList.toggle('active',t.getAttribute('data-module')===name);});
+  document.querySelectorAll('.module-panel').forEach(function(p){p.classList.toggle('active',p.id==='module-'+name);});
+  if(name==='pourcentages') loadProgram();
+  if(name==='admins') loadMembers('admin','a-list');
+  if(name==='promoteurs') loadMembers('affiliate','p-list');
+  if(name==='produits') loadProducts();
+  if(name==='portails'){ loadPortals(); }
+  if(name==='clients'){ loadPortals(); loadPortalClients(); }
+}
+function showMsg(id,text,ok){var el=document.getElementById(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text;el.style.display='block';}
+async function api(path,method,body){
+  var opts={method:method||'GET',headers:{'Content-Type':'application/json','X-Univers-Token':TOKEN||''}};
+  if(body) opts.body=JSON.stringify(body);
+  var res=await fetch(path,opts);
+  var data=await res.json();
+  if(res.status===401){doLogout();throw new Error('Session expirée');}
+  return {res:res,data:data};
+}
+async function doLogin(){
+  var password=document.getElementById('login-password').value;
+  var msg=document.getElementById('login-msg');
+  try{
+    var res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:password})});
+    var data=await res.json();
+    if(data.success&&data.token){TOKEN=data.token;sessionStorage.setItem(TOKEN_KEY,TOKEN);document.getElementById('loginGate').classList.add('hidden');document.getElementById('app').classList.add('visible');loadProgram();}
+    else{msg.className='login-msg error';msg.style.display='block';msg.textContent=data.error||'Erreur';}
+  }catch(e){msg.className='login-msg error';msg.style.display='block';msg.textContent='Serveur injoignable';}
+}
+async function doLogout(){
+  try{await api('/api/logout','POST',{});}catch(e){}
+  TOKEN=null;sessionStorage.removeItem(TOKEN_KEY);
+  document.getElementById('app').classList.remove('visible');document.getElementById('loginGate').classList.remove('hidden');
+}
+async function loadProgram(){
+  try{
+    var out=await api('/api/program','GET');
+    var p=out.data.program||{};
+    document.getElementById('c1').value=p.cercle1!=null?p.cercle1:25;
+    document.getElementById('c2').value=p.cercle2!=null?p.cercle2:10;
+    document.getElementById('c3').value=p.cercle3!=null?p.cercle3:5;
+  }catch(e){}
+}
+async function saveProgram(){
+  try{
+    var out=await api('/api/program','POST',{cercle1:Number(document.getElementById('c1').value),cercle2:Number(document.getElementById('c2').value),cercle3:Number(document.getElementById('c3').value)});
+    showMsg('prog-msg',out.data.success?'Enregistré.':(out.data.error||'Erreur'),!!out.data.success);
+  }catch(e){showMsg('prog-msg',e.message,false);}
+}
+async function createUser(role){
+  var prefix=role==='admin'?'a':'p';
+  var body={role:role,prenom:document.getElementById(prefix+'-prenom').value.trim(),email:document.getElementById(prefix+'-email').value.trim(),password:document.getElementById(prefix+'-password').value,paypal:document.getElementById(prefix+'-paypal').value.trim()};
+  if(role==='affiliate') body.parentCode=document.getElementById('p-parent').value.trim();
+  try{
+    var out=await api('/api/members','POST',body);
+    if(out.data.success){
+      showMsg(prefix+'-msg','Créé : '+out.data.member.prenom+' — code '+out.data.member.code,true);
+      loadMembers(role,prefix+'-list');
+    } else showMsg(prefix+'-msg',out.data.error||'Erreur',false);
+  }catch(e){showMsg(prefix+'-msg',e.message,false);}
+}
+async function loadMembers(role,listId){
+  var box=document.getElementById(listId);if(!box)return;
+  box.textContent='Chargement…';
+  try{
+    var out=await api('/api/members?role='+encodeURIComponent(role),'GET');
+    var list=out.data.members||[];
+    if(!list.length){box.textContent='Aucun compte.';return;}
+    box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Code</th><th>PayPal</th><th></th></tr>'+list.map(function(m){
+      return '<tr><td><strong>'+esc(m.prenom)+'</strong></td><td>'+esc(m.email)+'</td><td>'+esc(m.code)+'</td><td>'+esc(m.paypal||'—')+'</td><td><button class="btn btn-danger" onclick="delMember(\''+esc(m.id)+'\',\''+role+'\')">Supprimer</button></td></tr>';
+    }).join('')+'</table>';
+  }catch(e){box.textContent=e.message;}
+}
+async function delMember(id,role){
+  if(!confirm('Supprimer ce compte ?'))return;
+  await api('/api/members/delete','POST',{id:id});
+  loadMembers(role,role==='admin'?'a-list':'p-list');
+}
+async function createProduct(){
+  var body={
+    title:document.getElementById('pr-title').value.trim(),
+    description:document.getElementById('pr-desc').value.trim(),
+    price:document.getElementById('pr-price').value,
+    price_monthly:document.getElementById('pr-price-month').value,
+    billing_type:document.getElementById('pr-billing').value,
+    affiliateLink:document.getElementById('pr-link').value.trim(),
+    imageUrl:document.getElementById('pr-img').value.trim(),
+    promo_guide:document.getElementById('pr-promo-guide').value.trim(),
+    join_type:document.getElementById('pr-join-type').value,
+    join_url:document.getElementById('pr-join-url').value.trim(),
+    status:'active'
+  };
+  var n1=document.getElementById('pr-n1').value,n2=document.getElementById('pr-n2').value,n3=document.getElementById('pr-n3').value;
+  if(n1!=='')body.n1=Number(n1);if(n2!=='')body.n2=Number(n2);if(n3!=='')body.n3=Number(n3);
+  try{
+    var out=await api('/api/products','POST',body);
+    showMsg('pr-msg',out.data.success?'Produit publié.':(out.data.error||'Erreur'),!!out.data.success);
+    if(out.data.success){loadProducts();var el=document.getElementById('pr-list');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
+  }catch(e){showMsg('pr-msg',e.message,false);}
+}
+async function loadProducts(){
+  var box=document.getElementById('pr-list');box.textContent='Chargement…';
+  try{
+    var out=await api('/api/products','GET');
+    var list=out.data.products||[];
+    if(!list.length){box.textContent='Aucun produit.';return;}
+    box.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th align="left">Titre</th><th>Prix</th><th>%</th><th>Statut</th><th>Origine</th><th></th></tr>'+list.map(function(p){
+      var st=p.status||'';
+      var pending=(st==='draft')?' (en attente)':'';
+      var origin=(p.seller_id==null||p.seller_id===''||p.seller_id==='superadmin'||p.seller_id==='SUPERADMIN')?'Super Admin':(p.seller_name||'Admin Cercle');
+      var btnSt=(st==='active'||st==='published')
+        ? '<button class="btn btn-ghost" type="button" onclick="setProductStatus(\''+esc(p.id)+'\',\'draft\')">Brouillon</button> '
+        : '<button class="btn btn-ghost" type="button" onclick="setProductStatus(\''+esc(p.id)+'\',\'active\')">Publier / valider</button> ';
+      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(p.price)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+pending+'</td><td>'+esc(origin)+'</td><td style="white-space:nowrap">'+btnSt+'<button class="btn btn-danger" type="button" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
+    }).join('')+'</table>';
+  }catch(e){box.textContent=e.message;}
+}
+async function setProductStatus(id,status){try{await api('/api/products/update','POST',{id:id,status:status});loadProducts();}catch(e){alert(e.message||e);}}
+async function delProduct(id){if(!confirm('Supprimer ce produit ?'))return;await api('/api/products/delete','POST',{id:id});loadProducts();}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+(async function(){
+  var saved=sessionStorage.getItem(TOKEN_KEY);if(!saved)return;
+  try{
+    var res=await fetch('/api/check-auth',{method:'POST',headers:{'Content-Type':'application/json','X-Univers-Token':saved},body:'{}'});
+    var data=await res.json();
+    if(data.valid){TOKEN=saved;document.getElementById('loginGate').classList.add('hidden');document.getElementById('app').classList.add('visible');loadProgram();}
+  }catch(e){}
+})();
+document.getElementById('login-password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+</script>
+</body>
+</html>
