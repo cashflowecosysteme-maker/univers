@@ -474,7 +474,6 @@ async function loadAPayer(){
     document.getElementById('pay-paid').textContent=moneyCAD(d.paid);
     var list=d.commissions||[];
     if(!list.length){box.textContent='Aucune commission pour le moment (aucune vente trackée sur tes produits).';return;}
-    // Grouper par personne (beneficiary) pour faciliter la facturation
     var byPerson={};
     list.forEach(function(c){
       var key=c.beneficiary_id||c.beneficiary_code||c.benef_email||'inconnu';
@@ -483,34 +482,41 @@ async function loadAPayer(){
     });
     var html='';
     Object.keys(byPerson).forEach(function(key){
-      var p=byPerson[key];
-      var pend=p.items.filter(function(i){return i.status!=='paid';});
+      var person=byPerson[key];
+      var pend=person.items.filter(function(i){return i.status!=='paid';});
       var totalPend=pend.reduce(function(s,i){return s+(Number(i.amount)||0);},0);
+      var safeKey=esc(key).replace(/'/g,'');
       html+='<div style="border:1px solid rgba(123,92,255,.25);border-radius:14px;padding:14px;margin-bottom:12px;background:rgba(15,28,63,.45)">';
       html+='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px">';
-      html+='<div><strong style="color:#fff;font-size:15px">'+esc(p.name)+'</strong>';
-      if(p.email) html+=' <span style="color:var(--t3);font-size:12px">'+esc(p.email)+'</span>';
-      html+='<div style="font-size:12px;color:#c4b5fd;margin-top:4px">Code : '+esc(p.code||'—');
-      if(p.paypal) html+=' · PayPal : '+esc(p.paypal);
+      html+='<div><strong style="color:#fff;font-size:15px">'+esc(person.name)+'</strong>';
+      if(person.email) html+=' <span style="color:var(--t3);font-size:12px">'+esc(person.email)+'</span>';
+      html+='<div style="font-size:12px;color:#c4b5fd;margin-top:4px">Code : '+esc(person.code||'—');
+      if(person.paypal) html+=' · PayPal : '+esc(person.paypal);
       html+='</div></div>';
       if(pend.length){
-        html+='<button type="button" class="btn" style="background:linear-gradient(135deg,#00E676,#00c853);color:#041a0c;font-weight:800;padding:10px 18px" onclick="markPersonPaid(\\''+esc(key)+'\\')">✓ Tout payer ('+moneyCAD(totalPend)+')</button>';
+        html+='<button type="button" class="btn" data-person="'+safeKey+'" style="background:linear-gradient(135deg,#00E676,#00c853);color:#041a0c;font-weight:800;padding:10px 18px">✓ Tout payer ('+moneyCAD(totalPend)+')</button>';
       } else {
         html+='<span style="color:var(--green);font-weight:700;font-size:13px">✓ Tout est payé</span>';
       }
       html+='</div>';
       html+='<table style="width:100%;font-size:12px"><tr><th align="left">Date</th><th>Niv.</th><th>Montant</th><th>Statut</th><th></th></tr>';
-      p.items.forEach(function(c){
+      person.items.forEach(function(c){
         var st=c.status||'pending';
         var btn=(st!=='paid')
-          ? '<button type="button" class="btn" style="background:linear-gradient(135deg,#00E676,#00c853);color:#041a0c;font-weight:700;padding:8px 14px;font-size:12px" onclick="markPaid(\\''+esc(c.id)+'\\')">Payé</button>'
+          ? '<button type="button" class="btn btn-mark-paid" data-id="'+esc(c.id)+'" style="background:linear-gradient(135deg,#00E676,#00c853);color:#041a0c;font-weight:700;padding:8px 14px;font-size:12px">Payé</button>'
           : '<span style="color:var(--green)">Payé</span>';
-        html+='<tr><td>'+esc((c.created_at||'').slice(0,10))+'</td><td>'+esc(c.level)+'</td><td>'+moneyCAD(c.amount)+'</td><td>'+(st==='paid'?'<span style="color:var(--green)">payé</span>':'<span style="color:#F4C842">à payer</span>')+'</td><td>'+btn+'</td></tr>';
+        html+='<tr><td>'+esc((c.created_at||'').slice(0,10))+'</td><td>'+esc(String(c.level||''))+'</td><td>'+moneyCAD(c.amount)+'</td><td>'+(st==='paid'?'<span style="color:var(--green)">payé</span>':'<span style="color:#F4C842">à payer</span>')+'</td><td>'+btn+'</td></tr>';
       });
       html+='</table></div>';
     });
     box.innerHTML=html;
     window._payByPerson=byPerson;
+    box.querySelectorAll('[data-person]').forEach(function(btn){
+      btn.addEventListener('click',function(){ markPersonPaid(btn.getAttribute('data-person')); });
+    });
+    box.querySelectorAll('.btn-mark-paid').forEach(function(btn){
+      btn.addEventListener('click',function(){ markPaid(btn.getAttribute('data-id')); });
+    });
   }catch(e){box.textContent=e.message||e;}
 }
 async function markPaid(id){
@@ -521,11 +527,16 @@ async function markPaid(id){
   }catch(e){alert(e.message||e);}
 }
 async function markPersonPaid(personKey){
-  var p=(window._payByPerson&&window._payByPerson[personKey])||null;
-  if(!p)return;
-  var pend=p.items.filter(function(i){return i.status!=='paid';});
+  var person=(window._payByPerson&&window._payByPerson[personKey])||null;
+  if(!person){
+    // try match without special chars
+    var keys=Object.keys(window._payByPerson||{});
+    for(var i=0;i<keys.length;i++){ if(keys[i].indexOf(personKey)>=0||personKey.indexOf(keys[i])>=0){ person=window._payByPerson[keys[i]]; break; } }
+  }
+  if(!person)return;
+  var pend=person.items.filter(function(i){return i.status!=='paid';});
   if(!pend.length)return;
-  if(!confirm('Marquer TOUTES les commissions de '+p.name+' comme payées ('+pend.length+' ligne(s)) ?'))return;
+  if(!confirm('Marquer TOUTES les commissions de '+person.name+' comme payées ('+pend.length+' ligne(s)) ?'))return;
   try{
     for(var i=0;i<pend.length;i++){
       await api('/api/commissions/mark-paid','POST',{id:pend[i].id});
