@@ -166,6 +166,73 @@ async function handleRegenerateCode(request, env) {
   return json({ success: true, id, email: user.email, role: user.role, old_code: user.affiliate_code, code: newCode });
 }
 
+
+async function ensureCommissionsTable(env) {
+  if (!env.DB) return;
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS commissions (
+      id TEXT PRIMARY KEY,
+      sale_id TEXT,
+      product_id TEXT,
+      seller_id TEXT,
+      beneficiary_id TEXT,
+      beneficiary_code TEXT,
+      level INTEGER DEFAULT 1,
+      amount REAL DEFAULT 0,
+      currency TEXT DEFAULT 'CAD',
+      status TEXT DEFAULT 'pending',
+      buyer_email TEXT,
+      ref_code TEXT,
+      source TEXT,
+      created_at TEXT,
+      paid_at TEXT
+    )`).run();
+  } catch (e) { console.error(e); }
+}
+
+async function handleCommissionsToPay(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'DB absente' }, 500);
+  await ensureCommissionsTable(env);
+
+  // Commissions dues par Super Admin (ses produits)
+  const rows = await env.DB.prepare(
+    `SELECT c.*, u.full_name as benef_name, u.email as benef_email, u.paypal_email as benef_paypal
+     FROM commissions c
+     LEFT JOIN users u ON u.id = c.beneficiary_id
+     WHERE (c.seller_id = 'superadmin' OR c.seller_id = 'SUPERADMIN' OR lower(c.seller_id) = 'superadmin')
+     ORDER BY c.created_at DESC
+     LIMIT 500`
+  ).all();
+
+  const list = rows.results || [];
+  let pending = 0, paid = 0;
+  for (const r of list) {
+    if (r.status === 'paid') paid += Number(r.amount) || 0;
+    else pending += Number(r.amount) || 0;
+  }
+
+  return json({
+    success: true,
+    pending: Math.round(pending * 100) / 100,
+    paid: Math.round(paid * 100) / 100,
+    commissions: list
+  });
+}
+
+async function handleMarkCommissionPaid(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'DB absente' }, 500);
+  const body = await request.json().catch(() => ({}));
+  const id = (body.id || '').trim();
+  if (!id) return json({ error: 'id requis' }, 400);
+  await ensureCommissionsTable(env);
+  await env.DB.prepare(
+    `UPDATE commissions SET status = 'paid', paid_at = ? WHERE id = ? AND (seller_id = 'superadmin' OR seller_id = 'SUPERADMIN')`
+  ).bind(new Date().toISOString(), id).run();
+  return json({ success: true });
+}
+
 async function handleListMembers(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const url = new URL(request.url);
@@ -629,6 +696,8 @@ export default {
       if (path === '/api/members/delete' && request.method === 'POST') return await handleDeleteMember(request, env);
       if (path === '/api/members/regenerate-code' && request.method === 'POST') return await handleRegenerateCode(request, env);
       if (path === '/api/stats' && (request.method === 'GET' || request.method === 'POST')) return await handleStats(request, env);
+      if (path === '/api/commissions/to-pay' && request.method === 'GET') return await handleCommissionsToPay(request, env);
+      if (path === '/api/commissions/mark-paid' && request.method === 'POST') return await handleMarkCommissionPaid(request, env);
       if (path === '/api/products' && request.method === 'GET') return await handleListProducts(request, env);
       if (path === '/api/products' && request.method === 'POST') return await handleCreateProduct(request, env);
       if (path === '/api/products/update' && request.method === 'POST') return await handleUpdateProduct(request, env);
