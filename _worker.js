@@ -457,6 +457,9 @@ async function handleUpdateProduct(request, env) {
       commission_n3 = COALESCE(?, commission_n3),
       affiliate_link = COALESCE(?, affiliate_link),
       image_url = COALESCE(?, image_url),
+      promo_guide = COALESCE(?, promo_guide),
+      join_url = COALESCE(?, join_url),
+      join_type = COALESCE(?, join_type),
       status = COALESCE(?, status),
       updated_at = datetime('now')
      WHERE id = ?`
@@ -469,6 +472,9 @@ async function handleUpdateProduct(request, env) {
     body.n3 != null ? Number(body.n3) : null,
     body.affiliateLink || null,
     body.imageUrl || null,
+    (body.promo_guide || body.promoGuide || '').trim() || null,
+    (body.join_url || body.joinUrl || '').trim() || null,
+    (body.join_type || body.joinType) || null,
     body.status || null,
     body.id
   ).run();
