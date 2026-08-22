@@ -172,7 +172,7 @@ td strong{color:#fff}
     <div class="module-panel" id="module-apayer">
       <div class="panel">
         <h3>À payer — produits Super Admin</h3>
-        <p class="hint" style="margin-bottom:12px">Commissions dues aux promoteurs qui ont référé <strong style="color:#fff">tes</strong> produits. Tu ne paies pas les promoteurs des Admins.</p>
+        <p class="hint" style="margin-bottom:12px">Commissions dues aux promoteurs sur <strong style="color:#fff">tes</strong> produits. Bouton vert <strong style="color:#00E676">Payé</strong> = classer la ligne (ou toute la personne). Tu ne paies pas les promoteurs des Admins.</p>
         <div style="display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:12px;margin-bottom:16px">
           <div style="background:rgba(15,28,63,.6);border:1px solid rgba(123,92,255,.2);border-radius:12px;padding:12px">
             <div style="font-size:11px;color:var(--t3)">En attente</div>
@@ -474,20 +474,62 @@ async function loadAPayer(){
     document.getElementById('pay-paid').textContent=moneyCAD(d.paid);
     var list=d.commissions||[];
     if(!list.length){box.textContent='Aucune commission pour le moment (aucune vente trackée sur tes produits).';return;}
-    box.innerHTML='<table><tr><th>Date</th><th>Promoteur</th><th>Code</th><th>Niv.</th><th>Montant</th><th>Statut</th><th></th></tr>'+list.map(function(c){
-      var name=c.benef_name||c.benef_email||c.beneficiary_id||'—';
-      var st=c.status||'pending';
-      var btn=(st==='pending')
-        ? '<button class="btn btn-ghost" type="button" onclick="markPaid(\''+esc(c.id)+'\')">Marquer payé</button>'
-        : '—';
-      return '<tr><td>'+esc((c.created_at||'').slice(0,10))+'</td><td>'+esc(name)+'</td><td><code style="color:#c4b5fd">'+esc(c.beneficiary_code||c.ref_code||'')+'</code></td><td>'+esc(c.level)+'</td><td>'+moneyCAD(c.amount)+'</td><td>'+esc(st)+'</td><td>'+btn+'</td></tr>';
-    }).join('')+'</table>';
+    // Grouper par personne (beneficiary) pour faciliter la facturation
+    var byPerson={};
+    list.forEach(function(c){
+      var key=c.beneficiary_id||c.beneficiary_code||c.benef_email||'inconnu';
+      if(!byPerson[key]) byPerson[key]={name:c.benef_name||c.benef_email||'—',email:c.benef_email||'',paypal:c.benef_paypal||'',code:c.beneficiary_code||c.ref_code||'',items:[]};
+      byPerson[key].items.push(c);
+    });
+    var html='';
+    Object.keys(byPerson).forEach(function(key){
+      var p=byPerson[key];
+      var pend=p.items.filter(function(i){return i.status!=='paid';});
+      var totalPend=pend.reduce(function(s,i){return s+(Number(i.amount)||0);},0);
+      html+='<div style="border:1px solid rgba(123,92,255,.25);border-radius:14px;padding:14px;margin-bottom:12px;background:rgba(15,28,63,.45)">';
+      html+='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px">';
+      html+='<div><strong style="color:#fff;font-size:15px">'+esc(p.name)+'</strong>';
+      if(p.email) html+=' <span style="color:var(--t3);font-size:12px">'+esc(p.email)+'</span>';
+      html+='<div style="font-size:12px;color:#c4b5fd;margin-top:4px">Code : '+esc(p.code||'—');
+      if(p.paypal) html+=' · PayPal : '+esc(p.paypal);
+      html+='</div></div>';
+      if(pend.length){
+        html+='<button type="button" class="btn" style="background:linear-gradient(135deg,#00E676,#00c853);color:#041a0c;font-weight:800;padding:10px 18px" onclick="markPersonPaid(\\''+esc(key)+'\\')">✓ Tout payer ('+moneyCAD(totalPend)+')</button>';
+      } else {
+        html+='<span style="color:var(--green);font-weight:700;font-size:13px">✓ Tout est payé</span>';
+      }
+      html+='</div>';
+      html+='<table style="width:100%;font-size:12px"><tr><th align="left">Date</th><th>Niv.</th><th>Montant</th><th>Statut</th><th></th></tr>';
+      p.items.forEach(function(c){
+        var st=c.status||'pending';
+        var btn=(st!=='paid')
+          ? '<button type="button" class="btn" style="background:linear-gradient(135deg,#00E676,#00c853);color:#041a0c;font-weight:700;padding:8px 14px;font-size:12px" onclick="markPaid(\\''+esc(c.id)+'\\')">Payé</button>'
+          : '<span style="color:var(--green)">Payé</span>';
+        html+='<tr><td>'+esc((c.created_at||'').slice(0,10))+'</td><td>'+esc(c.level)+'</td><td>'+moneyCAD(c.amount)+'</td><td>'+(st==='paid'?'<span style="color:var(--green)">payé</span>':'<span style="color:#F4C842">à payer</span>')+'</td><td>'+btn+'</td></tr>';
+      });
+      html+='</table></div>';
+    });
+    box.innerHTML=html;
+    window._payByPerson=byPerson;
   }catch(e){box.textContent=e.message||e;}
 }
 async function markPaid(id){
-  if(!confirm('Marquer cette commission comme payée ?'))return;
+  if(!confirm('Confirmer : cette ligne est payée ?'))return;
   try{
     await api('/api/commissions/mark-paid','POST',{id:id});
+    loadAPayer();
+  }catch(e){alert(e.message||e);}
+}
+async function markPersonPaid(personKey){
+  var p=(window._payByPerson&&window._payByPerson[personKey])||null;
+  if(!p)return;
+  var pend=p.items.filter(function(i){return i.status!=='paid';});
+  if(!pend.length)return;
+  if(!confirm('Marquer TOUTES les commissions de '+p.name+' comme payées ('+pend.length+' ligne(s)) ?'))return;
+  try{
+    for(var i=0;i<pend.length;i++){
+      await api('/api/commissions/mark-paid','POST',{id:pend[i].id});
+    }
     loadAPayer();
   }catch(e){alert(e.message||e);}
 }
