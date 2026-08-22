@@ -68,6 +68,7 @@ td strong{color:#fff}
     <button class="module-tab" data-module="admins" onclick="switchModule('admins')">Admin commerçants</button>
     <button class="module-tab" data-module="promoteurs" onclick="switchModule('promoteurs')">Promoteurs</button>
     <button class="module-tab" data-module="produits" onclick="switchModule('produits')">Produits SuperAdmin</button>
+    <button class="module-tab" data-module="apayer" onclick="switchModule('apayer')">À payer (mes produits)</button>
     <button class="module-tab" data-module="portails" onclick="switchModule('portails')">Portails</button>
     <button class="module-tab" data-module="clients" onclick="switchModule('clients')">Clients portails</button>
     <button class="module-tab" data-module="outils" onclick="switchModule('outils')">Outils</button>
@@ -167,6 +168,25 @@ td strong{color:#fff}
       </div>
     </div>
     
+    
+    <div class="module-panel" id="module-apayer">
+      <div class="panel">
+        <h3>À payer — produits Super Admin</h3>
+        <p class="hint" style="margin-bottom:12px">Commissions dues aux promoteurs qui ont référé <strong style="color:#fff">tes</strong> produits. Tu ne paies pas les promoteurs des Admins.</p>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:12px;margin-bottom:16px">
+          <div style="background:rgba(15,28,63,.6);border:1px solid rgba(123,92,255,.2);border-radius:12px;padding:12px">
+            <div style="font-size:11px;color:var(--t3)">En attente</div>
+            <div style="font-size:20px;color:#F4C842;font-weight:700" id="pay-pending">—</div>
+          </div>
+          <div style="background:rgba(15,28,63,.6);border:1px solid rgba(123,92,255,.2);border-radius:12px;padding:12px">
+            <div style="font-size:11px;color:var(--t3)">Déjà payé</div>
+            <div style="font-size:20px;color:var(--green);font-weight:700" id="pay-paid">—</div>
+          </div>
+        </div>
+        <div id="pay-list">—</div>
+      </div>
+    </div>
+
     <div class="module-panel" id="module-portails">
       <div class="panel">
         <h3>Ajouter un portail</h3>
@@ -318,6 +338,7 @@ function switchModule(name){
   if(name==='admins') loadMembers('admin','a-list');
   if(name==='promoteurs') loadMembers('affiliate','p-list');
   if(name==='produits') loadProducts();
+  if(name==='apayer') loadAPayer();
   if(name==='portails'){ loadPortals(); }
   if(name==='clients'){ loadPortals(); loadPortalClients(); }
 }
@@ -440,6 +461,35 @@ async function createProduct(){
     showMsg('pr-msg',out.data.success?'Produit publié.':(out.data.error||'Erreur'),!!out.data.success);
     if(out.data.success)loadProducts();
   }catch(e){showMsg('pr-msg',e.message,false);}
+}
+function moneyCAD(n){return Number(n||0).toLocaleString('fr-CA',{minimumFractionDigits:2,maximumFractionDigits:2})+' $';}
+async function loadAPayer(){
+  var box=document.getElementById('pay-list');
+  if(!box)return;
+  box.textContent='Chargement…';
+  try{
+    var out=await api('/api/commissions/to-pay','GET');
+    var d=out.data||out;
+    document.getElementById('pay-pending').textContent=moneyCAD(d.pending);
+    document.getElementById('pay-paid').textContent=moneyCAD(d.paid);
+    var list=d.commissions||[];
+    if(!list.length){box.textContent='Aucune commission pour le moment (aucune vente trackée sur tes produits).';return;}
+    box.innerHTML='<table><tr><th>Date</th><th>Promoteur</th><th>Code</th><th>Niv.</th><th>Montant</th><th>Statut</th><th></th></tr>'+list.map(function(c){
+      var name=c.benef_name||c.benef_email||c.beneficiary_id||'—';
+      var st=c.status||'pending';
+      var btn=(st==='pending')
+        ? '<button class="btn btn-ghost" type="button" onclick="markPaid(\''+esc(c.id)+'\')">Marquer payé</button>'
+        : '—';
+      return '<tr><td>'+esc((c.created_at||'').slice(0,10))+'</td><td>'+esc(name)+'</td><td><code style="color:#c4b5fd">'+esc(c.beneficiary_code||c.ref_code||'')+'</code></td><td>'+esc(c.level)+'</td><td>'+moneyCAD(c.amount)+'</td><td>'+esc(st)+'</td><td>'+btn+'</td></tr>';
+    }).join('')+'</table>';
+  }catch(e){box.textContent=e.message||e;}
+}
+async function markPaid(id){
+  if(!confirm('Marquer cette commission comme payée ?'))return;
+  try{
+    await api('/api/commissions/mark-paid','POST',{id:id});
+    loadAPayer();
+  }catch(e){alert(e.message||e);}
 }
 async function loadProducts(){
   var box=document.getElementById('pr-list');box.textContent='Chargement…';
