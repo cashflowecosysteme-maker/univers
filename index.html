@@ -389,19 +389,29 @@ async function loadMembers(role,listId){
   box.textContent='Chargement…';
   try{
     var out=await api('/api/members?role='+encodeURIComponent(role),'GET');
-    var list=out.data.members||[];
+    var list=(out.data&&out.data.members)||out.members||[];
     if(!list.length){box.textContent='Aucun compte.';return;}
-    box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Code</th><th>PayPal</th><th></th></tr>'+list.map(function(m){
-      return '<tr><td><strong>'+esc(m.prenom)+'</strong></td><td>'+esc(m.email)+'</td><td><code style="color:#a78bfa">'+esc(m.code)+'</code></td><td>'+esc(m.paypal||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="regenCode(\''+esc(m.id)+'\',\''+role+'\')">Nouveau code</button> <button class="btn btn-danger" type="button" onclick="delMember(\''+esc(m.id)+'\',\''+role+'\')">Supprimer</button></td></tr>';
+    box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Code unique</th><th>Lien /r/</th><th>PayPal</th><th></th></tr>'+list.map(function(m){
+      var code=(m.code||m.affiliate_code||'').toString().trim().toUpperCase();
+      var codeCell=code
+        ? ('<code style="color:#c4b5fd;font-size:13px;font-weight:700;letter-spacing:.04em">'+esc(code)+'</code>')
+        : '<span style="color:#F4C842">sans code</span>';
+      var lien=code?('https://nyxia.top/r/'+code):'—';
+      var lienCell=code
+        ? ('<button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" onclick="navigator.clipboard.writeText(\''+esc(lien)+'\')">Copier lien</button>')
+        : '—';
+      return '<tr><td><strong>'+esc(m.prenom)+'</strong></td><td>'+esc(m.email)+'</td><td>'+codeCell+'</td><td>'+lienCell+'</td><td>'+esc(m.paypal||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="regenCode(\''+esc(m.id)+'\',\''+role+'\',\''+esc(listId)+'\')">Nouveau code</button> <button class="btn btn-danger" type="button" onclick="delMember(\''+esc(m.id)+'\',\''+role+'\')">Supprimer</button></td></tr>';
     }).join('')+'</table>';
   }catch(e){box.textContent=e.message;}
 }
-async function regenCode(id,role){
+async function regenCode(id,role,listId){
   if(!confirm('Générer un NOUVEAU code unique pour ce membre ? L’ancien lien ne fonctionnera plus.'))return;
   try{
     var out=await api('/api/members/regenerate-code','POST',{id:id});
-    if(out.data&&out.data.success){alert('Nouveau code : '+out.data.code);loadMembers(role);}
-    else alert((out.data&&out.data.error)||'Erreur');
+    if(out.data&&out.data.success){
+      alert('Nouveau code : '+out.data.code);
+      loadMembers(role, listId||(role==='admin'?'a-list':'p-list'));
+    } else alert((out.data&&out.data.error)||'Erreur');
   }catch(e){alert(e.message||e);}
 }
 async function delMember(id,role){
