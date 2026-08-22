@@ -392,9 +392,17 @@ async function loadMembers(role,listId){
     var list=out.data.members||[];
     if(!list.length){box.textContent='Aucun compte.';return;}
     box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Code</th><th>PayPal</th><th></th></tr>'+list.map(function(m){
-      return '<tr><td><strong>'+esc(m.prenom)+'</strong></td><td>'+esc(m.email)+'</td><td>'+esc(m.code)+'</td><td>'+esc(m.paypal||'—')+'</td><td><button class="btn btn-danger" onclick="delMember(\''+esc(m.id)+'\',\''+role+'\')">Supprimer</button></td></tr>';
+      return '<tr><td><strong>'+esc(m.prenom)+'</strong></td><td>'+esc(m.email)+'</td><td><code style="color:#a78bfa">'+esc(m.code)+'</code></td><td>'+esc(m.paypal||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="regenCode(\''+esc(m.id)+'\',\''+role+'\')">Nouveau code</button> <button class="btn btn-danger" type="button" onclick="delMember(\''+esc(m.id)+'\',\''+role+'\')">Supprimer</button></td></tr>';
     }).join('')+'</table>';
   }catch(e){box.textContent=e.message;}
+}
+async function regenCode(id,role){
+  if(!confirm('Générer un NOUVEAU code unique pour ce membre ? L’ancien lien ne fonctionnera plus.'))return;
+  try{
+    var out=await api('/api/members/regenerate-code','POST',{id:id});
+    if(out.data&&out.data.success){alert('Nouveau code : '+out.data.code);loadMembers(role);}
+    else alert((out.data&&out.data.error)||'Erreur');
+  }catch(e){alert(e.message||e);}
 }
 async function delMember(id,role){
   if(!confirm('Supprimer ce compte ?'))return;
