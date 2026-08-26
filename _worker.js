@@ -687,6 +687,95 @@ async function handleDeletePortalClient(request, env) {
   return json({ success: true });
 }
 
+// ───────────── FORMATIONS (KV partagé avec le Portail Alex) ─────────────
+// Les formations sont stockées dans le MÊME KV que le Portail Alex, à la clé
+// formation:{agent}:{id}. Le worker d'Alex les lit directement. Aucun contenu inventé ici :
+// le Super Admin ne fait qu'écrire ce que Diane saisit.
+const FORMATION_AGENTS = ['alex'];
+
+function formationKey(agent, id) { return 'formation:' + agent + ':' + id; }
+
+function slugifyFormationId(s) {
+  return String(s || '').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+
+const FORMATION_BLOC_TYPES = ['texte', 'image', 'audio', 'video', 'exercice', 'intervention'];
+
+// Nettoie/valide un bloc selon son type, sans rien inventer.
+function sanitizeFormationBloc(raw) {
+  const type = FORMATION_BLOC_TYPES.includes(String(raw && raw.type)) ? raw.type : 'texte';
+  const b = { type };
+  const str = (v) => (v == null ? '' : String(v));
+  if (type === 'texte' || type === 'intervention') { b.contenu = str(raw.contenu); }
+  else if (type === 'image') { b.url = str(raw.url).trim(); b.legende = str(raw.legende); }
+  else if (type === 'audio' || type === 'video') { b.url = str(raw.url).trim(); b.titre = str(raw.titre); b.intro = str(raw.intro); }
+  else if (type === 'exercice') { b.objectif = str(raw.objectif); b.consigne = str(raw.consigne); }
+  return b;
+}
+
+function sanitizeFormationDoc(input) {
+  const id = slugifyFormationId(input && (input.id || input.titre));
+  const modulesIn = Array.isArray(input && input.modules) ? input.modules : [];
+  const modules = modulesIn.map((m, i) => ({
+    id: String((m && m.id) || ('m' + (i + 1))).trim() || ('m' + (i + 1)),
+    numero: Number.isFinite(m && m.numero) ? m.numero : (i + 1),
+    titre: String((m && m.titre) || ('Module ' + (i + 1))),
+    blocs: Array.isArray(m && m.blocs) ? m.blocs.map(sanitizeFormationBloc) : []
+  }));
+  return {
+    id,
+    titre: String((input && input.titre) || '').trim(),
+    description: String((input && input.description) || '').trim(),
+    ordre: Number.isFinite(input && input.ordre) ? input.ordre : 0,
+    modules
+  };
+}
+
+async function handleListFormations(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const url = new URL(request.url);
+  const agent = FORMATION_AGENTS.includes(url.searchParams.get('agent')) ? url.searchParams.get('agent') : 'alex';
+  const out = [];
+  try {
+    const list = await env.CASHFLOW_KV.list({ prefix: 'formation:' + agent + ':' });
+    for (const k of list.keys || []) {
+      const raw = await env.CASHFLOW_KV.get(k.name);
+      if (!raw) continue;
+      let doc; try { doc = JSON.parse(raw); } catch (_) { continue; }
+      if (doc && doc.id) out.push(doc);
+    }
+  } catch (e) { return json({ error: 'Lecture impossible : ' + e.message }, 500); }
+  out.sort((a, b) => (a.ordre || 0) - (b.ordre || 0) || String(a.titre || '').localeCompare(String(b.titre || '')));
+  return json({ formations: out });
+}
+
+async function handleSaveFormation(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const agent = FORMATION_AGENTS.includes(body.agent) ? body.agent : 'alex';
+  const doc = sanitizeFormationDoc(body.formation || body);
+  if (!doc.id) return json({ error: 'Donne au moins un titre à la formation.' }, 400);
+  if (!doc.titre) return json({ error: 'Le titre est requis.' }, 400);
+  try {
+    await env.CASHFLOW_KV.put(formationKey(agent, doc.id), JSON.stringify(doc));
+  } catch (e) { return json({ error: 'Enregistrement impossible : ' + e.message }, 500); }
+  return json({ success: true, formation: doc });
+}
+
+async function handleDeleteFormation(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const agent = FORMATION_AGENTS.includes(body.agent) ? body.agent : 'alex';
+  const id = slugifyFormationId(body.id);
+  if (!id) return json({ error: 'Identifiant requis.' }, 400);
+  try {
+    await env.CASHFLOW_KV.delete(formationKey(agent, id));
+  } catch (e) { return json({ error: 'Suppression impossible : ' + e.message }, 500); }
+  return json({ success: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -715,6 +804,9 @@ export default {
       if (path === '/api/portal-clients' && request.method === 'GET') return await handleListPortalClients(request, env);
       if (path === '/api/portal-clients' && request.method === 'POST') return await handleCreatePortalClient(request, env);
       if (path === '/api/portal-clients/delete' && request.method === 'POST') return await handleDeletePortalClient(request, env);
+      if (path === '/api/formations' && request.method === 'GET') return await handleListFormations(request, env);
+      if (path === '/api/formations/save' && request.method === 'POST') return await handleSaveFormation(request, env);
+      if (path === '/api/formations/delete' && request.method === 'POST') return await handleDeleteFormation(request, env);
     } catch (e) {
       console.error(e);
       return json({ error: 'Erreur serveur.', detail: String(e.message || e) }, 500);
