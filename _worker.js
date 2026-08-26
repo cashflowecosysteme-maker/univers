@@ -691,7 +691,7 @@ async function handleDeletePortalClient(request, env) {
 // Les formations sont stockées dans le MÊME KV que le Portail Alex, à la clé
 // formation:{agent}:{id}. Le worker d'Alex les lit directement. Aucun contenu inventé ici :
 // le Super Admin ne fait qu'écrire ce que Diane saisit.
-const FORMATION_AGENTS = ['alex'];
+const FORMATION_AGENTS = ['diane', 'nyxia', 'eric', 'alex', 'lena', 'selena', 'kael'];
 
 function formationKey(agent, id) { return 'formation:' + agent + ':' + id; }
 
