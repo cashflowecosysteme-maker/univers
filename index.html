@@ -72,7 +72,7 @@ td strong{color:#fff}
     <button class="module-tab" data-module="portails" onclick="switchModule('portails')">Portails</button>
     <button class="module-tab" data-module="clients" onclick="switchModule('clients')">Clients portails</button>
     <button class="module-tab" data-module="outils" onclick="switchModule('outils')">Outils</button>
-    <button class="module-tab" data-module="formations" onclick="switchModule('formations')">Formations Alex</button>
+    <button class="module-tab" data-module="formations" onclick="switchModule('formations')">Formations des personnages
   </nav>
   <div class="main">
     <div class="module-panel active" id="module-pourcentages">
@@ -252,8 +252,20 @@ td strong{color:#fff}
 
     <div class="module-panel" id="module-formations">
       <div class="panel">
-        <h3>Formations vivantes d’Alex</h3>
-        <p class="hint" style="margin-bottom:14px">Le contenu que tu ajoutes ici apparaît directement dans le Portail Alex (même base). Types de blocs : texte, image, audio MP3, vidéo, exercice, intervention d’Alex.</p>
+        <h3>Formations des personnages</h3>
+        <p class="hint" style="margin-bottom:14px">Choisis le personnage : sa formation sera dirigée vers son propre portail. Types de blocs : texte, image, audio MP3, vidéo, exercice, intervention du personnage.</p>
+        <div style="max-width:320px;margin-bottom:16px">
+          <label class="f">Personnage</label>
+          <select class="f" id="fo-agent" onchange="foChangeAgent(this.value)">
+            <option value="diane">Diane</option>
+            <option value="nyxia">NyXia</option>
+            <option value="eric">Éric</option>
+            <option value="alex" selected>Alex</option>
+            <option value="lena">Léna</option>
+            <option value="selena">Séléna</option>
+            <option value="kael">Kael</option>
+          </select>
+        </div>
         <div id="fo-list">—</div>
         <button class="btn" style="margin-top:14px" onclick="foNew()">➕ Nouvelle formation</button>
       </div>
@@ -604,6 +616,13 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 
 /* ───────────── FORMATIONS ALEX (constructeur visuel) ───────────── */
 var FO_AGENT='alex';
+function foChangeAgent(agent){
+  FO_AGENT=agent||'alex';
+  /* on ferme l'éditeur en cours pour éviter d'enregistrer sur le mauvais personnage */
+  var ed=document.getElementById('fo-editor');if(ed)ed.style.display='none';
+  FO_STATE=null;FO_EDIT_ID=null;
+  foLoadList();
+}
 var FO_STATE=null; /* {id,titre,description,ordre,modules:[{id,numero,titre,blocs:[...]}]} */
 var FO_EDIT_ID=null; /* id d'origine si édition (pour renommer proprement) */
 var FO_BLOC_TYPES=[
@@ -612,7 +631,7 @@ var FO_BLOC_TYPES=[
   {v:'audio',label:'Audio MP3'},
   {v:'video',label:'Vidéo'},
   {v:'exercice',label:'Exercice'},
-  {v:'intervention',label:'Intervention d’Alex'}
+  {v:'intervention',label:'Intervention du personnage'}
 ];
 
 async function foLoadList(){
@@ -717,7 +736,7 @@ function foBlocFields(mi,bi,b){
   function inp(field,label,val,ph){return '<div style="margin-top:8px"><label class="f">'+label+'</label><input class="f" id="fo-b-'+field+'-'+mi+'-'+bi+'" value="'+esc(val||'')+'" placeholder="'+(ph||'')+'"></div>';}
   var t=b.type;
   if(t==='texte')return ta('contenu','Contenu de la leçon',b.contenu,'Le texte que la personne lit');
-  if(t==='intervention')return ta('contenu','Ce qu’Alex dit / fait',b.contenu,'Ex. « Écoute bien cette partie, puis reviens me voir. »');
+  if(t==='intervention')return ta('contenu','Ce que le personnage dit / fait',b.contenu,'Ex. « Écoute bien cette partie, puis reviens me voir. »');
   if(t==='image')return inp('url','Adresse de l’image (https)',b.url,'https://…')+inp('legende','Légende (optionnel)',b.legende,'');
   if(t==='audio')return inp('url','Adresse du MP3 (https)',b.url,'https://…/audio.mp3')+inp('titre','Titre (optionnel)',b.titre,'')+inp('intro','Intro suggérée (optionnel)',b.intro,'Ex. Écoute et reviens me voir.');
   if(t==='video')return inp('url','Adresse de la vidéo (https)',b.url,'https://… (YouTube, Vimeo, MP4…)')+inp('titre','Titre (optionnel)',b.titre,'')+inp('intro','Intro suggérée (optionnel)',b.intro,'');
