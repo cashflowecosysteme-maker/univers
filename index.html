@@ -72,6 +72,7 @@ td strong{color:#fff}
     <button class="module-tab" data-module="portails" onclick="switchModule('portails')">Portails</button>
     <button class="module-tab" data-module="clients" onclick="switchModule('clients')">Clients portails</button>
     <button class="module-tab" data-module="outils" onclick="switchModule('outils')">Outils</button>
+    <button class="module-tab" data-module="formations" onclick="switchModule('formations')">Formations Alex</button>
   </nav>
   <div class="main">
     <div class="module-panel active" id="module-pourcentages">
@@ -248,6 +249,37 @@ td strong{color:#fff}
         </div>
       </div>
     </div>
+
+    <div class="module-panel" id="module-formations">
+      <div class="panel">
+        <h3>Formations vivantes d’Alex</h3>
+        <p class="hint" style="margin-bottom:14px">Le contenu que tu ajoutes ici apparaît directement dans le Portail Alex (même base). Types de blocs : texte, image, audio MP3, vidéo, exercice, intervention d’Alex.</p>
+        <div id="fo-list">—</div>
+        <button class="btn" style="margin-top:14px" onclick="foNew()">➕ Nouvelle formation</button>
+      </div>
+
+      <div class="panel" id="fo-editor" style="display:none">
+        <h3 id="fo-editor-title">Nouvelle formation</h3>
+        <div class="grid2">
+          <div><label class="f">Titre *</label><input class="f" id="fo-titre" placeholder="Ex. Écrire ton roman"></div>
+          <div><label class="f">Identifiant</label><input class="f" id="fo-id" placeholder="auto d’après le titre"></div>
+          <div style="grid-column:1/-1"><label class="f">Description</label><input class="f" id="fo-desc" placeholder="De l’idée au manuscrit"></div>
+          <div><label class="f">Ordre d’affichage</label><input class="f" type="number" id="fo-ordre" value="0" step="1"></div>
+        </div>
+
+        <div style="margin-top:18px;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:14px;font-weight:700;color:#fff">Modules</div>
+          <button class="btn btn-ghost" type="button" onclick="foAddModule()">➕ Ajouter un module</button>
+        </div>
+        <div id="fo-modules" style="margin-top:12px;display:flex;flex-direction:column;gap:14px"></div>
+
+        <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" type="button" onclick="foSave()">💾 Enregistrer la formation</button>
+          <button class="btn btn-ghost" type="button" onclick="foCancel()">Annuler</button>
+        </div>
+        <div class="msg" id="fo-msg"></div>
+      </div>
+    </div>
   </div>
 </div>
 <script src="/starry-bg.js" defer></script>
@@ -341,6 +373,7 @@ function switchModule(name){
   if(name==='apayer') loadAPayer();
   if(name==='portails'){ loadPortals(); }
   if(name==='clients'){ loadPortals(); loadPortalClients(); }
+  if(name==='formations'){ foLoadList(); }
 }
 function showMsg(id,text,ok){var el=document.getElementById(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text;el.style.display='block';}
 async function api(path,method,body){
@@ -568,6 +601,212 @@ async function setProductStatus(id,status){try{await api('/api/products/update',
 async function setJoinType(id,type){try{await api('/api/products/update','POST',{id:id,join_type:type});loadProducts();}catch(e){alert(e.message||e);}}
 async function delProduct(id){if(!confirm('Supprimer ce produit ?'))return;await api('/api/products/delete','POST',{id:id});loadProducts();}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+
+/* ───────────── FORMATIONS ALEX (constructeur visuel) ───────────── */
+var FO_AGENT='alex';
+var FO_STATE=null; /* {id,titre,description,ordre,modules:[{id,numero,titre,blocs:[...]}]} */
+var FO_EDIT_ID=null; /* id d'origine si édition (pour renommer proprement) */
+var FO_BLOC_TYPES=[
+  {v:'texte',label:'Texte'},
+  {v:'image',label:'Image'},
+  {v:'audio',label:'Audio MP3'},
+  {v:'video',label:'Vidéo'},
+  {v:'exercice',label:'Exercice'},
+  {v:'intervention',label:'Intervention d’Alex'}
+];
+
+async function foLoadList(){
+  var box=document.getElementById('fo-list');
+  box.textContent='Chargement…';
+  try{
+    var r=await api('/api/formations?agent='+FO_AGENT,'GET');
+    var formations=(r.data&&r.data.formations)||[];
+    if(!formations.length){box.innerHTML='<p class="hint">Aucune formation pour l’instant. Clique sur « Nouvelle formation » pour commencer.</p>';return;}
+    var html='<table><thead><tr><th>Titre</th><th>Modules</th><th>Ordre</th><th></th></tr></thead><tbody>';
+    formations.forEach(function(f){
+      var nbMods=(f.modules&&f.modules.length)||0;
+      html+='<tr><td><strong>'+esc(f.titre)+'</strong><div style="font-size:11px;color:var(--t3)">'+esc(f.id)+'</div></td>'
+        +'<td>'+nbMods+'</td><td>'+esc(f.ordre||0)+'</td>'
+        +'<td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="foEdit(\''+esc(f.id)+'\')">Modifier</button> '
+        +'<button class="btn btn-danger" type="button" onclick="foDelete(\''+esc(f.id)+'\')">Supprimer</button></td></tr>';
+    });
+    html+='</tbody></table>';
+    box.innerHTML=html;
+  }catch(e){box.textContent=e.message||'Erreur de chargement.';}
+}
+
+function foBlankBloc(type){
+  return {type:type||'texte',contenu:'',url:'',legende:'',titre:'',intro:'',objectif:'',consigne:''};
+}
+function foNew(){
+  FO_EDIT_ID=null;
+  FO_STATE={id:'',titre:'',description:'',ordre:0,modules:[]};
+  document.getElementById('fo-editor-title').textContent='Nouvelle formation';
+  foRenderEditor();
+}
+async function foEdit(id){
+  try{
+    var r=await api('/api/formations?agent='+FO_AGENT,'GET');
+    var formations=(r.data&&r.data.formations)||[];
+    var f=formations.filter(function(x){return x.id===id;})[0];
+    if(!f){alert('Formation introuvable.');return;}
+    FO_EDIT_ID=f.id;
+    FO_STATE={
+      id:f.id||'',titre:f.titre||'',description:f.description||'',ordre:f.ordre||0,
+      modules:(f.modules||[]).map(function(m,i){
+        return {id:m.id||('m'+(i+1)),numero:(m.numero!=null?m.numero:(i+1)),titre:m.titre||('Module '+(i+1)),
+          blocs:(m.blocs||[]).map(function(b){var nb=foBlankBloc(b.type);for(var k in b){if(b[k]!=null)nb[k]=b[k];}return nb;})};
+      })
+    };
+    document.getElementById('fo-editor-title').textContent='Modifier : '+ (f.titre||f.id);
+    foRenderEditor();
+  }catch(e){alert(e.message||e);}
+}
+function foCancel(){document.getElementById('fo-editor').style.display='none';FO_STATE=null;FO_EDIT_ID=null;}
+
+async function foDelete(id){
+  if(!confirm('Supprimer cette formation ? Cette action est définitive.'))return;
+  try{await api('/api/formations/delete','POST',{agent:FO_AGENT,id:id});foLoadList();
+    if(FO_EDIT_ID===id)foCancel();
+  }catch(e){alert(e.message||e);}
+}
+
+function foAddModule(){
+  if(!FO_STATE)return;
+  var n=FO_STATE.modules.length+1;
+  FO_STATE.modules.push({id:'m'+n,numero:n,titre:'Module '+n,blocs:[]});
+  foRenderEditor();
+}
+function foRemoveModule(mi){FO_STATE.modules.splice(mi,1);foRenumberModules();foRenderEditor();}
+function foMoveModule(mi,dir){
+  var j=mi+dir;if(j<0||j>=FO_STATE.modules.length)return;
+  var tmp=FO_STATE.modules[mi];FO_STATE.modules[mi]=FO_STATE.modules[j];FO_STATE.modules[j]=tmp;
+  foRenumberModules();foRenderEditor();
+}
+function foRenumberModules(){FO_STATE.modules.forEach(function(m,i){m.numero=i+1;if(!m.id)m.id='m'+(i+1);});}
+
+function foAddBloc(mi){FO_STATE.modules[mi].blocs.push(foBlankBloc('texte'));foRenderEditor();}
+function foRemoveBloc(mi,bi){FO_STATE.modules[mi].blocs.splice(bi,1);foRenderEditor();}
+function foMoveBloc(mi,bi,dir){
+  var arr=FO_STATE.modules[mi].blocs;var j=bi+dir;if(j<0||j>=arr.length)return;
+  var tmp=arr[bi];arr[bi]=arr[j];arr[j]=tmp;foRenderEditor();
+}
+
+/* Lecture des champs de l'éditeur -> FO_STATE (avant re-render ou save) */
+function foCollect(){
+  if(!FO_STATE)return;
+  FO_STATE.titre=document.getElementById('fo-titre').value;
+  FO_STATE.description=document.getElementById('fo-desc').value;
+  var ord=parseInt(document.getElementById('fo-ordre').value,10);FO_STATE.ordre=isNaN(ord)?0:ord;
+  var idField=document.getElementById('fo-id').value.trim();
+  if(idField)FO_STATE.id=idField;
+  FO_STATE.modules.forEach(function(m,mi){
+    var t=document.getElementById('fo-m-titre-'+mi);if(t)m.titre=t.value;
+    m.blocs.forEach(function(b,bi){
+      var typeEl=document.getElementById('fo-b-type-'+mi+'-'+bi);if(typeEl)b.type=typeEl.value;
+      ['contenu','url','legende','titre','intro','objectif','consigne'].forEach(function(f){
+        var el=document.getElementById('fo-b-'+f+'-'+mi+'-'+bi);if(el)b[f]=el.value;
+      });
+    });
+  });
+}
+
+/* Champs affichés selon le type de bloc */
+function foBlocFields(mi,bi,b){
+  function ta(field,label,val,ph){return '<div style="margin-top:8px"><label class="f">'+label+'</label><textarea class="f" id="fo-b-'+field+'-'+mi+'-'+bi+'" rows="3" placeholder="'+(ph||'')+'">'+esc(val||'')+'</textarea></div>';}
+  function inp(field,label,val,ph){return '<div style="margin-top:8px"><label class="f">'+label+'</label><input class="f" id="fo-b-'+field+'-'+mi+'-'+bi+'" value="'+esc(val||'')+'" placeholder="'+(ph||'')+'"></div>';}
+  var t=b.type;
+  if(t==='texte')return ta('contenu','Contenu de la leçon',b.contenu,'Le texte que la personne lit');
+  if(t==='intervention')return ta('contenu','Ce qu’Alex dit / fait',b.contenu,'Ex. « Écoute bien cette partie, puis reviens me voir. »');
+  if(t==='image')return inp('url','Adresse de l’image (https)',b.url,'https://…')+inp('legende','Légende (optionnel)',b.legende,'');
+  if(t==='audio')return inp('url','Adresse du MP3 (https)',b.url,'https://…/audio.mp3')+inp('titre','Titre (optionnel)',b.titre,'')+inp('intro','Intro suggérée (optionnel)',b.intro,'Ex. Écoute et reviens me voir.');
+  if(t==='video')return inp('url','Adresse de la vidéo (https)',b.url,'https://… (YouTube, Vimeo, MP4…)')+inp('titre','Titre (optionnel)',b.titre,'')+inp('intro','Intro suggérée (optionnel)',b.intro,'');
+  if(t==='exercice')return inp('objectif','Objectif (optionnel)',b.objectif,'Ce que l’exercice fait travailler')+ta('consigne','Consigne',b.consigne,'Ce que la personne doit faire');
+  return '';
+}
+
+function foRenderEditor(){
+  var ed=document.getElementById('fo-editor');ed.style.display='block';
+  document.getElementById('fo-titre').value=FO_STATE.titre||'';
+  document.getElementById('fo-id').value=FO_STATE.id||'';
+  document.getElementById('fo-desc').value=FO_STATE.description||'';
+  document.getElementById('fo-ordre').value=FO_STATE.ordre||0;
+
+  var wrap=document.getElementById('fo-modules');
+  if(!FO_STATE.modules.length){wrap.innerHTML='<p class="hint">Aucun module. Ajoute ton premier module ci-dessus.</p>';return;}
+  var html='';
+  FO_STATE.modules.forEach(function(m,mi){
+    html+='<div style="background:rgba(15,28,63,.55);border:1px solid rgba(123,92,255,.22);border-radius:14px;padding:14px">';
+    html+='<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">'
+      +'<div style="font-weight:700;color:#fff">Module '+(mi+1)+'</div>'
+      +'<div style="white-space:nowrap">'
+      +'<button class="btn btn-ghost" type="button" onclick="foMoveModuleLive('+mi+',-1)">↑</button> '
+      +'<button class="btn btn-ghost" type="button" onclick="foMoveModuleLive('+mi+',1)">↓</button> '
+      +'<button class="btn btn-danger" type="button" onclick="foRemoveModuleLive('+mi+')">Retirer le module</button>'
+      +'</div></div>';
+    html+='<div style="margin-top:8px"><label class="f">Titre du module</label><input class="f" id="fo-m-titre-'+mi+'" value="'+esc(m.titre||'')+'" placeholder="Ex. Construire ton personnage"></div>';
+    html+='<div style="margin-top:12px;font-size:12px;color:var(--t3);font-weight:600">Blocs</div>';
+    if(!m.blocs.length){html+='<p class="hint" style="margin:6px 0">Aucun bloc. Ajoute du texte, un audio, une vidéo, une image ou un exercice.</p>';}
+    m.blocs.forEach(function(b,bi){
+      html+='<div style="background:rgba(6,10,24,.5);border:1px solid rgba(123,92,255,.16);border-radius:11px;padding:11px;margin-top:9px">';
+      html+='<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">';
+      html+='<select class="f" style="max-width:200px" id="fo-b-type-'+mi+'-'+bi+'" onchange="foChangeType('+mi+','+bi+',this.value)">';
+      FO_BLOC_TYPES.forEach(function(o){html+='<option value="'+o.v+'"'+(b.type===o.v?' selected':'')+'>'+o.label+'</option>';});
+      html+='</select>';
+      html+='<div style="white-space:nowrap">'
+        +'<button class="btn btn-ghost" type="button" onclick="foMoveBlocLive('+mi+','+bi+',-1)">↑</button> '
+        +'<button class="btn btn-ghost" type="button" onclick="foMoveBlocLive('+mi+','+bi+',1)">↓</button> '
+        +'<button class="btn btn-danger" type="button" onclick="foRemoveBlocLive('+mi+','+bi+')">✕</button>'
+        +'</div></div>';
+      html+='<div id="fo-b-fields-'+mi+'-'+bi+'">'+foBlocFields(mi,bi,b)+'</div>';
+      html+='</div>';
+    });
+    html+='<button class="btn btn-ghost" type="button" style="margin-top:10px" onclick="foAddBlocLive('+mi+')">➕ Ajouter un bloc</button>';
+    html+='</div>';
+  });
+  wrap.innerHTML=html;
+}
+
+/* Variantes « live » : on lit les champs avant de re-render pour ne rien perdre */
+function foChangeType(mi,bi,val){foCollect();FO_STATE.modules[mi].blocs[bi].type=val;foRenderEditor();}
+function foAddBlocLive(mi){foCollect();foAddBloc(mi);}
+function foRemoveBlocLive(mi,bi){foCollect();foRemoveBloc(mi,bi);}
+function foMoveBlocLive(mi,bi,dir){foCollect();foMoveBloc(mi,bi,dir);}
+function foAddModuleLive(){foCollect();foAddModule();}
+function foRemoveModuleLive(mi){foCollect();if(!confirm('Retirer ce module ?'))return;foRemoveModule(mi);}
+function foMoveModuleLive(mi,dir){foCollect();foMoveModule(mi,dir);}
+
+async function foSave(){
+  foCollect();
+  if(!FO_STATE.titre.trim()){showMsg('fo-msg','Donne un titre à la formation.',false);return;}
+  try{
+    var r=await api('/api/formations/save','POST',{agent:FO_AGENT,formation:FO_STATE});
+    if(r.data&&r.data.success){
+      /* si l'id a changé lors d'un renommage, supprime l'ancienne clé */
+      if(FO_EDIT_ID&&r.data.formation&&r.data.formation.id&&FO_EDIT_ID!==r.data.formation.id){
+        try{await api('/api/formations/delete','POST',{agent:FO_AGENT,id:FO_EDIT_ID});}catch(e){}
+      }
+      showMsg('fo-msg','Formation enregistrée ✅',true);
+      FO_EDIT_ID=r.data.formation?r.data.formation.id:FO_STATE.id;
+      FO_STATE.id=FO_EDIT_ID;
+      document.getElementById('fo-id').value=FO_EDIT_ID;
+      foLoadList();
+    }else{
+      showMsg('fo-msg',(r.data&&r.data.error)||'Enregistrement impossible.',false);
+    }
+  }catch(e){showMsg('fo-msg',e.message||'Erreur.',false);}
+}
+
+/* Met à jour l'aperçu de l'identifiant auto quand on tape le titre (si id vide) */
+document.addEventListener('input',function(e){
+  if(e.target&&e.target.id==='fo-titre'&&FO_STATE&&!FO_EDIT_ID){
+    var idEl=document.getElementById('fo-id');
+    if(idEl&&!idEl.value.trim()){
+      idEl.placeholder=(e.target.value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60)||'auto d’après le titre';
+    }
+  }
+});
+
 (async function(){
   var saved=sessionStorage.getItem(TOKEN_KEY);if(!saved)return;
   try{
