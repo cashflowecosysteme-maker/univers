@@ -18,3 +18,16 @@ database_id = "a21fd813-06fa-41f1-b744-07bf1c5c7951"
 
 [vars]
 SITE_URL = "https://univers.nyxia.top"
+# ── À AJOUTER dans le wrangler.toml du Super Admin (univers) pour la vectorisation ──
+# (garde tout ce que tu as déjà : CASHFLOW_KV, DB, assets…)
+
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "univers-livres"
+
+[ai]
+binding = "AI"
+
+# L'index "univers-livres" doit déjà exister (1024 dimensions, cosine, modèle @cf/baai/bge-m3).
+# Sans ces deux bindings, la gestion des personnages marche quand même ; seule la vectorisation
+# affiche un avertissement tant qu'ils ne sont pas ajoutés.
