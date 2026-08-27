@@ -691,50 +691,7 @@ async function handleDeletePortalClient(request, env) {
 // Les formations sont stockées dans le MÊME KV que le Portail Alex, à la clé
 // formation:{agent}:{id}. Le worker d'Alex les lit directement. Aucun contenu inventé ici :
 // le Super Admin ne fait qu'écrire ce que Diane saisit.
-// Personnages par défaut. La liste est enrichissable dynamiquement (KV admin:formation_personnages).
-const DEFAULT_FORMATION_AGENTS = [
-  { code: 'diane', nom: 'Diane' },
-  { code: 'nyxia', nom: 'NyXia' },
-  { code: 'eric', nom: 'Éric' },
-  { code: 'alex', nom: 'Alex' },
-  { code: 'lena', nom: 'Léna' },
-  { code: 'selena', nom: 'Séléna' },
-  { code: 'kael', nom: 'Kael' }
-];
-const FORMATION_AGENTS_KEY = 'admin:formation_personnages';
-
-function isValidAgentCode(a) { return /^[a-z0-9][a-z0-9-]{0,40}$/.test(String(a || '')); }
-
-async function getFormationAgents(env) {
-  let custom = [];
-  try { const raw = await env.CASHFLOW_KV.get(FORMATION_AGENTS_KEY); if (raw) custom = JSON.parse(raw) || []; } catch (_) {}
-  const map = new Map();
-  for (const a of DEFAULT_FORMATION_AGENTS) map.set(a.code, { code: a.code, nom: a.nom, custom: false });
-  for (const a of (Array.isArray(custom) ? custom : [])) {
-    if (a && isValidAgentCode(a.code)) map.set(a.code, { code: a.code, nom: String(a.nom || a.code), custom: true });
-  }
-  return [...map.values()];
-}
-
-async function saveFormationAgent(env, code, nom) {
-  code = slugifyFormationId(code);
-  if (!isValidAgentCode(code)) return null;
-  let custom = [];
-  try { const raw = await env.CASHFLOW_KV.get(FORMATION_AGENTS_KEY); if (raw) custom = JSON.parse(raw) || []; } catch (_) {}
-  custom = custom.filter(a => a && a.code !== code);
-  custom.push({ code, nom: String(nom || code).trim().slice(0, 40) });
-  await env.CASHFLOW_KV.put(FORMATION_AGENTS_KEY, JSON.stringify(custom));
-  return { code, nom: String(nom || code).trim().slice(0, 40) };
-}
-
-async function deleteFormationAgent(env, code) {
-  code = slugifyFormationId(code);
-  let custom = [];
-  try { const raw = await env.CASHFLOW_KV.get(FORMATION_AGENTS_KEY); if (raw) custom = JSON.parse(raw) || []; } catch (_) {}
-  custom = custom.filter(a => a && a.code !== code);
-  await env.CASHFLOW_KV.put(FORMATION_AGENTS_KEY, JSON.stringify(custom));
-  return true;
-}
+const FORMATION_AGENTS = ['diane', 'nyxia', 'eric', 'alex', 'lena', 'selena', 'kael'];
 
 function formationKey(agent, id) { return 'formation:' + agent + ':' + id; }
 
@@ -776,150 +733,13 @@ function sanitizeFormationDoc(input) {
   };
 }
 
-// ── Gestion dynamique des personnages de formation ──
-async function handleListFormationAgents(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  return json({ agents: await getFormationAgents(env) });
-}
-
-async function handleSaveFormationAgent(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  const body = await request.json().catch(() => ({}));
-  const nom = String(body.nom || '').trim();
-  const code = slugifyFormationId(body.code || body.nom);
-  if (!nom) return json({ error: 'Le nom du personnage est requis.' }, 400);
-  if (!isValidAgentCode(code)) return json({ error: 'Identifiant invalide (lettres minuscules, chiffres, tirets).' }, 400);
-  const saved = await saveFormationAgent(env, code, nom);
-  if (!saved) return json({ error: 'Enregistrement impossible.' }, 500);
-  return json({ success: true, agent: saved, agents: await getFormationAgents(env) });
-}
-
-async function handleDeleteFormationAgent(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  const body = await request.json().catch(() => ({}));
-  const code = slugifyFormationId(body.code);
-  if (DEFAULT_FORMATION_AGENTS.some(a => a.code === code)) {
-    return json({ error: 'Personnage par défaut : non supprimable.' }, 400);
-  }
-  await deleteFormationAgent(env, code);
-  return json({ success: true, agents: await getFormationAgents(env) });
-}
-
-// ── Vectorisation (cerveau) — index univers-livres, namespace = personnage ──
-const VEC_EMBED_MODEL = '@cf/baai/bge-m3';
-const vecIdsKey = (agent) => 'brain:' + agent + ':ids';
-const vecSourcesKey = (agent) => 'brain:' + agent + ':sources';
-
-function chunkText(text, size, overlap) {
-  size = size || 1100; overlap = overlap || 150;
-  text = String(text || '').replace(/\r\n/g, '\n').trim();
-  if (!text) return [];
-  const chunks = [];
-  let i = 0;
-  while (i < text.length) {
-    let end = Math.min(i + size, text.length);
-    if (end < text.length) {
-      const slice = text.slice(i, end);
-      const brk = Math.max(slice.lastIndexOf('\n\n'), slice.lastIndexOf('. '), slice.lastIndexOf('\n'));
-      if (brk > size * 0.5) end = i + brk + 1;
-    }
-    const piece = text.slice(i, end).trim();
-    if (piece) chunks.push(piece);
-    if (end >= text.length) break;
-    i = end - overlap; if (i < 0) i = 0;
-  }
-  return chunks;
-}
-
-async function embedBatch(env, texts) {
-  const res = await env.AI.run(VEC_EMBED_MODEL, { text: texts });
-  const data = res && (res.data || res.embeddings || (res.result && res.result.data));
-  if (!Array.isArray(data)) throw new Error("Réponse d'embedding inattendue.");
-  return data;
-}
-
-async function handleVectorizeIngest(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  if (!env.VECTORIZE_INDEX || !env.AI) {
-    return json({ error: 'Vectorisation indisponible : ajoute les bindings VECTORIZE_INDEX et [ai] dans wrangler.toml.' }, 400);
-  }
-  const body = await request.json().catch(() => ({}));
-  const agent = isValidAgentCode(body.agent) ? body.agent : null;
-  if (!agent) return json({ error: 'Personnage invalide.' }, 400);
-  const source = (String(body.source || '').trim()) || 'Document';
-  const text = String(body.text || '').trim();
-  if (!text) return json({ error: 'Aucun contenu à vectoriser.' }, 400);
-  const chunks = chunkText(text);
-  if (!chunks.length) return json({ error: 'Contenu trop court.' }, 400);
-
-  const sourceId = slugifyFormationId(source) + '-' + Date.now().toString(36);
-  const allIds = [];
-  try {
-    const BATCH = 40;
-    for (let b = 0; b < chunks.length; b += BATCH) {
-      const part = chunks.slice(b, b + BATCH);
-      const embs = await embedBatch(env, part);
-      const vectors = part.map((chunk, j) => {
-        const id = agent + ':' + sourceId + ':' + (b + j);
-        allIds.push(id);
-        return { id, values: embs[j], namespace: agent, metadata: { agent, source, text: chunk.slice(0, 1500) } };
-      });
-      await env.VECTORIZE_INDEX.upsert(vectors);
-    }
-    let ids = []; try { const raw = await env.CASHFLOW_KV.get(vecIdsKey(agent)); if (raw) ids = JSON.parse(raw) || []; } catch (_) {}
-    ids = ids.concat(allIds);
-    await env.CASHFLOW_KV.put(vecIdsKey(agent), JSON.stringify(ids));
-    let sources = []; try { const raw = await env.CASHFLOW_KV.get(vecSourcesKey(agent)); if (raw) sources = JSON.parse(raw) || []; } catch (_) {}
-    sources.push({ id: sourceId, source, chunks: allIds.length, at: new Date().toISOString() });
-    await env.CASHFLOW_KV.put(vecSourcesKey(agent), JSON.stringify(sources));
-  } catch (e) {
-    return json({ error: 'Vectorisation échouée : ' + e.message }, 500);
-  }
-  return json({ success: true, agent, source, chunks: allIds.length });
-}
-
-async function handleVectorizeStats(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  const url = new URL(request.url);
-  const agent = isValidAgentCode(url.searchParams.get('agent')) ? url.searchParams.get('agent') : null;
-  if (!agent) return json({ error: 'Personnage invalide.' }, 400);
-  let ids = [], sources = [];
-  try { const raw = await env.CASHFLOW_KV.get(vecIdsKey(agent)); if (raw) ids = JSON.parse(raw) || []; } catch (_) {}
-  try { const raw = await env.CASHFLOW_KV.get(vecSourcesKey(agent)); if (raw) sources = JSON.parse(raw) || []; } catch (_) {}
-  return json({ agent, vectors: ids.length, sources, bindings: { vectorize: !!env.VECTORIZE_INDEX, ai: !!env.AI } });
-}
-
-async function handleVectorizeWipe(request, env) {
-  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
-  if (!env.VECTORIZE_INDEX) return json({ error: 'Binding VECTORIZE_INDEX absent.' }, 400);
-  const body = await request.json().catch(() => ({}));
-  const agent = isValidAgentCode(body.agent) ? body.agent : null;
-  if (!agent) return json({ error: 'Personnage invalide.' }, 400);
-  let ids = []; try { const raw = await env.CASHFLOW_KV.get(vecIdsKey(agent)); if (raw) ids = JSON.parse(raw) || []; } catch (_) {}
-
-  if (body.sourceId) {
-    const prefix = agent + ':' + body.sourceId + ':';
-    const del = ids.filter(id => id.startsWith(prefix));
-    const remaining = ids.filter(id => !id.startsWith(prefix));
-    try { for (let i = 0; i < del.length; i += 500) await env.VECTORIZE_INDEX.deleteByIds(del.slice(i, i + 500)); }
-    catch (e) { return json({ error: 'Suppression échouée : ' + e.message }, 500); }
-    await env.CASHFLOW_KV.put(vecIdsKey(agent), JSON.stringify(remaining));
-    let sources = []; try { const raw = await env.CASHFLOW_KV.get(vecSourcesKey(agent)); if (raw) sources = JSON.parse(raw) || []; } catch (_) {}
-    sources = sources.filter(s => s.id !== body.sourceId);
-    await env.CASHFLOW_KV.put(vecSourcesKey(agent), JSON.stringify(sources));
-    return json({ success: true, removed: del.length, remaining: remaining.length });
-  }
-  try { for (let i = 0; i < ids.length; i += 500) await env.VECTORIZE_INDEX.deleteByIds(ids.slice(i, i + 500)); }
-  catch (e) { return json({ error: 'Suppression échouée : ' + e.message }, 500); }
-  await env.CASHFLOW_KV.delete(vecIdsKey(agent));
-  await env.CASHFLOW_KV.delete(vecSourcesKey(agent));
-  return json({ success: true, removed: ids.length, remaining: 0 });
-}
-
 async function handleListFormations(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const url = new URL(request.url);
-  const agent = isValidAgentCode(url.searchParams.get('agent')) ? url.searchParams.get('agent') : 'alex';
+  const asked = String(url.searchParams.get('agent') || 'alex').toLowerCase();
+  const catalog = await lirePersonnages(env);
+  const allowed = catalog.map(p => p.code).concat(FORMATION_AGENTS);
+  const agent = allowed.includes(asked) ? asked : 'alex';
   const out = [];
   try {
     const list = await env.CASHFLOW_KV.list({ prefix: 'formation:' + agent + ':' });
@@ -937,8 +757,10 @@ async function handleListFormations(request, env) {
 async function handleSaveFormation(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const body = await request.json().catch(() => ({}));
-  const agent = isValidAgentCode(body.agent) ? body.agent : null;
-  if (!agent) return json({ error: 'Personnage invalide.' }, 400);
+  const asked = String(body.agent || 'alex').toLowerCase();
+  const catalog = await lirePersonnages(env);
+  const allowed = catalog.map(p => p.code).concat(FORMATION_AGENTS);
+  const agent = allowed.includes(asked) ? asked : 'alex';
   const doc = sanitizeFormationDoc(body.formation || body);
   if (!doc.id) return json({ error: 'Donne au moins un titre à la formation.' }, 400);
   if (!doc.titre) return json({ error: 'Le titre est requis.' }, 400);
@@ -951,8 +773,10 @@ async function handleSaveFormation(request, env) {
 async function handleDeleteFormation(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const body = await request.json().catch(() => ({}));
-  const agent = isValidAgentCode(body.agent) ? body.agent : null;
-  if (!agent) return json({ error: 'Personnage invalide.' }, 400);
+  const asked = String(body.agent || 'alex').toLowerCase();
+  const catalog = await lirePersonnages(env);
+  const allowed = catalog.map(p => p.code).concat(FORMATION_AGENTS);
+  const agent = allowed.includes(asked) ? asked : 'alex';
   const id = slugifyFormationId(body.id);
   if (!id) return json({ error: 'Identifiant requis.' }, 400);
   try {
@@ -1156,12 +980,9 @@ export default {
       if (path === '/api/formations' && request.method === 'GET') return await handleListFormations(request, env);
       if (path === '/api/formations/save' && request.method === 'POST') return await handleSaveFormation(request, env);
       if (path === '/api/formations/delete' && request.method === 'POST') return await handleDeleteFormation(request, env);
-      if (path === '/api/formations/agents' && request.method === 'GET') return await handleListFormationAgents(request, env);
-      if (path === '/api/formations/agents/save' && request.method === 'POST') return await handleSaveFormationAgent(request, env);
-      if (path === '/api/formations/agents/delete' && request.method === 'POST') return await handleDeleteFormationAgent(request, env);
-      if (path === '/api/vectorize/ingest' && request.method === 'POST') return await handleVectorizeIngest(request, env);
-      if (path === '/api/vectorize/stats' && request.method === 'GET') return await handleVectorizeStats(request, env);
-      if (path === '/api/vectorize/wipe' && request.method === 'POST') return await handleVectorizeWipe(request, env);
+      if ((path === '/api/personnages' || path === '/api/formations/agents') && (request.method === 'GET' || request.method === 'POST')) return await handlePersonnagesList(request, env);
+      if ((path === '/api/personnages/save' || path === '/api/formations/agents/save') && request.method === 'POST') return await handlePersonnagesSave(request, env);
+      if ((path === '/api/personnages/delete' || path === '/api/formations/agents/delete') && request.method === 'POST') return await handlePersonnagesDelete(request, env);
       if (path === '/api/defunts' && request.method === 'GET') return await handleListDefunts(request, env);
       if (path === '/api/defunts/save' && request.method === 'POST') return await handleSaveDefunt(request, env);
       if (path === '/api/defunts/delete' && request.method === 'POST') return await handleDeleteDefunt(request, env);
@@ -1179,3 +1000,76 @@ export default {
     return new Response('Not found', { status: 404 });
   }
 };
+
+// ───────────── Personnages partagés (Univers + Studio Prompt, même KV) ─────────────
+const PERSONNAGES_KV_KEY = 'nyxia:personnages';
+const PERSONNAGES_KV_KEY_LEGACY = 'formations:agents';
+const PERSONNAGES_DEFAUT = [
+  { code: 'diane', nom: 'Diane', portail: 'lena', custom: false },
+  { code: 'nyxia', nom: 'NyXia', portail: 'tous', custom: false },
+  { code: 'lena', nom: 'Léna', portail: 'lena', custom: false },
+  { code: 'sophia', nom: 'Sophia', portail: 'lena', custom: false },
+  { code: 'aletheia', nom: 'Aletheia', portail: 'lena', custom: false },
+  { code: 'cassandre', nom: 'Cassandre', portail: 'lena', custom: false },
+  { code: 'celeste', nom: 'Céleste', portail: 'lena', custom: false },
+  { code: 'selena', nom: 'Séléna', portail: 'selena', custom: false },
+  { code: 'kael', nom: 'Kael', portail: 'kael', custom: false },
+  { code: 'eric', nom: 'Éric', portail: 'cercles', custom: false },
+  { code: 'alex', nom: 'Alex', portail: 'alex', custom: false }
+];
+function slugPersonnage(nom) {
+  return String(nom || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+}
+async function lirePersonnages(env) {
+  const raw = (await env.CASHFLOW_KV.get(PERSONNAGES_KV_KEY)) || (await env.CASHFLOW_KV.get(PERSONNAGES_KV_KEY_LEGACY));
+  let extra = [];
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      extra = Array.isArray(parsed) ? parsed : (parsed.agents || parsed.personnages || []);
+    } catch (_) {}
+  }
+  const map = {};
+  PERSONNAGES_DEFAUT.concat(extra).forEach((p) => {
+    const code = String(p.code || p.id || '').toLowerCase().trim();
+    if (!code) return;
+    map[code] = {
+      code,
+      nom: p.nom || p.name || code,
+      portail: p.portail || p.portal || '',
+      custom: !!p.custom || !PERSONNAGES_DEFAUT.some((d) => d.code === code)
+    };
+  });
+  return Object.values(map).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+}
+async function ecrirePersonnages(env, list) {
+  const custom = list.filter((p) => p.custom);
+  await env.CASHFLOW_KV.put(PERSONNAGES_KV_KEY, JSON.stringify(custom));
+  await env.CASHFLOW_KV.put(PERSONNAGES_KV_KEY_LEGACY, JSON.stringify({ agents: custom }));
+}
+async function handlePersonnagesList(request, env) {
+  const agents = await lirePersonnages(env);
+  return json({ success: true, personnages: agents, agents });
+}
+async function handlePersonnagesSave(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const nom = String(body.nom || body.name || '').trim();
+  const code = slugPersonnage(body.code || nom);
+  if (!nom || !code) return json({ error: 'Nom requis.' }, 400);
+  const list = await lirePersonnages(env);
+  const exist = list.find((p) => p.code === code);
+  const row = { code, nom, portail: String(body.portail || body.portal || '').toLowerCase(), custom: true };
+  if (exist) Object.assign(exist, row);
+  else list.push(row);
+  await ecrirePersonnages(env, list);
+  return json({ success: true, agent: row, personnage: row });
+}
+async function handlePersonnagesDelete(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const code = String(body.code || body.id || '').toLowerCase().trim();
+  if (!code) return json({ error: 'code requis.' }, 400);
+  const list = (await lirePersonnages(env)).filter((p) => p.code !== code);
+  await ecrirePersonnages(env, list);
+  return json({ success: true });
+}
+
