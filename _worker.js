@@ -981,6 +981,9 @@ export default {
       if (path === '/api/formations' && request.method === 'GET') return await handleListFormations(request, env);
       if (path === '/api/formations/save' && request.method === 'POST') return await handleSaveFormation(request, env);
       if (path === '/api/formations/delete' && request.method === 'POST') return await handleDeleteFormation(request, env);
+      if (path === '/api/vectorize/stats' && request.method === 'GET') return await handleVectorizeStats(request, env);
+      if (path === '/api/vectorize/ingest' && request.method === 'POST') return await handleVectorizeIngest(request, env);
+      if (path === '/api/vectorize/wipe' && request.method === 'POST') return await handleVectorizeWipe(request, env);
       if ((path === '/api/personnages' || path === '/api/formations/agents') && (request.method === 'GET' || request.method === 'POST')) return await handlePersonnagesList(request, env);
       if ((path === '/api/personnages/save' || path === '/api/formations/agents/save') && request.method === 'POST') return await handlePersonnagesSave(request, env);
       if ((path === '/api/personnages/delete' || path === '/api/formations/agents/delete') && request.method === 'POST') return await handlePersonnagesDelete(request, env);
@@ -1072,5 +1075,89 @@ async function handlePersonnagesDelete(request, env) {
   const list = (await lirePersonnages(env)).filter((p) => p.code !== code);
   await ecrirePersonnages(env, list);
   return json({ success: true });
+}
+
+async function handleVectorizeStats(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const url = new URL(request.url);
+  const agent = String(url.searchParams.get('agent') || 'alex').toLowerCase();
+  const bindings = { vectorize: !!(env.VECTORIZE_INDEX || env.VECTORIZE), ai: !!env.AI, kv: !!env.CASHFLOW_KV };
+  const sourcesMap = {};
+  let vectors = 0;
+  try {
+    const prefix = 'brain_id:' + agent + ':';
+    let cursor;
+    do {
+      const list = await env.CASHFLOW_KV.list({ prefix, cursor });
+      for (const k of (list.keys || [])) {
+        vectors++;
+        const id = k.name.slice(prefix.length);
+        let book = id.replace(/-chapitre-.*$/i, '').replace(/-\d+$/, '') || id;
+        if (!sourcesMap[book]) sourcesMap[book] = { id: book, source: book, chunks: 0 };
+        sourcesMap[book].chunks++;
+      }
+      cursor = list.list_complete ? null : list.cursor;
+    } while (cursor);
+  } catch (e) {}
+  return json({ success: true, data: { vectors, sources: Object.values(sourcesMap), bindings, agent } });
+}
+
+async function handleVectorizeIngest(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const agent = String(body.agent || 'alex').toLowerCase();
+  const source = String(body.source || 'sans-titre').slice(0, 200);
+  const text = String(body.text || '');
+  if (!text.trim()) return json({ error: 'Texte requis.' }, 400);
+  if (!env.AI || !(env.VECTORIZE_INDEX || env.VECTORIZE)) {
+    return json({ error: 'Vectorisation inactive sur Univers. Utilise Ingestion (Studio Prompt) pour remplir le cerveau.' }, 400);
+  }
+  const index = env.VECTORIZE_INDEX || env.VECTORIZE;
+  const chunks = [];
+  const raw = text.replace(/\r/g, '');
+  let parts = raw.split(/\n(?=#{1,3} )/);
+  if (parts.length < 2) {
+    for (let i = 0; i < raw.length; i += 1500) parts.push(raw.slice(i, i + 1800));
+  }
+  let n = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const piece = parts[i].trim();
+    if (piece.length < 20) continue;
+    n++;
+    const id = agent + '-' + source.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '-' + n;
+    await env.CASHFLOW_KV.put('brain_text:' + agent + ':' + id, piece);
+    await env.CASHFLOW_KV.put('brain_id:' + agent + ':' + id, '1');
+    const embedText = piece.length > 8000 ? piece.slice(0, 8000) : piece;
+    const embeddings = await env.AI.run('@cf/baai/bge-m3', { text: [embedText] });
+    await index.upsert([{
+      id, values: embeddings.data[0], namespace: agent,
+      metadata: { texte_original: piece.slice(0, 1500), source, cible: agent, has_full: piece.length > 1500 ? '1' : '0' }
+    }]);
+    chunks.push(id);
+  }
+  return json({ success: true, chunks: chunks.length });
+}
+
+async function handleVectorizeWipe(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const agent = String(body.agent || body.personnage || '').toLowerCase();
+  if (!agent) return json({ error: 'agent requis.' }, 400);
+  const prefix = 'brain_id:' + agent + ':';
+  const ids = [], kvKeys = [];
+  let cursor;
+  do {
+    const list = await env.CASHFLOW_KV.list({ prefix, cursor });
+    for (const k of (list.keys || [])) { kvKeys.push(k.name); ids.push(k.name.slice(prefix.length)); }
+    cursor = list.list_complete ? null : list.cursor;
+  } while (cursor);
+  const index = env.VECTORIZE_INDEX || env.VECTORIZE;
+  if (index) {
+    for (let i = 0; i < ids.length; i += 500) {
+      try { await index.deleteByIds(ids.slice(i, i + 500)); } catch (_) {}
+    }
+  }
+  for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
+  return json({ success: true, deleted: ids.length });
 }
 
