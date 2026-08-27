@@ -72,7 +72,8 @@ td strong{color:#fff}
     <button class="module-tab" data-module="portails" onclick="switchModule('portails')">Portails</button>
     <button class="module-tab" data-module="clients" onclick="switchModule('clients')">Clients portails</button>
     <button class="module-tab" data-module="outils" onclick="switchModule('outils')">Outils</button>
-    <button class="module-tab" data-module="formations" onclick="switchModule('formations')">Formations des personnages
+    <button class="module-tab" data-module="formations" onclick="switchModule('formations')">Formations des personnages</button>
+    <button class="module-tab" data-module="defunts" onclick="switchModule('defunts')">Défunts · Ovilus</button>
   </nav>
   <div class="main">
     <div class="module-panel active" id="module-pourcentages">
@@ -250,6 +251,66 @@ td strong{color:#fff}
       </div>
     </div>
 
+    <div class="module-panel" id="module-defunts">
+      <div class="panel">
+        <h3>Vectoriser un défunt — soirée Ovilus</h3>
+        <p class="hint" style="margin-bottom:14px">Chaque fiche devient une voix dans l’Ovilus. Elle dit son histoire, son non-dit, puis quitte la scène pour le suivant. L’Ovilus lit la liste publique <code>/api/ovilus/cast</code>.</p>
+        <input type="hidden" id="df-id">
+        <div class="grid2">
+          <div><label class="f">Prénom</label><input class="f" id="df-prenom" placeholder="Mariette"></div>
+          <div><label class="f">Nom</label><input class="f" id="df-nom" placeholder="Leblanc"></div>
+          <div><label class="f">Date de naissance</label><input class="f" id="df-birth" type="date"></div>
+          <div><label class="f">Date de la mort</label><input class="f" id="df-death" type="date"></div>
+        </div>
+        <div style="margin-top:12px">
+          <label class="f">Circonstance de la mort</label>
+          <textarea class="f" id="df-circ" rows="2" placeholder="Verglas 1998, génératrice, fil tombé…"></textarea>
+        </div>
+        <div style="margin-top:12px">
+          <label class="f">Message qu’il ou elle veut dire</label>
+          <textarea class="f" id="df-message" rows="2" placeholder="Ce qu’il faut que les vivants entendent."></textarea>
+        </div>
+        <div style="margin-top:12px">
+          <label class="f">Sentiment d’être incomplet</label>
+          <textarea class="f" id="df-incomplet" rows="2" placeholder="Ce qui reste en suspens dans sa poitrine."></textarea>
+        </div>
+        <div style="margin-top:12px">
+          <label class="f">Non-dit — n’a pas pu faire ou dire</label>
+          <textarea class="f" id="df-unsaid" rows="2" placeholder="Pardon jamais dit, lettre jamais envoyée…"></textarea>
+        </div>
+        <div class="grid2" style="margin-top:12px">
+          <div>
+            <label class="f">Tempérament</label>
+            <select class="f" id="df-tone">
+              <option value="story">Récit — veut partager</option>
+              <option value="grouch">Bougon — vole le micro</option>
+            </select>
+          </div>
+          <div>
+            <label class="f">Actif dans l’Ovilus</label>
+            <select class="f" id="df-active">
+              <option value="1">Oui — entre en scène</option>
+              <option value="0">Non — en réserve</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <label class="f">Soirée / étiquette (optionnel)</label>
+          <input class="f" id="df-soiree" placeholder="Meurtre au manoir — 29 août">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn" type="button" onclick="dfSave()">Enregistrer la fiche</button>
+          <button class="btn btn-ghost" type="button" onclick="dfReset()">Nouvelle fiche</button>
+        </div>
+        <div class="msg" id="df-msg"></div>
+      </div>
+      <div class="panel">
+        <h3>Cast de la soirée</h3>
+        <p class="hint" style="margin-bottom:10px">Ordre = ordre d’entrée sur scène. Après son dernier non-dit, le défunt quitte et le suivant prend le micro.</p>
+        <div id="df-list">—</div>
+      </div>
+    </div>
+
     <div class="module-panel" id="module-formations">
       <div class="panel">
         <h3>Formations des personnages</h3>
@@ -386,6 +447,7 @@ function switchModule(name){
   if(name==='portails'){ loadPortals(); }
   if(name==='clients'){ loadPortals(); loadPortalClients(); }
   if(name==='formations'){ foLoadList(); }
+  if(name==='defunts'){ dfLoad(); }
 }
 function showMsg(id,text,ok){var el=document.getElementById(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text;el.style.display='block';}
 async function api(path,method,body){
@@ -814,6 +876,85 @@ async function foSave(){
       showMsg('fo-msg',(r.data&&r.data.error)||'Enregistrement impossible.',false);
     }
   }catch(e){showMsg('fo-msg',e.message||'Erreur.',false);}
+}
+
+var DF_LIST=[];
+function yearOf(d){ if(!d) return ''; var m=String(d).match(/^(\d{4})/); return m?m[1]:d; }
+function dfReset(){
+  ['df-id','df-prenom','df-nom','df-birth','df-death','df-circ','df-message','df-incomplet','df-unsaid','df-soiree'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('df-tone').value='story';
+  document.getElementById('df-active').value='1';
+  showMsg('df-msg','Nouvelle fiche.',true);
+}
+async function dfLoad(){
+  try{
+    var out=await api('/api/defunts','GET');
+    DF_LIST=(out.data&&out.data.defunts)||[];
+    var box=document.getElementById('df-list');
+    if(!DF_LIST.length){ box.textContent='Aucune fiche. Vectorise le premier défunt.'; return; }
+    var html='<table><thead><tr><th>Défunt</th><th>Dates</th><th>Ton</th><th>Scène</th><th></th></tr></thead><tbody>';
+    DF_LIST.forEach(function(d,i){
+      html+='<tr><td><strong>'+escDf(d.prenom)+' '+escDf(d.nom)+'</strong><div class="hint">'+(d.soiree?escDf(d.soiree):'')+'</div></td>';
+      html+='<td>'+escDf(yearOf(d.birth))+' – '+escDf(yearOf(d.death))+'</td>';
+      html+='<td>'+(d.tone==='grouch'?'bougon':'récit')+'</td>';
+      html+='<td>'+(d.active?'actif':'réserve')+'</td>';
+      html+='<td style="white-space:nowrap">';
+      html+='<button class="btn btn-ghost" onclick="dfEdit(\''+d.id+'\')">Éditer</button> ';
+      html+='<button class="btn btn-ghost" onclick="dfMove(\''+d.id+'\',-1)" '+(i===0?'disabled':'')+'>↑</button> ';
+      html+='<button class="btn btn-ghost" onclick="dfMove(\''+d.id+'\',1)" '+(i===DF_LIST.length-1?'disabled':'')+'>↓</button> ';
+      html+='<button class="btn btn-danger" onclick="dfDel(\''+d.id+'\')">✕</button></td></tr>';
+    });
+    html+='</tbody></table>';
+    box.innerHTML=html;
+  }catch(e){ document.getElementById('df-list').textContent=e.message||'Erreur'; }
+}
+function escDf(s){ return String(s||'').replace(/[&<>"]/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]);}); }
+function dfEdit(id){
+  var d=DF_LIST.find(function(x){return x.id===id;}); if(!d) return;
+  document.getElementById('df-id').value=d.id;
+  document.getElementById('df-prenom').value=d.prenom||'';
+  document.getElementById('df-nom').value=d.nom||'';
+  document.getElementById('df-birth').value=d.birth||'';
+  document.getElementById('df-death').value=d.death||'';
+  document.getElementById('df-circ').value=d.circumstance||'';
+  document.getElementById('df-message').value=d.message||'';
+  document.getElementById('df-incomplet').value=d.incomplete||'';
+  document.getElementById('df-unsaid').value=d.unsaid||'';
+  document.getElementById('df-tone').value=d.tone||'story';
+  document.getElementById('df-active').value=d.active?'1':'0';
+  document.getElementById('df-soiree').value=d.soiree||'';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function dfSave(){
+  var body={
+    id:document.getElementById('df-id').value.trim(),
+    prenom:document.getElementById('df-prenom').value.trim(),
+    nom:document.getElementById('df-nom').value.trim(),
+    birth:document.getElementById('df-birth').value,
+    death:document.getElementById('df-death').value,
+    circumstance:document.getElementById('df-circ').value.trim(),
+    message:document.getElementById('df-message').value.trim(),
+    incomplete:document.getElementById('df-incomplet').value.trim(),
+    unsaid:document.getElementById('df-unsaid').value.trim(),
+    tone:document.getElementById('df-tone').value,
+    active:document.getElementById('df-active').value==='1',
+    soiree:document.getElementById('df-soiree').value.trim()
+  };
+  if(!body.prenom){ showMsg('df-msg','Le prénom est requis.',false); return; }
+  try{
+    var r=await api('/api/defunts/save','POST',body);
+    if(r.res.ok && r.data && r.data.success){ showMsg('df-msg','Fiche enregistrée. L’Ovilus la verra au prochain cercle ouvert.',true); dfReset(); dfLoad(); }
+    else showMsg('df-msg',(r.data&&r.data.error)||'Échec.',false);
+  }catch(e){ showMsg('df-msg',e.message,false); }
+}
+async function dfDel(id){
+  if(!confirm('Retirer ce défunt du cast ?')) return;
+  await api('/api/defunts/delete','POST',{id:id});
+  dfLoad();
+}
+async function dfMove(id,dir){
+  await api('/api/defunts/reorder','POST',{id:id,dir:dir});
+  dfLoad();
 }
 
 /* Met à jour l'aperçu de l'identifiant auto quand on tape le titre (si id vide) */
