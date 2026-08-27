@@ -701,7 +701,7 @@ function slugifyFormationId(s) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 }
 
-const FORMATION_BLOC_TYPES = ['texte', 'image', 'audio', 'video', 'exercice', 'intervention'];
+const FORMATION_BLOC_TYPES = ['texte', 'image', 'audio', 'video', 'exercice', 'intervention', 'lien'];
 
 // Nettoie/valide un bloc selon son type, sans rien inventer.
 function sanitizeFormationBloc(raw) {
@@ -712,6 +712,7 @@ function sanitizeFormationBloc(raw) {
   else if (type === 'image') { b.url = str(raw.url).trim(); b.legende = str(raw.legende); }
   else if (type === 'audio' || type === 'video') { b.url = str(raw.url).trim(); b.titre = str(raw.titre); b.intro = str(raw.intro); }
   else if (type === 'exercice') { b.objectif = str(raw.objectif); b.consigne = str(raw.consigne); }
+  else if (type === 'lien') { b.url = str(raw.url).trim(); b.titre = str(raw.titre || raw.legende); b.intro = str(raw.intro || raw.contenu); }
   return b;
 }
 
