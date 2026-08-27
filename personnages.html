@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Personnages — NyXia SuperAdmin</title>
+  <style>
+    :root { --bg:#0A1628; --p:#7B5CFF; --t:#E8EAF8; --t3:#8891B8; }
+    body { margin:0; font-family:Outfit,system-ui,sans-serif; background:#0A1628; color:var(--t); }
+    .wrap { max-width:820px; margin:0 auto; padding:24px 16px 80px; }
+    h1 { font-size:22px; }
+    .hint { color:var(--t3); font-size:13px; line-height:1.5; }
+    .card { background:rgba(15,28,63,.85); border:1px solid rgba(123,92,255,.2); border-radius:14px; padding:16px; margin:14px 0; }
+    label { display:block; font-size:12px; color:var(--t3); margin:8px 0 4px; }
+    input, select { width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid rgba(123,92,255,.25); background:#080f22; color:#fff; }
+    .row { display:grid; grid-template-columns:1fr 1fr 140px; gap:10px; }
+    @media(max-width:700px){ .row { grid-template-columns:1fr; } }
+    button { cursor:pointer; border:0; border-radius:10px; padding:10px 14px; font-weight:700; }
+    .btn { background:linear-gradient(135deg,#7B5CFF,#5A6CFF); color:#fff; }
+    .btn-ghost { background:transparent; color:#ff8fab; border:1px solid rgba(255,75,110,.3); }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th,td { text-align:left; padding:8px 6px; border-bottom:1px solid rgba(123,92,255,.12); }
+    .code { font-size:12px; color:var(--t3); }
+    #filtre { margin-bottom:10px; }
+    .ok { color:#00E676; } .err { color:#ff8fab; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Personnages NyXia</h1>
+    <p class="hint">Un personnage créé ici apparaît dans <strong>Formations</strong> (Univers) et dans <strong>Ingestion / cerveaux</strong> (Studio Prompt), même KV. Le <em>code</em> doit être celui utilisé par le portail (sophia, celeste, un-nouveau…).</p>
+
+    <div class="card">
+      <div class="row">
+        <div><label>Nom affiché</label><input id="nom" placeholder="Ex. Luna"></div>
+        <div><label>Code agent (cerveau)</label><input id="code" placeholder="luna"></div>
+        <div>
+          <label>Portail</label>
+          <select id="portail">
+            <option value="lena">Léna</option>
+            <option value="selena">Séléna</option>
+            <option value="kael">Kael</option>
+            <option value="alex">Alex</option>
+            <option value="cercles">Cercles / Éric</option>
+            <option value="tous">Tous</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" style="margin-top:12px" type="button" onclick="sauver()">Ajouter le personnage</button>
+      <div id="msg" class="hint" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <input id="filtre" type="search" placeholder="Chercher un personnage…" oninput="filtrer()">
+      <div id="liste">Chargement…</div>
+    </div>
+  </div>
+  <script>
+    var TOKEN = sessionStorage.getItem('nyxia_admin_token') || sessionStorage.getItem('nyxia_token') || '';
+    document.getElementById('nom').addEventListener('input', function(){
+      var c=document.getElementById('code');
+      if(!c.dataset.lock){
+        c.value=this.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+      }
+    });
+    document.getElementById('code').addEventListener('input', function(){ this.dataset.lock='1'; });
+
+    function headers(){ return { 'Content-Type':'application/json', 'X-Admin-Token': TOKEN }; }
+
+    async function charger(){
+      var box=document.getElementById('liste');
+      try{
+        var r=await fetch('/api/personnages',{method:'POST',headers:headers(),body:'{}'});
+        if(!r.ok) r=await fetch('/api/formations/agents',{headers:headers()});
+        var d=await r.json();
+        var list=d.personnages||d.agents||(d.data&&d.data.agents)||[];
+        window._persos=list;
+        rendre(list);
+      }catch(e){ box.textContent='Impossible de charger : '+e.message; }
+    }
+    function rendre(list){
+      if(!list.length){ document.getElementById('liste').textContent='Aucun personnage.'; return; }
+      var html='<table><thead><tr><th>Nom</th><th>Code / cerveau</th><th>Portail</th><th></th></tr></thead><tbody>';
+      list.forEach(function(p){
+        html+='<tr data-q="'+(p.nom+' '+p.code+' '+(p.portail||'')).toLowerCase()+'"><td>'+esc(p.nom)+'</td><td class="code">'+esc(p.code)+'</td><td>'+esc(p.portail||'—')+'</td><td>'
+          +(p.custom?'<button class="btn-ghost" type="button" onclick="retirer(\''+esc(p.code)+'\')">Retirer</button>':'défaut')+'</td></tr>';
+      });
+      html+='</tbody></table>';
+      document.getElementById('liste').innerHTML=html;
+    }
+    function filtrer(){
+      var q=document.getElementById('filtre').value.toLowerCase();
+      document.querySelectorAll('#liste tr[data-q]').forEach(function(tr){
+        tr.style.display=!q||tr.getAttribute('data-q').indexOf(q)>-1?'':'none';
+      });
+    }
+    async function sauver(){
+      var nom=document.getElementById('nom').value.trim();
+      var code=document.getElementById('code').value.trim();
+      var portail=document.getElementById('portail').value;
+      var msg=document.getElementById('msg');
+      if(!nom){ msg.className='err'; msg.textContent='Nom requis.'; return; }
+      var r=await fetch('/api/personnages/save',{method:'POST',headers:headers(),body:JSON.stringify({nom:nom,code:code,portail:portail})});
+      var d=await r.json();
+      if(d.success){ msg.className='ok'; msg.textContent='Ajouté. Il apparaît maintenant dans Ingestion.'; document.getElementById('nom').value=''; document.getElementById('code').value=''; charger(); }
+      else { msg.className='err'; msg.textContent=d.error||'Erreur — as-tu collé les routes dans le worker ?'; }
+    }
+    async function retirer(code){
+      if(!confirm('Retirer '+code+' ?')) return;
+      await fetch('/api/personnages/delete',{method:'POST',headers:headers(),body:JSON.stringify({code:code})});
+      charger();
+    }
+    function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+    charger();
+  </script>
+</body>
+</html>
