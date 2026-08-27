@@ -776,98 +776,128 @@ async function handleDeleteFormation(request, env) {
   return json({ success: true });
 }
 
-const DEFUNT_KV = 'ovilus:defunts';
-
 function yearFromDate(d) {
   const m = String(d || '').match(/^(\d{4})/);
   return m ? Number(m[1]) : null;
 }
 
-function sanitizeDefunt(raw, fallbackId) {
-  const prenom = String(raw.prenom || '').trim();
-  const nom = String(raw.nom || '').trim();
-  const birth = String(raw.birth || '').trim();
-  const death = String(raw.death || '').trim();
-  const by = yearFromDate(birth);
-  const dy = yearFromDate(death);
-  const id = String(raw.id || fallbackId || crypto.randomUUID());
-  const stories = [];
-  if (raw.circumstance) stories.push(String(raw.circumstance).trim());
-  if (raw.message) stories.push(String(raw.message).trim());
-  if (raw.incomplete) stories.push(String(raw.incomplete).trim());
-  if (raw.unsaid) stories.push(String(raw.unsaid).trim());
+function rowToDefunt(row) {
+  if (!row) return null;
+  const stories = [row.circumstance, row.message, row.incomplete, row.unsaid].filter(Boolean);
   return {
-    id,
-    prenom,
-    nom,
-    birth,
-    death,
-    born: by,
-    died: dy,
-    circumstance: String(raw.circumstance || '').trim(),
-    message: String(raw.message || '').trim(),
-    incomplete: String(raw.incomplete || '').trim(),
-    unsaid: String(raw.unsaid || '').trim(),
-    tone: raw.tone === 'grouch' ? 'grouch' : 'story',
-    active: raw.active !== false && raw.active !== 0 && raw.active !== '0',
-    soiree: String(raw.soiree || '').trim(),
-    stories,
-    updated_at: new Date().toISOString()
+    id: row.id,
+    prenom: row.prenom,
+    nom: row.nom || '',
+    birth: row.birth || '',
+    death: row.death || '',
+    born: yearFromDate(row.birth),
+    died: yearFromDate(row.death),
+    circumstance: row.circumstance || '',
+    message: row.message || '',
+    incomplete: row.incomplete || '',
+    unsaid: row.unsaid || '',
+    tone: row.tone === 'grouch' ? 'grouch' : 'story',
+    active: Number(row.active) === 1,
+    soiree: row.soiree || '',
+    sort_order: row.sort_order || 0,
+    stories
   };
 }
 
-async function readDefunts(env) {
-  const raw = await env.CASHFLOW_KV.get(DEFUNT_KV);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (_) { return []; }
+async function ensureDefuntsTable(env) {
+  if (!env.DB) return;
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS defunts (
+    id TEXT PRIMARY KEY,
+    prenom TEXT NOT NULL,
+    nom TEXT DEFAULT '',
+    birth TEXT DEFAULT '',
+    death TEXT DEFAULT '',
+    circumstance TEXT DEFAULT '',
+    message TEXT DEFAULT '',
+    incomplete TEXT DEFAULT '',
+    unsaid TEXT DEFAULT '',
+    tone TEXT DEFAULT 'story',
+    active INTEGER DEFAULT 1,
+    soiree TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT,
+    updated_at TEXT
+  )`).run();
 }
 
-async function writeDefunts(env, list) {
-  await env.CASHFLOW_KV.put(DEFUNT_KV, JSON.stringify(list));
+async function readDefunts(env) {
+  if (!env.DB) return [];
+  await ensureDefuntsTable(env);
+  const res = await env.DB.prepare(`SELECT * FROM defunts ORDER BY sort_order ASC, created_at ASC`).all();
+  return (res.results || []).map(rowToDefunt);
 }
 
 async function handleListDefunts(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'DB absente' }, 500);
   return json({ defunts: await readDefunts(env) });
 }
 
 async function handleSaveDefunt(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'DB absente' }, 500);
+  await ensureDefuntsTable(env);
   const body = await request.json().catch(() => ({}));
-  if (!String(body.prenom || '').trim()) return json({ error: 'Le prénom est requis.' }, 400);
-  const list = await readDefunts(env);
-  const incoming = sanitizeDefunt(body, body.id);
-  const idx = list.findIndex((d) => d.id === incoming.id);
-  if (idx >= 0) list[idx] = incoming;
-  else list.push(incoming);
-  await writeDefunts(env, list);
-  return json({ success: true, defunt: incoming });
+  const prenom = String(body.prenom || '').trim();
+  if (!prenom) return json({ error: 'Le prénom est requis.' }, 400);
+  const now = new Date().toISOString();
+  const id = String(body.id || crypto.randomUUID());
+  const existing = await env.DB.prepare(`SELECT id, sort_order, created_at FROM defunts WHERE id = ?`).bind(id).first();
+  const nom = String(body.nom || '').trim();
+  const birth = String(body.birth || '').trim();
+  const death = String(body.death || '').trim();
+  const circumstance = String(body.circumstance || '').trim();
+  const message = String(body.message || '').trim();
+  const incomplete = String(body.incomplete || '').trim();
+  const unsaid = String(body.unsaid || '').trim();
+  const tone = body.tone === 'grouch' ? 'grouch' : 'story';
+  const active = (body.active === false || body.active === 0 || body.active === '0') ? 0 : 1;
+  const soiree = String(body.soiree || '').trim();
+  if (existing) {
+    await env.DB.prepare(`UPDATE defunts SET prenom=?, nom=?, birth=?, death=?, circumstance=?, message=?, incomplete=?, unsaid=?, tone=?, active=?, soiree=?, updated_at=? WHERE id=?`)
+      .bind(prenom, nom, birth, death, circumstance, message, incomplete, unsaid, tone, active, soiree, now, id).run();
+  } else {
+    const maxRow = await env.DB.prepare(`SELECT MAX(sort_order) as m FROM defunts`).first();
+    const sort = (maxRow && maxRow.m != null) ? Number(maxRow.m) + 1 : 0;
+    await env.DB.prepare(`INSERT INTO defunts (id, prenom, nom, birth, death, circumstance, message, incomplete, unsaid, tone, active, soiree, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, prenom, nom, birth, death, circumstance, message, incomplete, unsaid, tone, active, soiree, sort, now, now).run();
+  }
+  const row = await env.DB.prepare(`SELECT * FROM defunts WHERE id = ?`).bind(id).first();
+  return json({ success: true, defunt: rowToDefunt(row) });
 }
 
 async function handleDeleteDefunt(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'DB absente' }, 500);
+  await ensureDefuntsTable(env);
   const body = await request.json().catch(() => ({}));
   const id = String(body.id || '');
   if (!id) return json({ error: 'Identifiant requis.' }, 400);
-  const list = (await readDefunts(env)).filter((d) => d.id !== id);
-  await writeDefunts(env, list);
+  await env.DB.prepare(`DELETE FROM defunts WHERE id = ?`).bind(id).run();
   return json({ success: true });
 }
 
 async function handleReorderDefunt(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.DB) return json({ error: 'DB absente' }, 500);
+  await ensureDefuntsTable(env);
   const body = await request.json().catch(() => ({}));
   const list = await readDefunts(env);
   const i = list.findIndex((d) => d.id === body.id);
   if (i < 0) return json({ error: 'Introuvable.' }, 404);
   const j = i + Number(body.dir || 0);
   if (j < 0 || j >= list.length) return json({ success: true, defunts: list });
-  const tmp = list[i]; list[i] = list[j]; list[j] = tmp;
-  await writeDefunts(env, list);
-  return json({ success: true, defunts: list });
+  const a = list[i];
+  const b = list[j];
+  await env.DB.prepare(`UPDATE defunts SET sort_order = ? WHERE id = ?`).bind(b.sort_order, a.id).run();
+  await env.DB.prepare(`UPDATE defunts SET sort_order = ? WHERE id = ?`).bind(a.sort_order, b.id).run();
+  return json({ success: true, defunts: await readDefunts(env) });
 }
 
 function corsCast(res) {
@@ -879,7 +909,7 @@ function corsCast(res) {
 
 async function handleOvilusCast(request, env) {
   const all = await readDefunts(env);
-  const defunts = all.filter((d) => d.active !== false).map((d) => ({
+  const defunts = all.filter((d) => d.active).map((d) => ({
     id: d.id,
     name: [d.prenom, d.nom].filter(Boolean).join(' '),
     prenom: d.prenom,
@@ -894,7 +924,7 @@ async function handleOvilusCast(request, env) {
     message: d.message,
     incomplete: d.incomplete,
     unsaid: d.unsaid,
-    stories: d.stories && d.stories.length ? d.stories : [d.message, d.incomplete, d.unsaid, d.circumstance].filter(Boolean),
+    stories: d.stories,
     soiree: d.soiree || ''
   }));
   return corsCast(json({ defunts }));
