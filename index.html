@@ -838,7 +838,8 @@ var FO_BLOC_TYPES=[
   {v:'audio',label:'Audio MP3'},
   {v:'video',label:'Vidéo'},
   {v:'exercice',label:'Exercice'},
-  {v:'intervention',label:'Intervention du personnage'}
+  {v:'intervention',label:'Intervention du personnage'},
+  {v:'lien',label:'Lien (quiz, page, Google Forms…)'}
 ];
 
 async function foLoadList(){
@@ -948,6 +949,7 @@ function foBlocFields(mi,bi,b){
   if(t==='audio')return inp('url','Adresse du MP3 (https)',b.url,'https://…/audio.mp3')+inp('titre','Titre (optionnel)',b.titre,'')+inp('intro','Intro suggérée (optionnel)',b.intro,'Ex. Écoute et reviens me voir.');
   if(t==='video')return inp('url','Adresse de la vidéo (https)',b.url,'https://… (YouTube, Vimeo, MP4…)')+inp('titre','Titre (optionnel)',b.titre,'')+inp('intro','Intro suggérée (optionnel)',b.intro,'');
   if(t==='exercice')return inp('objectif','Objectif (optionnel)',b.objectif,'Ce que l’exercice fait travailler')+ta('consigne','Consigne',b.consigne,'Ce que la personne doit faire');
+  if(t==='lien')return inp('url','Adresse du lien (https)',b.url,'https://docs.google.com/forms/…')+inp('titre','Texte du bouton / titre',b.titre,'Ex. Quiz du module 2')+inp('intro','Phrase que le personnage dit',b.intro,'Ex. Voici ton quiz, ouvre-le puis reviens me voir.');
   return '';
 }
 
