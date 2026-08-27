@@ -776,6 +776,130 @@ async function handleDeleteFormation(request, env) {
   return json({ success: true });
 }
 
+const DEFUNT_KV = 'ovilus:defunts';
+
+function yearFromDate(d) {
+  const m = String(d || '').match(/^(\d{4})/);
+  return m ? Number(m[1]) : null;
+}
+
+function sanitizeDefunt(raw, fallbackId) {
+  const prenom = String(raw.prenom || '').trim();
+  const nom = String(raw.nom || '').trim();
+  const birth = String(raw.birth || '').trim();
+  const death = String(raw.death || '').trim();
+  const by = yearFromDate(birth);
+  const dy = yearFromDate(death);
+  const id = String(raw.id || fallbackId || crypto.randomUUID());
+  const stories = [];
+  if (raw.circumstance) stories.push(String(raw.circumstance).trim());
+  if (raw.message) stories.push(String(raw.message).trim());
+  if (raw.incomplete) stories.push(String(raw.incomplete).trim());
+  if (raw.unsaid) stories.push(String(raw.unsaid).trim());
+  return {
+    id,
+    prenom,
+    nom,
+    birth,
+    death,
+    born: by,
+    died: dy,
+    circumstance: String(raw.circumstance || '').trim(),
+    message: String(raw.message || '').trim(),
+    incomplete: String(raw.incomplete || '').trim(),
+    unsaid: String(raw.unsaid || '').trim(),
+    tone: raw.tone === 'grouch' ? 'grouch' : 'story',
+    active: raw.active !== false && raw.active !== 0 && raw.active !== '0',
+    soiree: String(raw.soiree || '').trim(),
+    stories,
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function readDefunts(env) {
+  const raw = await env.CASHFLOW_KV.get(DEFUNT_KV);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) { return []; }
+}
+
+async function writeDefunts(env, list) {
+  await env.CASHFLOW_KV.put(DEFUNT_KV, JSON.stringify(list));
+}
+
+async function handleListDefunts(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  return json({ defunts: await readDefunts(env) });
+}
+
+async function handleSaveDefunt(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  if (!String(body.prenom || '').trim()) return json({ error: 'Le prénom est requis.' }, 400);
+  const list = await readDefunts(env);
+  const incoming = sanitizeDefunt(body, body.id);
+  const idx = list.findIndex((d) => d.id === incoming.id);
+  if (idx >= 0) list[idx] = incoming;
+  else list.push(incoming);
+  await writeDefunts(env, list);
+  return json({ success: true, defunt: incoming });
+}
+
+async function handleDeleteDefunt(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const id = String(body.id || '');
+  if (!id) return json({ error: 'Identifiant requis.' }, 400);
+  const list = (await readDefunts(env)).filter((d) => d.id !== id);
+  await writeDefunts(env, list);
+  return json({ success: true });
+}
+
+async function handleReorderDefunt(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const list = await readDefunts(env);
+  const i = list.findIndex((d) => d.id === body.id);
+  if (i < 0) return json({ error: 'Introuvable.' }, 404);
+  const j = i + Number(body.dir || 0);
+  if (j < 0 || j >= list.length) return json({ success: true, defunts: list });
+  const tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+  await writeDefunts(env, list);
+  return json({ success: true, defunts: list });
+}
+
+function corsCast(res) {
+  res.headers.set('Access-Control-Allow-Origin', '*');
+  res.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  return res;
+}
+
+async function handleOvilusCast(request, env) {
+  const all = await readDefunts(env);
+  const defunts = all.filter((d) => d.active !== false).map((d) => ({
+    id: d.id,
+    name: [d.prenom, d.nom].filter(Boolean).join(' '),
+    prenom: d.prenom,
+    nom: d.nom,
+    born: d.born,
+    died: d.died,
+    birth: d.birth,
+    death: d.death,
+    era: (d.born || '') + '-' + (d.died || ''),
+    tone: d.tone || 'story',
+    circumstance: d.circumstance,
+    message: d.message,
+    incomplete: d.incomplete,
+    unsaid: d.unsaid,
+    stories: d.stories && d.stories.length ? d.stories : [d.message, d.incomplete, d.unsaid, d.circumstance].filter(Boolean),
+    soiree: d.soiree || ''
+  }));
+  return corsCast(json({ defunts }));
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -807,6 +931,12 @@ export default {
       if (path === '/api/formations' && request.method === 'GET') return await handleListFormations(request, env);
       if (path === '/api/formations/save' && request.method === 'POST') return await handleSaveFormation(request, env);
       if (path === '/api/formations/delete' && request.method === 'POST') return await handleDeleteFormation(request, env);
+      if (path === '/api/defunts' && request.method === 'GET') return await handleListDefunts(request, env);
+      if (path === '/api/defunts/save' && request.method === 'POST') return await handleSaveDefunt(request, env);
+      if (path === '/api/defunts/delete' && request.method === 'POST') return await handleDeleteDefunt(request, env);
+      if (path === '/api/defunts/reorder' && request.method === 'POST') return await handleReorderDefunt(request, env);
+      if (path === '/api/ovilus/cast' && request.method === 'GET') return await handleOvilusCast(request, env);
+      if (path === '/api/ovilus/cast' && request.method === 'OPTIONS') return corsCast(new Response(null, { status: 204 }));
     } catch (e) {
       console.error(e);
       return json({ error: 'Erreur serveur.', detail: String(e.message || e) }, 500);
