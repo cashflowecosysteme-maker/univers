@@ -869,6 +869,10 @@ async function handleSaveDefunt(request, env) {
       .bind(id, prenom, nom, birth, death, circumstance, message, incomplete, unsaid, tone, active, soiree, sort, now, now).run();
   }
   const row = await env.DB.prepare(`SELECT * FROM defunts WHERE id = ?`).bind(id).first();
+  if (env.CASHFLOW_KV) {
+    const all = await readDefunts(env);
+    await env.CASHFLOW_KV.put('ovilus:defunts', JSON.stringify(all));
+  }
   return json({ success: true, defunt: rowToDefunt(row) });
 }
 
@@ -880,6 +884,10 @@ async function handleDeleteDefunt(request, env) {
   const id = String(body.id || '');
   if (!id) return json({ error: 'Identifiant requis.' }, 400);
   await env.DB.prepare(`DELETE FROM defunts WHERE id = ?`).bind(id).run();
+  if (env.CASHFLOW_KV) {
+    const all = await readDefunts(env);
+    await env.CASHFLOW_KV.put('ovilus:defunts', JSON.stringify(all));
+  }
   return json({ success: true });
 }
 
@@ -897,7 +905,9 @@ async function handleReorderDefunt(request, env) {
   const b = list[j];
   await env.DB.prepare(`UPDATE defunts SET sort_order = ? WHERE id = ?`).bind(b.sort_order, a.id).run();
   await env.DB.prepare(`UPDATE defunts SET sort_order = ? WHERE id = ?`).bind(a.sort_order, b.id).run();
-  return json({ success: true, defunts: await readDefunts(env) });
+  const all = await readDefunts(env);
+  if (env.CASHFLOW_KV) await env.CASHFLOW_KV.put('ovilus:defunts', JSON.stringify(all));
+  return json({ success: true, defunts: all });
 }
 
 function corsCast(res) {
