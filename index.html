@@ -317,18 +317,37 @@ td strong{color:#fff}
         <p class="hint" style="margin-bottom:14px">Choisis le personnage : sa formation sera dirigée vers son propre portail. Types de blocs : texte, image, audio MP3, vidéo, exercice, intervention du personnage.</p>
         <div style="max-width:320px;margin-bottom:16px">
           <label class="f">Personnage</label>
-          <select class="f" id="fo-agent" onchange="foChangeAgent(this.value)">
-            <option value="diane">Diane</option>
-            <option value="nyxia">NyXia</option>
-            <option value="eric">Éric</option>
-            <option value="alex" selected>Alex</option>
-            <option value="lena">Léna</option>
-            <option value="selena">Séléna</option>
-            <option value="kael">Kael</option>
-          </select>
+          <select class="f" id="fo-agent" onchange="foChangeAgent(this.value)"></select>
         </div>
+
+        <details style="margin-bottom:18px;background:rgba(15,28,63,.4);border:1px solid rgba(123,92,255,.18);border-radius:12px;padding:10px 14px">
+          <summary style="cursor:pointer;font-weight:700;color:#c4b5fd;font-size:13px">➕ Gérer les personnages</summary>
+          <p class="hint" style="margin:10px 0">Ajoute tes nouveaux assistants. L'identifiant se génère depuis le nom (il doit correspondre au « code agent » utilisé par le portail du personnage).</p>
+          <div class="grid2">
+            <div><label class="f">Nom affiché</label><input class="f" id="fa-nom" placeholder="Ex. Marraine Sophie" oninput="faSyncCode()"></div>
+            <div><label class="f">Identifiant (code agent)</label><input class="f" id="fa-code" placeholder="ex. sophie"></div>
+          </div>
+          <button class="btn" style="margin-top:10px" type="button" onclick="faAdd()">Ajouter le personnage</button>
+          <div id="fa-list" style="margin-top:12px"></div>
+          <div class="msg" id="fa-msg"></div>
+        </details>
+
         <div id="fo-list">—</div>
         <button class="btn" style="margin-top:14px" onclick="foNew()">➕ Nouvelle formation</button>
+      </div>
+
+      <div class="panel" id="vec-panel">
+        <h3>🧠 Cerveau vectoriel — <span id="vec-agent-label">…</span></h3>
+        <p class="hint" style="margin-bottom:14px">Ingère des documents (livres, notes, transcriptions) dans l'index <strong>univers-livres</strong>, namespace = personnage. Le personnage s'en imprègne pour répondre. Ceci est séparé de la Formation Vivante (parcours guidé).</p>
+        <div id="vec-warning" style="display:none;background:rgba(255,75,110,.1);border:1px solid rgba(255,75,110,.3);color:#ff8fab;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px"></div>
+        <div class="grid2">
+          <div><label class="f">Source (titre du document)</label><input class="f" id="vec-source" placeholder="Ex. Livre — Découvrir tes dons"></div>
+        </div>
+        <div style="margin-top:10px"><label class="f">Contenu à vectoriser</label>
+          <textarea class="f" id="vec-text" rows="8" placeholder="Colle ici le texte du document…"></textarea></div>
+        <button class="btn" style="margin-top:12px" type="button" onclick="vecIngest()">⚡ Vectoriser</button>
+        <div class="msg" id="vec-msg"></div>
+        <div id="vec-stats" style="margin-top:14px"></div>
       </div>
 
       <div class="panel" id="fo-editor" style="display:none">
@@ -446,7 +465,7 @@ function switchModule(name){
   if(name==='apayer') loadAPayer();
   if(name==='portails'){ loadPortals(); }
   if(name==='clients'){ loadPortals(); loadPortalClients(); }
-  if(name==='formations'){ foLoadList(); }
+  if(name==='formations'){ foLoadAgents(); }
   if(name==='defunts'){ dfLoad(); }
 }
 function showMsg(id,text,ok){var el=document.getElementById(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text;el.style.display='block';}
@@ -684,9 +703,135 @@ function foChangeAgent(agent){
   var ed=document.getElementById('fo-editor');if(ed)ed.style.display='none';
   FO_STATE=null;FO_EDIT_ID=null;
   foLoadList();
+  vecLoadStats();
+  var lbl=document.getElementById('vec-agent-label'); if(lbl) lbl.textContent=(FO_AGENTS_MAP[FO_AGENT]||FO_AGENT);
 }
-var FO_STATE=null; /* {id,titre,description,ordre,modules:[{id,numero,titre,blocs:[...]}]} */
-var FO_EDIT_ID=null; /* id d'origine si édition (pour renommer proprement) */
+var FO_AGENTS_MAP={}; /* code -> nom */
+
+async function foLoadAgents(){
+  try{
+    var r=await api('/api/formations/agents','GET');
+    var agents=(r.data&&r.data.agents)||[];
+    FO_AGENTS_MAP={};
+    var sel=document.getElementById('fo-agent');
+    var current=FO_AGENT;
+    var html='';
+    agents.forEach(function(a){
+      FO_AGENTS_MAP[a.code]=a.nom;
+      html+='<option value="'+esc(a.code)+'"'+(a.code===current?' selected':'')+'>'+esc(a.nom)+'</option>';
+    });
+    sel.innerHTML=html;
+    /* si l'agent courant n'existe plus, prends le premier */
+    if(!FO_AGENTS_MAP[FO_AGENT]&&agents.length){ FO_AGENT=agents[0].code; sel.value=FO_AGENT; }
+    faRenderList(agents);
+    var lbl=document.getElementById('vec-agent-label'); if(lbl) lbl.textContent=(FO_AGENTS_MAP[FO_AGENT]||FO_AGENT);
+    foLoadList();
+    vecLoadStats();
+  }catch(e){ /* session gérée par api() */ }
+}
+
+function faSyncCode(){
+  var nom=document.getElementById('fa-nom').value;
+  var codeEl=document.getElementById('fa-code');
+  if(!codeEl.value.trim()||codeEl.dataset.auto==='1'){
+    codeEl.value=(nom||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);
+    codeEl.dataset.auto='1';
+  }
+}
+document.addEventListener('input',function(e){ if(e.target&&e.target.id==='fa-code') e.target.dataset.auto='0'; });
+
+function faRenderList(agents){
+  var box=document.getElementById('fa-list');if(!box)return;
+  var custom=agents.filter(function(a){return a.custom;});
+  if(!custom.length){ box.innerHTML='<p class="hint" style="margin:6px 0">Aucun personnage ajouté (les 7 par défaut sont toujours là).</p>'; return; }
+  var html='<table><thead><tr><th>Nom</th><th>Code</th><th></th></tr></thead><tbody>';
+  custom.forEach(function(a){
+    html+='<tr><td>'+esc(a.nom)+'</td><td style="font-size:12px;color:var(--t3)">'+esc(a.code)+'</td>'
+      +'<td><button class="btn btn-danger" type="button" onclick="faDelete(\''+esc(a.code)+'\')">Retirer</button></td></tr>';
+  });
+  html+='</tbody></table>';
+  box.innerHTML=html;
+}
+
+async function faAdd(){
+  var nom=document.getElementById('fa-nom').value.trim();
+  var code=document.getElementById('fa-code').value.trim();
+  if(!nom){ showMsg('fa-msg','Donne un nom au personnage.',false); return; }
+  try{
+    var r=await api('/api/formations/agents/save','POST',{nom:nom,code:code});
+    if(r.data&&r.data.success){
+      showMsg('fa-msg','Personnage ajouté ✅',true);
+      document.getElementById('fa-nom').value='';document.getElementById('fa-code').value='';
+      var codeEl=document.getElementById('fa-code'); codeEl.dataset.auto='1';
+      FO_AGENT=r.data.agent.code;
+      foLoadAgents();
+    } else { showMsg('fa-msg',(r.data&&r.data.error)||'Erreur.',false); }
+  }catch(e){ showMsg('fa-msg',e.message||'Erreur.',false); }
+}
+
+async function faDelete(code){
+  if(!confirm('Retirer ce personnage du sélecteur ? (ses formations déjà créées ne sont pas supprimées)'))return;
+  try{
+    await api('/api/formations/agents/delete','POST',{code:code});
+    if(FO_AGENT===code) FO_AGENT='alex';
+    foLoadAgents();
+  }catch(e){ alert(e.message||e); }
+}
+
+/* ── Vectorisation ── */
+async function vecLoadStats(){
+  var box=document.getElementById('vec-stats');var warn=document.getElementById('vec-warning');
+  if(!box)return;
+  box.textContent='…';
+  try{
+    var r=await api('/api/vectorize/stats?agent='+encodeURIComponent(FO_AGENT),'GET');
+    var d=r.data||{};
+    if(d.bindings && (!d.bindings.vectorize || !d.bindings.ai)){
+      warn.style.display='block';
+      warn.textContent='⚠️ Vectorisation inactive : ajoute les bindings VECTORIZE_INDEX et [ai] dans le wrangler.toml du Super Admin, puis redéploie.';
+    } else { warn.style.display='none'; }
+    var sources=d.sources||[];
+    var html='<div style="font-size:13px;color:var(--t2);margin-bottom:8px"><strong>'+(d.vectors||0)+'</strong> passages vectorisés · <strong>'+sources.length+'</strong> source(s)</div>';
+    if(sources.length){
+      html+='<table><thead><tr><th>Source</th><th>Passages</th><th></th></tr></thead><tbody>';
+      sources.slice().reverse().forEach(function(s){
+        html+='<tr><td>'+esc(s.source)+'</td><td>'+(s.chunks||0)+'</td>'
+          +'<td><button class="btn btn-danger" type="button" onclick="vecWipeSource(\''+esc(s.id)+'\')">Supprimer</button></td></tr>';
+      });
+      html+='</tbody></table>';
+      html+='<button class="btn btn-ghost" style="margin-top:10px" type="button" onclick="vecWipeAll()">Vider tout le cerveau de ce personnage</button>';
+    }
+    box.innerHTML=html;
+  }catch(e){ box.textContent=''; }
+}
+
+async function vecIngest(){
+  var source=document.getElementById('vec-source').value.trim();
+  var text=document.getElementById('vec-text').value.trim();
+  if(!text){ showMsg('vec-msg','Colle du contenu à vectoriser.',false); return; }
+  showMsg('vec-msg','Vectorisation en cours… (ça peut prendre quelques secondes)',true);
+  try{
+    var r=await api('/api/vectorize/ingest','POST',{agent:FO_AGENT,source:source,text:text});
+    if(r.data&&r.data.success){
+      showMsg('vec-msg','✅ '+r.data.chunks+' passages vectorisés pour '+(FO_AGENTS_MAP[FO_AGENT]||FO_AGENT)+'.',true);
+      document.getElementById('vec-text').value='';document.getElementById('vec-source').value='';
+      vecLoadStats();
+    } else { showMsg('vec-msg',(r.data&&r.data.error)||'Erreur.',false); }
+  }catch(e){ showMsg('vec-msg',e.message||'Erreur.',false); }
+}
+
+async function vecWipeSource(id){
+  if(!confirm('Supprimer cette source du cerveau ?'))return;
+  try{ await api('/api/vectorize/wipe','POST',{agent:FO_AGENT,sourceId:id}); vecLoadStats(); }
+  catch(e){ alert(e.message||e); }
+}
+async function vecWipeAll(){
+  if(!confirm('Vider TOUT le cerveau vectoriel de ce personnage ? Action définitive.'))return;
+  try{ await api('/api/vectorize/wipe','POST',{agent:FO_AGENT}); vecLoadStats(); }
+  catch(e){ alert(e.message||e); }
+}
+
+
 var FO_BLOC_TYPES=[
   {v:'texte',label:'Texte'},
   {v:'image',label:'Image'},
