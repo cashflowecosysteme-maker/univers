@@ -693,7 +693,17 @@ async function handleDeletePortalClient(request, env) {
 // le Super Admin ne fait qu'écrire ce que Diane saisit.
 const FORMATION_AGENTS = ['diane', 'nyxia', 'eric', 'alex', 'lena', 'selena', 'kael'];
 
-function formationKey(agent, id) { return 'formation:' + agent + ':' + id; }
+function slugPortail(s) {
+  return String(s || '').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+}
+const PORTAILS_FORMATION = ['lena','selena','kael','alex','diane','nyxia','eric','studio'];
+function formationKey(portail, agent, id) {
+  const p = slugPortail(portail) || 'lena';
+  return 'formation:' + p + ':' + agent + ':' + id;
+}
+function formationKeyLegacy(agent, id) { return 'formation:' + agent + ':' + id; }
 
 function slugifyFormationId(s) {
   return String(s || '').trim().toLowerCase()
@@ -741,14 +751,15 @@ async function handleListFormations(request, env) {
   const catalog = await lirePersonnages(env);
   const allowed = catalog.map(p => p.code).concat(FORMATION_AGENTS);
   const agent = allowed.includes(asked) ? asked : 'alex';
+  const portail = slugPortail(url.searchParams.get('portail') || url.searchParams.get('portal') || 'lena');
   const out = [];
   try {
-    const list = await env.CASHFLOW_KV.list({ prefix: 'formation:' + agent + ':' });
+    const list = await env.CASHFLOW_KV.list({ prefix: 'formation:' + portail + ':' + agent + ':' });
     for (const k of list.keys || []) {
       const raw = await env.CASHFLOW_KV.get(k.name);
       if (!raw) continue;
       let doc; try { doc = JSON.parse(raw); } catch (_) { continue; }
-      if (doc && doc.id) out.push(doc);
+      if (doc && doc.id) { doc.portail = portail; out.push(doc); }
     }
   } catch (e) { return json({ error: 'Lecture impossible : ' + e.message }, 500); }
   out.sort((a, b) => (a.ordre || 0) - (b.ordre || 0) || String(a.titre || '').localeCompare(String(b.titre || '')));
@@ -762,11 +773,14 @@ async function handleSaveFormation(request, env) {
   const catalog = await lirePersonnages(env);
   const allowed = catalog.map(p => p.code).concat(FORMATION_AGENTS);
   const agent = allowed.includes(asked) ? asked : 'alex';
+  const portail = slugPortail(body.portail || body.portal || 'lena');
   const doc = sanitizeFormationDoc(body.formation || body);
+  doc.portail = portail;
+  doc.agent = agent;
   if (!doc.id) return json({ error: 'Donne au moins un titre à la formation.' }, 400);
   if (!doc.titre) return json({ error: 'Le titre est requis.' }, 400);
   try {
-    await env.CASHFLOW_KV.put(formationKey(agent, doc.id), JSON.stringify(doc));
+    await env.CASHFLOW_KV.put(formationKey(portail, agent, doc.id), JSON.stringify(doc));
   } catch (e) { return json({ error: 'Enregistrement impossible : ' + e.message }, 500); }
   return json({ success: true, formation: doc });
 }
@@ -778,10 +792,12 @@ async function handleDeleteFormation(request, env) {
   const catalog = await lirePersonnages(env);
   const allowed = catalog.map(p => p.code).concat(FORMATION_AGENTS);
   const agent = allowed.includes(asked) ? asked : 'alex';
+  const portail = slugPortail(body.portail || body.portal || 'lena');
   const id = slugifyFormationId(body.id);
   if (!id) return json({ error: 'Identifiant requis.' }, 400);
   try {
-    await env.CASHFLOW_KV.delete(formationKey(agent, id));
+    await env.CASHFLOW_KV.delete(formationKey(portail, agent, id));
+    await env.CASHFLOW_KV.delete(formationKeyLegacy(agent, id));
   } catch (e) { return json({ error: 'Suppression impossible : ' + e.message }, 500); }
   return json({ success: true });
 }
