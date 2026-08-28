@@ -966,7 +966,7 @@ function foBlocFields(mi,bi,b){
   function inp(field,label,val,ph){return '<div style="margin-top:8px"><label class="f">'+label+'</label><input class="f" id="fo-b-'+field+'-'+mi+'-'+bi+'" value="'+esc(val||'')+'" placeholder="'+(ph||'')+'"></div>';}
   var t=b.type;
   if(t==='texte')return ta('contenu','Contenu de la leçon',b.contenu,'Le texte que la personne lit');
-  if(t==='intervention')return ta('contenu','Ce que le personnage dit / fait',b.contenu,'Ex. « Écoute bien cette partie, puis reviens me voir. »');
+  if(t==='intervention')return ta('contenu','Ce que le personnage dit / fait — tu peux écrire {prenom}',b.contenu,'Ex. {prenom}, écoute bien cette partie, puis reviens me voir.');
   if(t==='image')return inp('url','Adresse de l’image (https)',b.url,'https://…')+inp('legende','Légende (optionnel)',b.legende,'');
   if(t==='audio')return inp('url','Adresse du MP3 (https)',b.url,'https://…/audio.mp3')+inp('titre','Titre (optionnel)',b.titre,'')+inp('intro','Intro suggérée (optionnel)',b.intro,'Ex. Écoute et reviens me voir.');
   if(t==='video')return inp('url','Adresse de la vidéo (https)',b.url,'https://… (YouTube, Vimeo, MP4…)')+inp('titre','Titre (optionnel)',b.titre,'')+inp('intro','Intro suggérée (optionnel)',b.intro,'');
