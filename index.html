@@ -169,8 +169,7 @@ td strong{color:#fff}
         <div id="pr-list">—</div>
       </div>
     </div>
-    
-    
+
     <div class="module-panel" id="module-apayer">
       <div class="panel">
         <h3>À payer — produits Super Admin</h3>
@@ -205,6 +204,7 @@ td strong{color:#fff}
         <div id="portal-list">—</div>
       </div>
     </div>
+
     <div class="module-panel" id="module-clients">
       <div class="panel">
         <h3>Inscrire un client à un ou plusieurs portails</h3>
@@ -230,7 +230,7 @@ td strong{color:#fff}
     <div class="module-panel" id="module-outils">
       <div class="panel">
         <h3>Outils d’équipe</h3>
-        <p class="hint" style="margin-bottom:16px">Raccourcis vers les outils techniques (pas des dashboards produit).</p>
+        <p class="hint" style="margin-bottom:16px">Raccourcis vers les outils techniques et de gestion de l’écosystème.</p>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
           <a href="https://portail-prompts.nyxia.top/ingestion.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;background:rgba(15,28,63,0.7);border:1px solid rgba(123,92,255,0.25);border-radius:16px;padding:20px;transition:border-color .15s,transform .15s" onmouseover="this.style.borderColor='rgba(123,92,255,0.55)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(123,92,255,0.25)';this.style.transform='none'">
             <div style="font-size:28px;margin-bottom:10px">📥</div>
@@ -246,6 +246,11 @@ td strong{color:#fff}
             <div style="font-size:28px;margin-bottom:10px">🔗</div>
             <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Générateur de webhooks</div>
             <div style="font-size:12px;color:var(--t3);line-height:1.5">Créer et brancher les webhooks Systeme.io / Cloudflare.</div>
+          </a>
+          <a href="https://portail-prompts.nyxia.top/gestion-contenus.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;background:rgba(15,28,63,0.7);border:1px solid rgba(123,92,255,0.25);border-radius:16px;padding:20px;transition:border-color .15s,transform .15s" onmouseover="this.style.borderColor='rgba(123,92,255,0.55)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(123,92,255,0.25)';this.style.transform='none'">
+            <div style="font-size:28px;margin-bottom:10px">📣</div>
+            <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Contenus prêts à publier</div>
+            <div style="font-size:12px;color:var(--t3);line-height:1.5">Ajouter, modifier et classer les modèles Canva et les textes Facebook, Instagram et TikTok de l’écosystème NyXia.</div>
           </a>
         </div>
       </div>
@@ -406,7 +411,6 @@ async function loadPortals(){
       return '<tr><td>'+esc(p.id)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+(p.active!==false?'oui':'non')+'</td>'
         +'<td><button class="btn btn-danger" type="button" onclick="removePortal(\''+esc(p.id)+'\')">Retirer</button></td></tr>';
     }).join('')+'</table>';
-    // checkboxes clients
     var checks=document.getElementById('cl-portals-checks');
     if(checks){
       checks.innerHTML=list.filter(function(p){return p.active!==false;}).map(function(p){
@@ -671,7 +675,6 @@ async function markPaid(id){
 async function markPersonPaid(personKey){
   var person=(window._payByPerson&&window._payByPerson[personKey])||null;
   if(!person){
-    // try match without special chars
     var keys=Object.keys(window._payByPerson||{});
     for(var i=0;i<keys.length;i++){ if(keys[i].indexOf(personKey)>=0||personKey.indexOf(keys[i])>=0){ person=window._payByPerson[keys[i]]; break; } }
   }
@@ -728,7 +731,7 @@ function foChangeAgent(agent){
   vecLoadStats();
   var lbl=document.getElementById('vec-agent-label'); if(lbl) lbl.textContent=(FO_AGENTS_MAP[FO_AGENT]||FO_AGENT);
 }
-var FO_AGENTS_MAP={}; /* code -> nom */
+var FO_AGENTS_MAP={};
 
 async function foLoadAgents(){
   try{
@@ -743,13 +746,12 @@ async function foLoadAgents(){
       html+='<option value="'+esc(a.code)+'"'+(a.code===current?' selected':'')+'>'+esc(a.nom)+'</option>';
     });
     sel.innerHTML=html;
-    /* si l'agent courant n'existe plus, prends le premier */
     if(!FO_AGENTS_MAP[FO_AGENT]&&agents.length){ FO_AGENT=agents[0].code; sel.value=FO_AGENT; }
     faRenderList(agents);
     var lbl=document.getElementById('vec-agent-label'); if(lbl) lbl.textContent=(FO_AGENTS_MAP[FO_AGENT]||FO_AGENT);
     foLoadList();
     vecLoadStats();
-  }catch(e){ /* session gérée par api() */ }
+  }catch(e){}
 }
 
 function faSyncCode(){
@@ -853,7 +855,6 @@ async function vecWipeAll(){
   catch(e){ alert(e.message||e); }
 }
 
-
 var FO_BLOC_TYPES=[
   {v:'texte',label:'Texte'},
   {v:'image',label:'Image'},
@@ -941,7 +942,6 @@ function foMoveBloc(mi,bi,dir){
   var tmp=arr[bi];arr[bi]=arr[j];arr[j]=tmp;foRenderEditor();
 }
 
-/* Lecture des champs de l'éditeur -> FO_STATE (avant re-render ou save) */
 function foCollect(){
   if(!FO_STATE)return;
   FO_STATE.titre=document.getElementById('fo-titre').value;
@@ -960,7 +960,6 @@ function foCollect(){
   });
 }
 
-/* Champs affichés selon le type de bloc */
 function foBlocFields(mi,bi,b){
   function ta(field,label,val,ph){return '<div style="margin-top:8px"><label class="f">'+label+'</label><textarea class="f" id="fo-b-'+field+'-'+mi+'-'+bi+'" rows="3" placeholder="'+(ph||'')+'">'+esc(val||'')+'</textarea></div>';}
   function inp(field,label,val,ph){return '<div style="margin-top:8px"><label class="f">'+label+'</label><input class="f" id="fo-b-'+field+'-'+mi+'-'+bi+'" value="'+esc(val||'')+'" placeholder="'+(ph||'')+'"></div>';}
@@ -1017,7 +1016,6 @@ function foRenderEditor(){
   wrap.innerHTML=html;
 }
 
-/* Variantes « live » : on lit les champs avant de re-render pour ne rien perdre */
 function foChangeType(mi,bi,val){foCollect();FO_STATE.modules[mi].blocs[bi].type=val;foRenderEditor();}
 function foAddBlocLive(mi){foCollect();foAddBloc(mi);}
 function foRemoveBlocLive(mi,bi){foCollect();foRemoveBloc(mi,bi);}
@@ -1032,7 +1030,6 @@ async function foSave(){
   try{
     var r=await api('/api/formations/save','POST',{agent:FO_AGENT,portail:FO_PORTAIL,formation:FO_STATE});
     if(r.data&&r.data.success){
-      /* si l'id a changé lors d'un renommage, supprime l'ancienne clé */
       if(FO_EDIT_ID&&r.data.formation&&r.data.formation.id&&FO_EDIT_ID!==r.data.formation.id){
         try{await api('/api/formations/delete','POST',{agent:FO_AGENT,portail:FO_PORTAIL,id:FO_EDIT_ID});}catch(e){}
       }
@@ -1126,7 +1123,6 @@ async function dfMove(id,dir){
   dfLoad();
 }
 
-/* Met à jour l'aperçu de l'identifiant auto quand on tape le titre (si id vide) */
 document.addEventListener('input',function(e){
   if(e.target&&e.target.id==='fo-titre'&&FO_STATE&&!FO_EDIT_ID){
     var idEl=document.getElementById('fo-id');
