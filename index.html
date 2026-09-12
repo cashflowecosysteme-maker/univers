@@ -44,6 +44,13 @@ th{text-align:left;color:var(--t3);font-size:11px;text-transform:uppercase;paddi
 td{padding:10px 6px;border-top:1px solid rgba(123,92,255,.1);color:var(--t2)}
 td strong{color:#fff}
 .hint{font-size:12px;color:var(--t3);margin-top:8px}
+.check-row{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:12px}
+.check-row label{display:flex;align-items:center;gap:7px;color:var(--t2);font-size:13px;cursor:pointer}
+.check-row input{accent-color:var(--p)}
+.boutique-actions{display:flex;flex-wrap:wrap;gap:8px}
+.boutique-portal-settings{padding:12px;border:1px solid rgba(123,92,255,.16);border-radius:12px;background:rgba(15,28,63,.35)}
+.boutique-portal-settings h4{color:#fff;margin-bottom:10px}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 </style>
 </head>
 <body>
@@ -68,6 +75,7 @@ td strong{color:#fff}
     <button class="module-tab" data-module="admins" onclick="switchModule('admins')">Admin commerçants</button>
     <button class="module-tab" data-module="promoteurs" onclick="switchModule('promoteurs')">Promoteurs</button>
     <button class="module-tab" data-module="produits" onclick="switchModule('produits')">Produits SuperAdmin</button>
+    <button class="module-tab" data-module="boutique" onclick="switchModule('boutique')">Boutique NyXia</button>
     <button class="module-tab" data-module="apayer" onclick="switchModule('apayer')">À payer (mes produits)</button>
     <button class="module-tab" data-module="portails" onclick="switchModule('portails')">Portails</button>
     <button class="module-tab" data-module="clients" onclick="switchModule('clients')">Clients portails</button>
@@ -167,6 +175,81 @@ td strong{color:#fff}
       <div class="panel">
         <h3>Produits (tous vendeurs)</h3>
         <div id="pr-list">—</div>
+      </div>
+    </div>
+
+    <div class="module-panel" id="module-boutique">
+      <div class="panel">
+        <h3>Réglages de la Boutique NyXia</h3>
+        <p class="hint" style="margin-bottom:14px">Ces informations alimentent directement boutique.nyxia.top et centralisent aussi le rendez-vous proposé par les personnages.</p>
+        <div class="grid2">
+          <div><label class="f">Nom de la boutique</label><input class="f" id="bt-title"></div>
+          <div><label class="f">Texte du bouton rendez-vous</label><input class="f" id="bt-appointment-label"></div>
+          <div style="grid-column:1/-1"><label class="f">Grand titre d’accueil</label><input class="f" id="bt-hero-title"></div>
+          <div style="grid-column:1/-1"><label class="f">Texte d’accueil</label><textarea class="f" id="bt-hero-text" rows="3"></textarea></div>
+          <div style="grid-column:1/-1"><label class="f">Lien central du rendez-vous</label><input class="f" id="bt-appointment-url" placeholder="https://..."></div>
+        </div>
+        <h3 style="margin-top:20px">Les 7 portes</h3>
+        <div id="bt-portals" class="grid2"></div>
+        <button class="btn" style="margin-top:14px" type="button" onclick="btSaveSettings()">Enregistrer les réglages</button>
+        <div class="msg" id="bt-settings-msg"></div>
+      </div>
+
+      <div class="panel" id="bt-product-editor">
+        <h3 id="bt-editor-title">Ajouter un produit, service ou événement</h3>
+        <input type="hidden" id="bt-id">
+        <div class="grid2">
+          <div><label class="f">Portail / personnage *</label>
+            <select class="f" id="bt-portal">
+              <option value="nyxia">NyXia</option><option value="diane">Diane</option><option value="eric">Éric</option>
+              <option value="lena">Léna</option><option value="selena">Séléna</option><option value="kael">Kael</option><option value="alex">Alex</option>
+            </select>
+          </div>
+          <div><label class="f">Type</label>
+            <select class="f" id="bt-type">
+              <option value="formation">Formation</option><option value="livre">Livre</option><option value="service">Service</option>
+              <option value="evenement">Événement</option><option value="activite">Activité</option><option value="outil">Outil</option>
+              <option value="produit-physique">Produit physique</option><option value="produit-numerique">Produit numérique</option><option value="autre">Autre</option>
+            </select>
+          </div>
+          <div><label class="f">Titre *</label><input class="f" id="bt-product-title"></div>
+          <div><label class="f">Catégorie libre</label><input class="f" id="bt-category" placeholder="Ex. Numérologie, EFT, Écriture"></div>
+          <div style="grid-column:1/-1"><label class="f">Description courte</label><input class="f" id="bt-short-description" maxlength="500"></div>
+          <div style="grid-column:1/-1"><label class="f">Description complète</label><textarea class="f" id="bt-description" rows="6"></textarea></div>
+          <div><label class="f">Prix</label><input class="f" id="bt-price" type="number" min="0" step="0.01"></div>
+          <div><label class="f">Ancien prix (facultatif)</label><input class="f" id="bt-old-price" type="number" min="0" step="0.01"></div>
+          <div><label class="f">Devise</label><select class="f" id="bt-currency"><option value="CAD">CAD</option><option value="EUR">EUR</option><option value="USD">USD</option></select></div>
+          <div><label class="f">Texte de prix (facultatif)</label><input class="f" id="bt-price-label" placeholder="Ex. À partir de 125 $"></div>
+          <div style="grid-column:1/-1"><label class="f">Image principale (URL)</label><input class="f" id="bt-image-main" placeholder="https://..."></div>
+          <div><label class="f">Petite image 1</label><input class="f" id="bt-image-1" placeholder="https://..."></div>
+          <div><label class="f">Petite image 2</label><input class="f" id="bt-image-2" placeholder="https://..."></div>
+          <div><label class="f">Petite image 3</label><input class="f" id="bt-image-3" placeholder="https://..."></div>
+          <div><label class="f">Petite image 4</label><input class="f" id="bt-image-4" placeholder="https://..."></div>
+          <div style="grid-column:1/-1"><label class="f">Témoignage</label><textarea class="f" id="bt-testimonial" rows="3"></textarea></div>
+          <div><label class="f">Nom du témoignage</label><input class="f" id="bt-testimonial-author"></div>
+          <div><label class="f">Bouton</label>
+            <select class="f" id="bt-cta-type"><option value="acheter">Acheter</option><option value="rendez-vous">Prendre un rendez-vous</option><option value="appel">Prendre un appel</option><option value="en-savoir-plus">En savoir plus</option></select>
+          </div>
+          <div style="grid-column:1/-1"><label class="f">Lien du bouton</label><input class="f" id="bt-cta-url" placeholder="https://..."></div>
+          <div><label class="f">Code promo</label><input class="f" id="bt-promo-code"></div>
+          <div><label class="f">Expiration du code</label><input class="f" id="bt-promo-expires" type="datetime-local"></div>
+          <div style="grid-column:1/-1"><label class="f">Texte de la promotion</label><input class="f" id="bt-promo-text"></div>
+          <div><label class="f">Ordre d’affichage</label><input class="f" id="bt-order" type="number" min="0" step="1" value="0"></div>
+        </div>
+        <div class="check-row">
+          <label><input type="checkbox" id="bt-active"> Visible dans la boutique</label>
+          <label><input type="checkbox" id="bt-featured"> Produit vedette</label>
+        </div>
+        <div class="boutique-actions" style="margin-top:14px">
+          <button class="btn" type="button" onclick="btSaveProduct()">Enregistrer</button>
+          <button class="btn btn-ghost" id="bt-cancel" type="button" onclick="btResetProduct()" style="display:none">Annuler la modification</button>
+        </div>
+        <div class="msg" id="bt-product-msg"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Catalogue de la Boutique</h3>
+        <div id="bt-products" class="table-scroll">—</div>
       </div>
     </div>
 
@@ -398,6 +481,175 @@ td strong{color:#fff}
 <script src="/starry-bg.js" defer></script>
 <script>
 var TOKEN=null, TOKEN_KEY='nyxia_univers_token';
+var BT_PRODUCTS=[];
+var BT_PORTALS=['nyxia','diane','eric','lena','selena','kael','alex'];
+
+function btPortalFields(portals){
+  var box=document.getElementById('bt-portals');
+  if(!box)return;
+  box.innerHTML=BT_PORTALS.map(function(id,index){
+    var p=(portals||[]).find(function(item){return item.id===id;})||{id:id,name:id,intro:'',imageUrl:'',order:index+1,active:true};
+    return '<div class="boutique-portal-settings">'
+      +'<h4>'+esc(p.name||id)+'</h4>'
+      +'<label class="f">Nom affiché</label><input class="f" id="bt-portal-name-'+id+'" value="'+esc(p.name||id)+'">'
+      +'<label class="f" style="margin-top:9px">Phrase d’accueil</label><textarea class="f" id="bt-portal-intro-'+id+'" rows="3">'+esc(p.intro||'')+'</textarea>'
+      +'<label class="f" style="margin-top:9px">Image du personnage (URL)</label><input class="f" id="bt-portal-image-'+id+'" value="'+esc(p.imageUrl||'')+'" placeholder="Facultatif pour l’instant">'
+      +'<div class="check-row"><label><input type="checkbox" id="bt-portal-active-'+id+'" '+(p.active!==false?'checked':'')+'> Porte visible</label>'
+      +'<label>Ordre <input class="f" id="bt-portal-order-'+id+'" type="number" min="0" step="1" value="'+(Number(p.order)||index+1)+'" style="width:76px;padding:7px"></label></div>'
+      +'</div>';
+  }).join('');
+}
+
+async function btLoad(){
+  var productsBox=document.getElementById('bt-products');
+  if(productsBox)productsBox.textContent='Chargement…';
+  try{
+    var result=await Promise.all([api('/api/boutique/settings','GET'),api('/api/boutique/products','GET')]);
+    var settings=result[0].data.settings||{};
+    BT_PRODUCTS=result[1].data.products||[];
+    document.getElementById('bt-title').value=settings.title||'';
+    document.getElementById('bt-hero-title').value=settings.heroTitle||'';
+    document.getElementById('bt-hero-text').value=settings.heroText||'';
+    document.getElementById('bt-appointment-url').value=settings.appointmentUrl||'';
+    document.getElementById('bt-appointment-label').value=settings.appointmentLabel||'';
+    btPortalFields(settings.portals||[]);
+    btRenderProducts();
+  }catch(e){
+    if(productsBox)productsBox.textContent=e.message||'Impossible de charger la boutique.';
+  }
+}
+
+async function btSaveSettings(){
+  var portals=BT_PORTALS.map(function(id){return{
+    id:id,
+    name:document.getElementById('bt-portal-name-'+id).value.trim(),
+    intro:document.getElementById('bt-portal-intro-'+id).value.trim(),
+    imageUrl:document.getElementById('bt-portal-image-'+id).value.trim(),
+    order:Number(document.getElementById('bt-portal-order-'+id).value)||0,
+    active:document.getElementById('bt-portal-active-'+id).checked
+  };});
+  var body={
+    title:document.getElementById('bt-title').value.trim(),
+    heroTitle:document.getElementById('bt-hero-title').value.trim(),
+    heroText:document.getElementById('bt-hero-text').value.trim(),
+    appointmentUrl:document.getElementById('bt-appointment-url').value.trim(),
+    appointmentLabel:document.getElementById('bt-appointment-label').value.trim(),
+    portals:portals
+  };
+  try{
+    var out=await api('/api/boutique/settings','POST',body);
+    if(!out.res.ok)throw new Error(out.data.error||'Erreur');
+    showMsg('bt-settings-msg','Réglages enregistrés. La Boutique utilise maintenant ces informations.',true);
+    btPortalFields(out.data.settings.portals||portals);
+  }catch(e){showMsg('bt-settings-msg',e.message||'Erreur',false);}
+}
+
+function btProductBody(source){
+  if(source)return Object.assign({},source,{images:Array.isArray(source.images)?source.images:[]});
+  var numberOrNull=function(id){var value=document.getElementById(id).value;return value===''?null:Number(value);};
+  return{
+    id:document.getElementById('bt-id').value.trim(),
+    portal:document.getElementById('bt-portal').value,
+    type:document.getElementById('bt-type').value,
+    category:document.getElementById('bt-category').value.trim(),
+    title:document.getElementById('bt-product-title').value.trim(),
+    shortDescription:document.getElementById('bt-short-description').value.trim(),
+    description:document.getElementById('bt-description').value.trim(),
+    price:numberOrNull('bt-price'),oldPrice:numberOrNull('bt-old-price'),
+    currency:document.getElementById('bt-currency').value,
+    priceLabel:document.getElementById('bt-price-label').value.trim(),
+    imageMain:document.getElementById('bt-image-main').value.trim(),
+    images:[1,2,3,4].map(function(n){return document.getElementById('bt-image-'+n).value.trim();}),
+    testimonialQuote:document.getElementById('bt-testimonial').value.trim(),
+    testimonialAuthor:document.getElementById('bt-testimonial-author').value.trim(),
+    ctaType:document.getElementById('bt-cta-type').value,
+    ctaUrl:document.getElementById('bt-cta-url').value.trim(),
+    promoCode:document.getElementById('bt-promo-code').value.trim(),
+    promoText:document.getElementById('bt-promo-text').value.trim(),
+    promoExpiresAt:document.getElementById('bt-promo-expires').value,
+    order:Number(document.getElementById('bt-order').value)||0,
+    active:document.getElementById('bt-active').checked,
+    featured:document.getElementById('bt-featured').checked
+  };
+}
+
+async function btSaveProduct(){
+  var body=btProductBody();
+  try{
+    var out=await api('/api/boutique/products/save','POST',body);
+    if(!out.res.ok)throw new Error(out.data.error||'Erreur');
+    showMsg('bt-product-msg',body.id?'Produit modifié.':'Produit ajouté à la Boutique.',true);
+    btResetProduct(false);
+    var refreshed=await api('/api/boutique/products','GET');
+    BT_PRODUCTS=refreshed.data.products||[];
+    btRenderProducts();
+  }catch(e){showMsg('bt-product-msg',e.message||'Erreur',false);}
+}
+
+function btDateInput(value){
+  if(!value)return '';
+  var d=new Date(value);if(isNaN(d.getTime()))return String(value).slice(0,16);
+  var local=new Date(d.getTime()-d.getTimezoneOffset()*60000);
+  return local.toISOString().slice(0,16);
+}
+
+function btEditProduct(id){
+  var p=BT_PRODUCTS.find(function(item){return item.id===id;});if(!p)return;
+  document.getElementById('bt-id').value=p.id||'';
+  document.getElementById('bt-portal').value=p.portal||'nyxia';
+  document.getElementById('bt-type').value=p.type||'autre';
+  document.getElementById('bt-category').value=p.category||'';
+  document.getElementById('bt-product-title').value=p.title||'';
+  document.getElementById('bt-short-description').value=p.shortDescription||'';
+  document.getElementById('bt-description').value=p.description||'';
+  document.getElementById('bt-price').value=p.price==null?'':p.price;
+  document.getElementById('bt-old-price').value=p.oldPrice==null?'':p.oldPrice;
+  document.getElementById('bt-currency').value=p.currency||'CAD';
+  document.getElementById('bt-price-label').value=p.priceLabel||'';
+  document.getElementById('bt-image-main').value=p.imageMain||'';
+  [1,2,3,4].forEach(function(n){document.getElementById('bt-image-'+n).value=(p.images||[])[n-1]||'';});
+  document.getElementById('bt-testimonial').value=p.testimonialQuote||'';
+  document.getElementById('bt-testimonial-author').value=p.testimonialAuthor||'';
+  document.getElementById('bt-cta-type').value=p.ctaType||'en-savoir-plus';
+  document.getElementById('bt-cta-url').value=p.ctaUrl||'';
+  document.getElementById('bt-promo-code').value=p.promoCode||'';
+  document.getElementById('bt-promo-text').value=p.promoText||'';
+  document.getElementById('bt-promo-expires').value=btDateInput(p.promoExpiresAt);
+  document.getElementById('bt-order').value=Number(p.order)||0;
+  document.getElementById('bt-active').checked=!!p.active;
+  document.getElementById('bt-featured').checked=!!p.featured;
+  document.getElementById('bt-editor-title').textContent='Modifier — '+(p.title||'Produit');
+  document.getElementById('bt-cancel').style.display='inline-flex';
+  document.getElementById('bt-product-editor').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function btResetProduct(clearMessage){
+  document.getElementById('bt-id').value='';
+  ['bt-category','bt-product-title','bt-short-description','bt-description','bt-price','bt-old-price','bt-price-label','bt-image-main','bt-image-1','bt-image-2','bt-image-3','bt-image-4','bt-testimonial','bt-testimonial-author','bt-cta-url','bt-promo-code','bt-promo-text','bt-promo-expires'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('bt-portal').value='nyxia';document.getElementById('bt-type').value='formation';document.getElementById('bt-currency').value='CAD';document.getElementById('bt-cta-type').value='acheter';document.getElementById('bt-order').value='0';document.getElementById('bt-active').checked=false;document.getElementById('bt-featured').checked=false;
+  document.getElementById('bt-editor-title').textContent='Ajouter un produit, service ou événement';document.getElementById('bt-cancel').style.display='none';
+  if(clearMessage!==false){var m=document.getElementById('bt-product-msg');m.style.display='none';}
+}
+
+async function btToggleProduct(id){
+  var p=BT_PRODUCTS.find(function(item){return item.id===id;});if(!p)return;
+  try{var out=await api('/api/boutique/products/save','POST',Object.assign({},p,{active:!p.active}));if(!out.res.ok)throw new Error(out.data.error||'Erreur');await btLoad();}catch(e){alert(e.message||e);}
+}
+
+async function btDeleteProduct(id){
+  if(!confirm('Supprimer définitivement ce produit de la Boutique ?'))return;
+  try{var out=await api('/api/boutique/products/delete','POST',{id:id});if(!out.res.ok)throw new Error(out.data.error||'Erreur');BT_PRODUCTS=BT_PRODUCTS.filter(function(p){return p.id!==id;});btRenderProducts();btResetProduct();}catch(e){alert(e.message||e);}
+}
+
+function btRenderProducts(){
+  var box=document.getElementById('bt-products');if(!box)return;
+  if(!BT_PRODUCTS.length){box.innerHTML='<p class="hint">Aucun produit pour l’instant. Le formulaire ci-dessus crée le premier.</p>';return;}
+  var portalNames={nyxia:'NyXia',diane:'Diane',eric:'Éric',lena:'Léna',selena:'Séléna',kael:'Kael',alex:'Alex'};
+  box.innerHTML='<table><thead><tr><th>Ordre</th><th>Titre</th><th>Univers</th><th>Type</th><th>Prix</th><th>État</th><th></th></tr></thead><tbody>'+BT_PRODUCTS.map(function(p){
+    var price=p.priceLabel||((p.price==null)?'—':Number(p.price).toLocaleString('fr-CA',{style:'currency',currency:p.currency||'CAD'}));
+    return '<tr><td>'+esc(p.order||0)+'</td><td><strong>'+esc(p.title||'')+'</strong>'+(p.featured?' <span title="Vedette">★</span>':'')+'</td><td>'+esc(portalNames[p.portal]||p.portal)+'</td><td>'+esc(p.type||'')+'</td><td>'+esc(price)+'</td><td>'+(p.active?'<span style="color:var(--green)">Visible</span>':'<span style="color:#F4C842">Brouillon</span>')+'</td><td><div class="boutique-actions"><button class="btn btn-ghost" type="button" onclick="btEditProduct(\''+esc(p.id)+'\')">Modifier</button><button class="btn btn-ghost" type="button" onclick="btToggleProduct(\''+esc(p.id)+'\')">'+(p.active?'Masquer':'Publier')+'</button><button class="btn btn-danger" type="button" onclick="btDeleteProduct(\''+esc(p.id)+'\')">Supprimer</button></div></td></tr>';
+  }).join('')+'</tbody></table>';
+}
 
 async function loadPortals(){
   try{
@@ -482,6 +734,7 @@ function switchModule(name){
   if(name==='admins') loadMembers('admin','a-list');
   if(name==='promoteurs') loadMembers('affiliate','p-list');
   if(name==='produits') loadProducts();
+  if(name==='boutique') btLoad();
   if(name==='apayer') loadAPayer();
   if(name==='portails'){ loadPortals(); }
   if(name==='clients'){ loadPortals(); loadPortalClients(); }
