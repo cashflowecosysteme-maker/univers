@@ -489,6 +489,271 @@ async function handleDeleteProduct(request, env) {
   return json({ success: true });
 }
 
+// ─── Boutique NyXia (catalogue central dans CASHFLOW_KV) ───
+const BOUTIQUE_PRODUCT_PREFIX = 'boutique:product:';
+const BOUTIQUE_INDEX_KEY = 'boutique:products:index';
+const BOUTIQUE_SETTINGS_KEY = 'boutique:settings';
+const BOUTIQUE_PORTALS = ['nyxia', 'diane', 'eric', 'lena', 'selena', 'kael', 'alex'];
+const BOUTIQUE_CTA_TYPES = ['acheter', 'rendez-vous', 'appel', 'en-savoir-plus'];
+
+const BOUTIQUE_DEFAULT_PORTALS = [
+  { id: 'nyxia', name: 'NyXia', intro: 'Solutions techniques, accompagnement et services Done For You.', imageUrl: '/images/nyxia.png', order: 1, active: true },
+  { id: 'diane', name: 'Diane', intro: 'Parcours, livres et créations de la fondatrice de l’écosystème.', imageUrl: '/images/diane.png', order: 2, active: true },
+  { id: 'eric', name: 'Éric', intro: 'Marketing relationnel, communication et univers CashFlow™.', imageUrl: '/images/eric.png', order: 3, active: true },
+  { id: 'lena', name: 'Léna', intro: 'Dons, outils spirituels et méthode DDM.', imageUrl: '/images/lena.png', order: 4, active: true },
+  { id: 'selena', name: 'Séléna', intro: 'Libération émotionnelle, miroir et méthode A.M.I.E.™.', imageUrl: '/images/selena.png', order: 5, active: true },
+  { id: 'kael', name: 'Kael', intro: 'Relations, activités et expériences à vivre à deux.', imageUrl: '/images/kael.png', order: 6, active: true },
+  { id: 'alex', name: 'Alex', intro: 'Écriture, livres et parcours pour aller jusqu’au mot FIN.', imageUrl: '/images/alex.png', order: 7, active: true }
+];
+
+function boutiqueText(value, max = 5000) {
+  return String(value == null ? '' : value).trim().slice(0, max);
+}
+
+function boutiqueBool(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  return value === true || value === 1 || value === '1' || value === 'true' || value === 'on';
+}
+
+function boutiqueNumber(value, fallback = null) {
+  if (value === '' || value === undefined || value === null) return fallback;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function boutiqueUrl(value) {
+  const url = boutiqueText(value, 2000);
+  if (!url) return '';
+  if (url.startsWith('/')) return url;
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === 'https:' || parsed.protocol === 'http:') ? parsed.toString() : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function boutiqueSlug(value) {
+  return boutiqueText(value, 160)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '').slice(0, 80) || 'produit';
+}
+
+function boutiqueCors(response) {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=60');
+  return response;
+}
+
+async function boutiqueIndex(env) {
+  const raw = await env.CASHFLOW_KV.get(BOUTIQUE_INDEX_KEY);
+  if (raw) {
+    try {
+      const ids = JSON.parse(raw);
+      if (Array.isArray(ids)) return ids.filter(Boolean);
+    } catch (_) {}
+  }
+  const listed = await env.CASHFLOW_KV.list({ prefix: BOUTIQUE_PRODUCT_PREFIX });
+  const ids = (listed.keys || []).map((key) => key.name.slice(BOUTIQUE_PRODUCT_PREFIX.length)).filter(Boolean);
+  await env.CASHFLOW_KV.put(BOUTIQUE_INDEX_KEY, JSON.stringify(ids));
+  return ids;
+}
+
+async function boutiqueProducts(env) {
+  const ids = await boutiqueIndex(env);
+  const rows = await Promise.all(ids.map(async (id) => {
+    const raw = await env.CASHFLOW_KV.get(BOUTIQUE_PRODUCT_PREFIX + id);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (_) { return null; }
+  }));
+  return rows.filter(Boolean).sort((a, b) =>
+    (Number(a.order) || 0) - (Number(b.order) || 0) ||
+    String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+  );
+}
+
+async function boutiqueSettings(env) {
+  const defaults = {
+    title: 'Boutique NyXia',
+    heroTitle: 'Sept portes. Sept univers. Une seule boutique vivante.',
+    heroText: 'Choisis l’univers qui t’appelle et découvre ses livres, formations, outils, services, activités et événements.',
+    appointmentUrl: '',
+    appointmentLabel: 'Prendre un rendez-vous',
+    portals: BOUTIQUE_DEFAULT_PORTALS,
+    updatedAt: null
+  };
+  const raw = await env.CASHFLOW_KV.get(BOUTIQUE_SETTINGS_KEY);
+  if (!raw) return defaults;
+  try {
+    const saved = JSON.parse(raw);
+    const savedPortals = Array.isArray(saved.portals) ? saved.portals : [];
+    return {
+      ...defaults,
+      ...saved,
+      portals: BOUTIQUE_DEFAULT_PORTALS.map((portal) => {
+        const savedPortal = savedPortals.find((item) => item && item.id === portal.id) || {};
+        return { ...portal, ...savedPortal, imageUrl: savedPortal.imageUrl || portal.imageUrl };
+      })
+    };
+  } catch (_) {
+    return defaults;
+  }
+}
+
+function boutiquePublicProduct(product) {
+  const expires = product.promoExpiresAt ? Date.parse(product.promoExpiresAt) : NaN;
+  const promoActive = !!product.promoCode && (!Number.isFinite(expires) || expires >= Date.now());
+  return {
+    ...product,
+    promoActive,
+    promoCode: promoActive ? product.promoCode : '',
+    promoText: promoActive ? product.promoText : ''
+  };
+}
+
+async function handleBoutiqueProductsAdmin(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  return json({ products: await boutiqueProducts(env) });
+}
+
+async function handleBoutiqueProductSave(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const title = boutiqueText(body.title, 180);
+  const portal = boutiqueText(body.portal, 30).toLowerCase();
+  if (!title) return json({ error: 'Titre requis.' }, 400);
+  if (!BOUTIQUE_PORTALS.includes(portal)) return json({ error: 'Portail invalide.' }, 400);
+
+  let id = boutiqueText(body.id, 100).replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!id) id = crypto.randomUUID();
+  const oldRaw = await env.CASHFLOW_KV.get(BOUTIQUE_PRODUCT_PREFIX + id);
+  let old = null;
+  try { old = oldRaw ? JSON.parse(oldRaw) : null; } catch (_) {}
+
+  const imageValues = Array.isArray(body.images) ? body.images : [body.image1, body.image2, body.image3, body.image4];
+  const imageMainRaw = boutiqueText(body.imageMain, 2000);
+  const ctaUrlRaw = boutiqueText(body.ctaUrl, 2000);
+  const promoExpiresRaw = boutiqueText(body.promoExpiresAt, 40);
+  const invalidImage = imageMainRaw && !boutiqueUrl(imageMainRaw);
+  const invalidCta = ctaUrlRaw && !boutiqueUrl(ctaUrlRaw);
+  if (invalidImage || invalidCta) return json({ error: 'Un lien est invalide. Utilise une adresse https:// complète.' }, 400);
+  if (promoExpiresRaw && !Number.isFinite(Date.parse(promoExpiresRaw))) return json({ error: 'La date d’expiration de la promotion est invalide.' }, 400);
+  const price = boutiqueNumber(body.price);
+  const oldPrice = boutiqueNumber(body.oldPrice);
+  if ((price != null && price < 0) || (oldPrice != null && oldPrice < 0)) return json({ error: 'Le prix ne peut pas être négatif.' }, 400);
+
+  const ctaType = BOUTIQUE_CTA_TYPES.includes(body.ctaType) ? body.ctaType : 'en-savoir-plus';
+  const now = new Date().toISOString();
+  const product = {
+    schemaVersion: 1,
+    id,
+    slug: boutiqueSlug(body.slug || title),
+    portal,
+    type: boutiqueText(body.type, 80) || 'autre',
+    category: boutiqueText(body.category, 100),
+    title,
+    shortDescription: boutiqueText(body.shortDescription, 500),
+    description: boutiqueText(body.description, 12000),
+    price,
+    oldPrice,
+    priceLabel: boutiqueText(body.priceLabel, 80),
+    currency: ['CAD', 'EUR', 'USD'].includes(body.currency) ? body.currency : 'CAD',
+    imageMain: boutiqueUrl(imageMainRaw),
+    images: imageValues.map(boutiqueUrl).filter(Boolean).slice(0, 4),
+    testimonialQuote: boutiqueText(body.testimonialQuote, 1200),
+    testimonialAuthor: boutiqueText(body.testimonialAuthor, 120),
+    ctaType,
+    ctaUrl: boutiqueUrl(ctaUrlRaw),
+    order: Math.max(0, Math.trunc(boutiqueNumber(body.order, 0))),
+    active: boutiqueBool(body.active, false),
+    featured: boutiqueBool(body.featured, false),
+    promoCode: boutiqueText(body.promoCode, 80),
+    promoText: boutiqueText(body.promoText, 500),
+    promoExpiresAt: promoExpiresRaw ? new Date(promoExpiresRaw).toISOString() : '',
+    createdAt: old && old.createdAt ? old.createdAt : now,
+    updatedAt: now
+  };
+
+  await env.CASHFLOW_KV.put(BOUTIQUE_PRODUCT_PREFIX + id, JSON.stringify(product));
+  const ids = await boutiqueIndex(env);
+  if (!ids.includes(id)) {
+    ids.push(id);
+    await env.CASHFLOW_KV.put(BOUTIQUE_INDEX_KEY, JSON.stringify(ids));
+  }
+  return json({ success: true, product });
+}
+
+async function handleBoutiqueProductDelete(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const id = boutiqueText(body.id, 100).replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!id) return json({ error: 'Identifiant requis.' }, 400);
+  await env.CASHFLOW_KV.delete(BOUTIQUE_PRODUCT_PREFIX + id);
+  const ids = (await boutiqueIndex(env)).filter((item) => item !== id);
+  await env.CASHFLOW_KV.put(BOUTIQUE_INDEX_KEY, JSON.stringify(ids));
+  return json({ success: true });
+}
+
+async function handleBoutiqueSettingsAdmin(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (request.method === 'GET') return json({ settings: await boutiqueSettings(env) });
+  const body = await request.json().catch(() => ({}));
+  const current = await boutiqueSettings(env);
+  const incomingPortals = Array.isArray(body.portals) ? body.portals : [];
+  const appointmentRaw = boutiqueText(body.appointmentUrl, 2000);
+  if (appointmentRaw && !boutiqueUrl(appointmentRaw)) return json({ error: 'Le lien central du rendez-vous est invalide.' }, 400);
+  const invalidPortalImage = incomingPortals.some((portal) => {
+    const image = boutiqueText(portal && portal.imageUrl, 2000);
+    return image && !boutiqueUrl(image);
+  });
+  if (invalidPortalImage) return json({ error: 'Une image de portail contient un lien invalide.' }, 400);
+  const settings = {
+    title: boutiqueText(body.title, 120) || current.title,
+    heroTitle: boutiqueText(body.heroTitle, 240) || current.heroTitle,
+    heroText: boutiqueText(body.heroText, 1200) || current.heroText,
+    appointmentUrl: boutiqueUrl(appointmentRaw),
+    appointmentLabel: boutiqueText(body.appointmentLabel, 80) || 'Prendre un rendez-vous',
+    portals: BOUTIQUE_DEFAULT_PORTALS.map((fallback) => {
+      const incoming = incomingPortals.find((item) => item && item.id === fallback.id) || {};
+      const prior = current.portals.find((item) => item && item.id === fallback.id) || fallback;
+      const imageRaw = boutiqueText(incoming.imageUrl, 2000);
+      return {
+        id: fallback.id,
+        name: boutiqueText(incoming.name, 80) || prior.name || fallback.name,
+        intro: boutiqueText(incoming.intro, 500) || prior.intro || fallback.intro,
+        imageUrl: boutiqueUrl(imageRaw),
+        order: Math.max(0, Math.trunc(boutiqueNumber(incoming.order, prior.order || fallback.order))),
+        active: boutiqueBool(incoming.active, prior.active !== false)
+      };
+    }),
+    updatedAt: new Date().toISOString()
+  };
+  await env.CASHFLOW_KV.put(BOUTIQUE_SETTINGS_KEY, JSON.stringify(settings));
+  return json({ success: true, settings });
+}
+
+async function handleBoutiqueCatalog(request, env) {
+  const url = new URL(request.url);
+  const portal = boutiqueText(url.searchParams.get('portal'), 30).toLowerCase();
+  const id = boutiqueText(url.searchParams.get('id'), 100);
+  const q = boutiqueText(url.searchParams.get('q'), 200).toLowerCase();
+  let products = (await boutiqueProducts(env)).filter((product) => product.active);
+  if (portal && BOUTIQUE_PORTALS.includes(portal)) products = products.filter((product) => product.portal === portal);
+  if (id) products = products.filter((product) => product.id === id || product.slug === id);
+  if (q) products = products.filter((product) =>
+    [product.title, product.shortDescription, product.description, product.category, product.type]
+      .join(' ').toLowerCase().includes(q)
+  );
+  return boutiqueCors(json({ products: products.map(boutiquePublicProduct), count: products.length }));
+}
+
+async function handleBoutiqueConfig(request, env) {
+  return boutiqueCors(json({ settings: await boutiqueSettings(env) }));
+}
+
 
 // Portails configurables (KV univers:portals)
 async function getPortalsList(env) {
@@ -987,6 +1252,14 @@ export default {
       if (path === '/api/products' && request.method === 'POST') return await handleCreateProduct(request, env);
       if (path === '/api/products/update' && request.method === 'POST') return await handleUpdateProduct(request, env);
       if (path === '/api/products/delete' && request.method === 'POST') return await handleDeleteProduct(request, env);
+      if (path === '/api/boutique/products' && request.method === 'GET') return await handleBoutiqueProductsAdmin(request, env);
+      if (path === '/api/boutique/products/save' && request.method === 'POST') return await handleBoutiqueProductSave(request, env);
+      if (path === '/api/boutique/products/delete' && request.method === 'POST') return await handleBoutiqueProductDelete(request, env);
+      if (path === '/api/boutique/settings' && (request.method === 'GET' || request.method === 'POST')) return await handleBoutiqueSettingsAdmin(request, env);
+      if (path === '/api/boutique/catalog' && request.method === 'GET') return await handleBoutiqueCatalog(request, env);
+      if (path === '/api/boutique/catalog' && request.method === 'OPTIONS') return boutiqueCors(new Response(null, { status: 204 }));
+      if (path === '/api/boutique/config' && request.method === 'GET') return await handleBoutiqueConfig(request, env);
+      if (path === '/api/boutique/config' && request.method === 'OPTIONS') return boutiqueCors(new Response(null, { status: 204 }));
       if (path === '/api/portals' && request.method === 'GET') return await handleListPortals(request, env);
       if (path === '/api/portals' && request.method === 'POST') return await handleSavePortals(request, env);
       if (path === '/api/portals/add' && request.method === 'POST') return await handleAddPortal(request, env);
@@ -1176,4 +1449,3 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
-
