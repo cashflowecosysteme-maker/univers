@@ -227,10 +227,17 @@ td strong{color:#fff}
           <div><label class="f">Petite image 4</label><input class="f" id="bt-image-4" placeholder="https://..."></div>
           <div style="grid-column:1/-1"><label class="f">Témoignage</label><textarea class="f" id="bt-testimonial" rows="3"></textarea></div>
           <div><label class="f">Nom du témoignage</label><input class="f" id="bt-testimonial-author"></div>
-          <div><label class="f">Bouton</label>
-            <select class="f" id="bt-cta-type"><option value="acheter">Acheter</option><option value="rendez-vous">Prendre un rendez-vous</option><option value="appel">Prendre un appel</option><option value="en-savoir-plus">En savoir plus</option></select>
+          <div style="grid-column:1/-1"><label class="f">Affichage sur la carte</label>
+            <select class="f" id="bt-cta-type">
+              <option value="auto">Automatique — prix présent : En savoir plus / sans prix : GRATUIT</option>
+              <option value="gratuit">GRATUIT</option>
+              <option value="rendez-vous">Prendre un rendez-vous</option>
+              <option value="en-savoir-plus">En savoir plus</option>
+              <option value="reservation-consultation">Réservation consultation</option>
+            </select>
+            <p class="hint">« Voir la fiche » reste toujours affiché. Ce choix contrôle uniquement le texte qui apparaît après.</p>
           </div>
-          <div style="grid-column:1/-1"><label class="f">Lien du bouton</label><input class="f" id="bt-cta-url" placeholder="https://..."></div>
+          <div style="grid-column:1/-1"><label class="f">Lien de l’action (facultatif)</label><input class="f" id="bt-cta-url" placeholder="https://..."><p class="hint">Ex. lien Systeme.io pour un rendez-vous, une consultation ou une inscription gratuite.</p></div>
           <div><label class="f">Code promo</label><input class="f" id="bt-promo-code"></div>
           <div><label class="f">Expiration du code</label><input class="f" id="bt-promo-expires" type="datetime-local"></div>
           <div style="grid-column:1/-1"><label class="f">Texte de la promotion</label><input class="f" id="bt-promo-text"></div>
@@ -549,9 +556,42 @@ async function btSaveSettings(){
   }catch(e){showMsg('bt-settings-msg',e.message||'Erreur',false);}
 }
 
+function btUiCtaFromProduct(p){
+  var type=(p&&p.ctaType)||'en-savoir-plus';
+  if(type==='appel')return 'reservation-consultation';
+  if(type==='rendez-vous')return 'rendez-vous';
+  if(type==='en-savoir-plus')return 'en-savoir-plus';
+  if(type==='acheter'){
+    var noLabel=!String((p&&p.priceLabel)||'').trim();
+    var explicitZero=(p&&p.price!==null&&p.price!==undefined&&p.price!==''&&Number(p.price)===0);
+    return (explicitZero&&noLabel)?'gratuit':'auto';
+  }
+  return 'auto';
+}
+
+function btTechnicalCta(uiType){
+  if(uiType==='rendez-vous')return 'rendez-vous';
+  if(uiType==='reservation-consultation')return 'appel';
+  if(uiType==='en-savoir-plus')return 'en-savoir-plus';
+  return 'acheter';
+}
+
 function btProductBody(source){
   if(source)return Object.assign({},source,{images:Array.isArray(source.images)?source.images:[]});
   var numberOrNull=function(id){var value=document.getElementById(id).value;return value===''?null:Number(value);};
+  var uiCta=document.getElementById('bt-cta-type').value;
+  var price=numberOrNull('bt-price');
+  var oldPrice=numberOrNull('bt-old-price');
+  var priceLabel=document.getElementById('bt-price-label').value.trim();
+
+  // GRATUIT explicite = prix 0. Cela permet de le distinguer du mode Automatique sans prix (null),
+  // tout en restant compatible avec le Worker et la Boutique existants.
+  if(uiCta==='gratuit'){
+    price=0;
+    oldPrice=null;
+    priceLabel='';
+  }
+
   return{
     id:document.getElementById('bt-id').value.trim(),
     portal:document.getElementById('bt-portal').value,
@@ -560,14 +600,14 @@ function btProductBody(source){
     title:document.getElementById('bt-product-title').value.trim(),
     shortDescription:document.getElementById('bt-short-description').value.trim(),
     description:document.getElementById('bt-description').value.trim(),
-    price:numberOrNull('bt-price'),oldPrice:numberOrNull('bt-old-price'),
+    price:price,oldPrice:oldPrice,
     currency:document.getElementById('bt-currency').value,
-    priceLabel:document.getElementById('bt-price-label').value.trim(),
+    priceLabel:priceLabel,
     imageMain:document.getElementById('bt-image-main').value.trim(),
     images:[1,2,3,4].map(function(n){return document.getElementById('bt-image-'+n).value.trim();}),
     testimonialQuote:document.getElementById('bt-testimonial').value.trim(),
     testimonialAuthor:document.getElementById('bt-testimonial-author').value.trim(),
-    ctaType:document.getElementById('bt-cta-type').value,
+    ctaType:btTechnicalCta(uiCta),
     ctaUrl:document.getElementById('bt-cta-url').value.trim(),
     promoCode:document.getElementById('bt-promo-code').value.trim(),
     promoText:document.getElementById('bt-promo-text').value.trim(),
@@ -607,15 +647,16 @@ function btEditProduct(id){
   document.getElementById('bt-product-title').value=p.title||'';
   document.getElementById('bt-short-description').value=p.shortDescription||'';
   document.getElementById('bt-description').value=p.description||'';
-  document.getElementById('bt-price').value=p.price==null?'':p.price;
-  document.getElementById('bt-old-price').value=p.oldPrice==null?'':p.oldPrice;
+  var uiCta=btUiCtaFromProduct(p);
+  document.getElementById('bt-price').value=(uiCta==='gratuit')?'':(p.price==null?'':p.price);
+  document.getElementById('bt-old-price').value=(uiCta==='gratuit')?'':(p.oldPrice==null?'':p.oldPrice);
   document.getElementById('bt-currency').value=p.currency||'CAD';
-  document.getElementById('bt-price-label').value=p.priceLabel||'';
+  document.getElementById('bt-price-label').value=(uiCta==='gratuit')?'':(p.priceLabel||'');
   document.getElementById('bt-image-main').value=p.imageMain||'';
   [1,2,3,4].forEach(function(n){document.getElementById('bt-image-'+n).value=(p.images||[])[n-1]||'';});
   document.getElementById('bt-testimonial').value=p.testimonialQuote||'';
   document.getElementById('bt-testimonial-author').value=p.testimonialAuthor||'';
-  document.getElementById('bt-cta-type').value=p.ctaType||'en-savoir-plus';
+  document.getElementById('bt-cta-type').value=uiCta;
   document.getElementById('bt-cta-url').value=p.ctaUrl||'';
   document.getElementById('bt-promo-code').value=p.promoCode||'';
   document.getElementById('bt-promo-text').value=p.promoText||'';
@@ -631,7 +672,7 @@ function btEditProduct(id){
 function btResetProduct(clearMessage){
   document.getElementById('bt-id').value='';
   ['bt-category','bt-product-title','bt-short-description','bt-description','bt-price','bt-old-price','bt-price-label','bt-image-main','bt-image-1','bt-image-2','bt-image-3','bt-image-4','bt-testimonial','bt-testimonial-author','bt-cta-url','bt-promo-code','bt-promo-text','bt-promo-expires'].forEach(function(id){document.getElementById(id).value='';});
-  document.getElementById('bt-portal').value='nyxia';document.getElementById('bt-type').value='formation';document.getElementById('bt-currency').value='CAD';document.getElementById('bt-cta-type').value='acheter';document.getElementById('bt-order').value='0';document.getElementById('bt-active').checked=false;document.getElementById('bt-featured').checked=false;
+  document.getElementById('bt-portal').value='nyxia';document.getElementById('bt-type').value='formation';document.getElementById('bt-currency').value='CAD';document.getElementById('bt-cta-type').value='auto';document.getElementById('bt-order').value='0';document.getElementById('bt-active').checked=false;document.getElementById('bt-featured').checked=false;
   document.getElementById('bt-editor-title').textContent='Ajouter un produit, service ou événement';document.getElementById('bt-cancel').style.display='none';
   if(clearMessage!==false){var m=document.getElementById('bt-product-msg');m.style.display='none';}
 }
