@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Commerce Boutique · NyXia</title>
+<link rel="stylesheet" href="/css/boutique-commerce.css">
+</head>
+<body>
+<main class="shell">
+  <div class="top">
+    <div><h1>Boutique · Paiements & Cercle</h1><p>Le vendeur, les taux et la chaîne d’entraide restent trois choses séparées.</p></div>
+    <a class="back" href="/">← Super Admin</a>
+  </div>
+
+  <div id="auth-msg" class="warning hidden">Ta session Super Admin n’est pas reconnue ici. Connecte-toi d’abord dans le Super Admin, puis reviens sur cette page.</div>
+
+  <div class="grid" id="app">
+    <aside class="panel side">
+      <div class="side-head"><button class="btn" id="refresh">Actualiser</button><button class="btn gold" id="sync">Synchroniser</button></div>
+      <div class="products" id="products"><div class="empty">Chargement…</div></div>
+    </aside>
+
+    <section class="panel editor">
+      <div id="no-product" class="empty">Choisis un produit à gauche.</div>
+      <div id="form-wrap" class="hidden">
+        <h2 id="product-title">Produit</h2>
+        <p class="sub" id="product-meta"></p>
+
+        <div class="section">
+          <h3>Propriétaire du produit</h3>
+          <div class="fields">
+            <div class="field full"><label>Vendeur / propriétaire</label><select id="seller"></select><div class="hint">Le vendeur est celui qui doit les commissions. Il ne devient pas automatiquement N1, N2 ou N3.</div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Commissions du Cercle d’entraide</h3>
+          <label class="check"><input type="checkbox" id="commission-enabled" checked> Ce produit verse des commissions</label>
+          <div class="fields" style="margin-top:12px">
+            <div class="field"><label>Niveau 1 (%)</label><input id="n1" type="number" min="0" max="100" step="0.01"><div class="hint" id="n1-hint"></div></div>
+            <div class="field"><label>Niveau 2 (%)</label><input id="n2" type="number" min="0" max="100" step="0.01"><div class="hint" id="n2-hint"></div></div>
+            <div class="field"><label>Niveau 3 (%)</label><input id="n3" type="number" min="0" max="100" step="0.01"><div class="hint" id="n3-hint"></div></div>
+            <div class="field"><label>Règle</label><div class="warning">Vide = taux général. <strong>0 = zéro commission</strong>, sans remplacement automatique.</div></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Paiement Systeme.io</h3>
+          <div class="fields">
+            <div class="field full"><label>URL de la page de paiement</label><input id="checkout" type="url" placeholder="https://..."></div>
+            <div class="field"><label>ID du plan tarifaire Systeme.io</label><input id="plan-id" placeholder="Ex. 123456"><div class="hint">Préféré pour reconnaître automatiquement la vente.</div></div>
+            <div class="field"><label>Nom interne du plan (secours)</label><input id="plan-name" placeholder="Nom exact dans Systeme.io"></div>
+          </div>
+        </div>
+
+        <div class="section" id="media-section">
+          <h3>Vidéo & témoignage visuel</h3>
+          <div class="fields">
+            <div class="field full"><label>Vidéo descriptive — URL</label><input id="video-url" type="url" placeholder="YouTube, Vimeo ou MP4"></div>
+            <div class="field"><label>Titre de la vidéo</label><input id="video-title"></div>
+            <div class="field"><label>Position de la vidéo</label><select id="video-position"><option value="gallery">Dans la galerie</option><option value="description">Après la description</option><option value="hidden">Ne pas afficher</option></select></div>
+            <div class="field full"><label>Image du témoignage — URL</label><input id="testimonial-image" type="url" placeholder="https://..."></div>
+            <div class="field"><label>Mode du témoignage</label><select id="testimonial-mode"><option value="text">Texte seulement</option><option value="image">Image seulement</option><option value="both">Texte + image</option></select></div>
+          </div>
+        </div>
+        <div id="media-na" class="warning hidden">Ce produit vient seulement du Répertoire. Ses médias Boutique ne sont donc pas modifiés ici.</div>
+
+        <div class="actions"><button class="btn gold" id="save">Enregistrer ce produit</button></div>
+        <div id="save-msg" class="msg"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="meta-grid">
+    <section class="panel mini">
+      <h3>Ton identité Super Admin dans le Cercle</h3>
+      <div class="field"><label>Ton code d’affiliation</label><div class="row"><div class="codebox" id="super-code">—</div><button class="btn" id="copy-code">Copier</button></div></div>
+      <div class="field" style="margin-top:12px"><label>Code de ton parent (facultatif)</label><input id="super-parent" placeholder="Laisser vide si aucun"><div class="hint" id="super-parent-info"></div></div>
+      <div class="actions"><button class="btn" id="save-parent">Enregistrer le parent</button><button class="btn danger" id="regen-code">Régénérer mon code</button></div>
+      <div id="affiliate-msg" class="msg"></div>
+    </section>
+
+    <section class="panel mini">
+      <h3>Webhook Systeme.io</h3>
+      <div class="field"><label>URL à mettre dans Systeme.io</label><div class="codebox" id="webhook-url">—</div></div>
+      <div class="field" style="margin-top:10px"><label>Clé secrète du webhook</label><div class="codebox" id="webhook-secret">—</div></div>
+      <div class="actions"><button class="btn" id="copy-webhook">Copier l’URL</button><button class="btn" id="copy-secret">Copier la clé</button><button class="btn danger" id="regen-secret">Régénérer le secret</button></div>
+      <p class="hint">Événements : Nouvelle vente + Vente annulée/remboursée. Le même endpoint protège les doublons de livraison.</p>
+      <div id="webhook-msg" class="msg"></div>
+    </section>
+  </div>
+
+  <section class="panel sales">
+    <div class="row"><h3 style="margin:0">Dernières ventes reçues</h3><button class="btn" id="refresh-sales">Actualiser</button></div>
+    <div id="sales-box" class="empty">Chargement…</div>
+  </section>
+</main>
+<script src="/js/boutique-commerce.js" defer></script>
+</body>
+</html>
