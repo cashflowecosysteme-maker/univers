@@ -98,14 +98,3 @@
     createStars()
   })
 })()
-
-/* Charge le complément médias de la Boutique dans le Super Admin.
-   Le ciel étoilé ci-dessus reste inchangé. */
-;(function () {
-  'use strict'
-  if (document.querySelector('script[data-boutique-media-admin]')) return
-  var script = document.createElement('script')
-  script.src = '/boutique-media-admin.js'
-  script.setAttribute('data-boutique-media-admin', '1')
-  document.head.appendChild(script)
-})()
