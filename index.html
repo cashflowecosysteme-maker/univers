@@ -79,6 +79,7 @@ td strong{color:#fff}
     <button class="module-tab" data-module="apayer" onclick="switchModule('apayer')">À payer (mes produits)</button>
     <button class="module-tab" data-module="portails" onclick="switchModule('portails')">Portails</button>
     <button class="module-tab" data-module="clients" onclick="switchModule('clients')">Clients portails</button>
+    <button class="module-tab" data-module="degustations" onclick="switchModule('degustations')">🍷 Dégustations & accès</button>
     <button class="module-tab" data-module="outils" onclick="switchModule('outils')">Outils</button>
     <button class="module-tab" data-module="formations" onclick="switchModule('formations')">Formations des personnages</button>
     <button class="module-tab" data-module="defunts" onclick="switchModule('defunts')">Défunts</button>
@@ -322,6 +323,75 @@ td strong{color:#fff}
         <h3>Clients inscrits</h3>
         <div id="cl-list">—</div>
       </div>
+    </div>
+
+
+    <div class="module-panel" id="module-degustations">
+      <div class="panel">
+        <h3>🍷 Gestionnaire de Dégustations & Accès</h3>
+        <p class="hint" style="margin-bottom:8px">Prépare une dégustation de n’importe quel portail sans toucher au code. La liste ci-dessous vient directement de <strong style="color:#fff">Super Admin → Portails</strong> : tout nouveau portail actif apparaîtra automatiquement.</p>
+        <div class="hint" id="dg-load-state"></div>
+      </div>
+
+      <div class="panel" id="dg-campaign-editor">
+        <h3 id="dg-editor-title">Créer une dégustation</h3>
+        <input type="hidden" id="dg-c-id">
+        <div class="grid2">
+          <div><label class="f">Nom de la campagne *</label><input class="f" id="dg-c-name" placeholder="Ex. VIP — Événement septembre 2026"></div>
+          <div><label class="f">État</label><select class="f" id="dg-c-status"><option value="draft">Brouillon</option><option value="active">Active</option><option value="ended">Terminée</option></select></div>
+          <div style="grid-column:1/-1"><label class="f">Portail(s) à faire goûter *</label><div id="dg-campaign-portals" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div></div>
+          <div><label class="f">Durée</label><select class="f" id="dg-duration-preset" onchange="dgDurationPresetChanged()"><option value="72">3 jours</option><option value="168">7 jours</option><option value="720">30 jours</option><option value="custom">Personnalisée</option></select></div>
+          <div id="dg-duration-custom-wrap" style="display:none"><label class="f">Durée personnalisée (heures)</label><input class="f" type="number" id="dg-duration-hours" min="1" step="1" value="72"></div>
+          <div><label class="f">Départ du compteur</label><select class="f" id="dg-start-mode"><option value="first_login">À la première entrée dans un portail</option><option value="activation">Dès l’activation / achat</option></select><p class="hint">Pour plusieurs portails, un seul compteur commun démarre pour toute la campagne.</p></div>
+          <div><label class="f">Prix de la porte d’entrée</label><div style="display:grid;grid-template-columns:1fr 100px;gap:8px"><input class="f" type="number" id="dg-price" min="0" step="0.01" placeholder="19"><select class="f" id="dg-currency"><option value="CAD">CAD</option><option value="EUR">EUR</option><option value="USD">USD</option></select></div></div>
+          <div><label class="f">Offre disponible à partir de</label><input class="f" type="datetime-local" id="dg-available-from"></div>
+          <div><label class="f">Offre disponible jusqu’au</label><input class="f" type="datetime-local" id="dg-available-until"></div>
+          <div style="grid-column:1/-1"><label class="f">Lien de paiement / déclencheur Systeme.io</label><input class="f" id="dg-checkout-url" placeholder="https://..."></div>
+          <div><label class="f">Après expiration</label><select class="f" id="dg-after-type" onchange="dgAfterTypeChanged()"><option value="offer">Page d’offre</option><option value="checkout">Page de paiement</option><option value="boutique">Boutique NyXia</option><option value="appointment">Prise de rendez-vous</option><option value="custom">URL personnalisée</option></select></div>
+          <div><label class="f">URL après expiration</label><input class="f" id="dg-after-url" placeholder="https://..."><p class="hint" id="dg-after-url-hint">Page affichée quand l’accès temporaire est terminé.</p></div>
+        </div>
+
+        <div style="margin-top:18px;padding:14px;border:1px solid rgba(123,92,255,.18);border-radius:12px;background:rgba(15,28,63,.32)">
+          <h3 style="margin-bottom:6px">Produits de continuité</h3>
+          <p class="hint" style="margin-bottom:12px">Ex. Studio Prompt 497 $ annuel ou 69 $ / mois. Ces choix restent liés à la campagne.</p>
+          <div class="grid2">
+            <div><label class="f">Choix 1 — libellé</label><input class="f" id="dg-cont-label-1" placeholder="Accès annuel"></div>
+            <div><label class="f">Choix 1 — prix</label><input class="f" type="number" id="dg-cont-price-1" min="0" step="0.01" placeholder="497"></div>
+            <div style="grid-column:1/-1"><label class="f">Choix 1 — lien</label><input class="f" id="dg-cont-url-1" placeholder="https://..."></div>
+            <div><label class="f">Choix 2 — libellé</label><input class="f" id="dg-cont-label-2" placeholder="Accès mensuel"></div>
+            <div><label class="f">Choix 2 — prix</label><input class="f" type="number" id="dg-cont-price-2" min="0" step="0.01" placeholder="69"></div>
+            <div style="grid-column:1/-1"><label class="f">Choix 2 — lien</label><input class="f" id="dg-cont-url-2" placeholder="https://..."></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn" type="button" onclick="dgSaveCampaign()">Enregistrer la dégustation</button><button class="btn btn-ghost" id="dg-cancel-edit" type="button" onclick="dgResetCampaign()" style="display:none">Annuler la modification</button></div>
+        <div class="msg" id="dg-c-msg"></div>
+      </div>
+
+      <div class="panel"><h3>Campagnes / événements</h3><div id="dg-campaigns-list">—</div></div>
+
+      <div class="panel">
+        <h3>👑 Comptes internes / permanents</h3>
+        <p class="hint" style="margin-bottom:12px"><strong style="color:#fff">magiquebusiness@gmail.com</strong> est protégé comme OWNER permanent sur tous les portails présents et futurs. Tu peux ajouter ici du STAFF ou des comptes TEST sans toucher au code.</p>
+        <div class="grid2">
+          <div><label class="f">Courriel</label><input class="f" type="email" id="dg-p-email"></div>
+          <div><label class="f">Rôle</label><select class="f" id="dg-p-role"><option value="staff">STAFF</option><option value="test">TEST</option></select></div>
+          <div style="grid-column:1/-1"><label style="display:flex;gap:8px;align-items:center;color:var(--t2);font-size:13px"><input type="checkbox" id="dg-p-all" onchange="dgPermanentAllChanged()"> Tous les portails présents et futurs</label></div>
+          <div style="grid-column:1/-1"><label class="f">Sinon, portail(s)</label><div id="dg-permanent-portals" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div></div>
+          <div style="grid-column:1/-1"><label class="f">Note</label><input class="f" id="dg-p-note" placeholder="Ex. compte de test équipe"></div>
+        </div>
+        <button class="btn" style="margin-top:12px" type="button" onclick="dgSavePermanent()">Enregistrer l’accès permanent</button>
+        <div class="msg" id="dg-p-msg"></div>
+        <div id="dg-permanent-list" style="margin-top:16px">—</div>
+      </div>
+
+      <div class="panel">
+        <h3>Accorder une dégustation manuellement</h3>
+        <p class="hint" style="margin-bottom:12px">Pratique pour tester ou offrir l’accès à quelqu’un sans passer par le paiement.</p>
+        <div class="grid2"><div><label class="f">Courriel</label><input class="f" type="email" id="dg-manual-email"></div><div><label class="f">Campagne</label><select class="f" id="dg-manual-campaign"><option value="">Choisir…</option></select></div></div>
+        <button class="btn" style="margin-top:12px" type="button" onclick="dgGrantManual()">Activer la dégustation</button><div class="msg" id="dg-manual-msg"></div>
+      </div>
+
+      <div class="panel"><h3>Accès temporaires</h3><div id="dg-grants-list">—</div></div>
     </div>
 
     <div class="module-panel" id="module-outils">
@@ -868,6 +938,7 @@ function switchModule(name){
   if(name==='apayer') loadAPayer();
   if(name==='portails'){ loadPortals(); }
   if(name==='clients'){ loadPortals(); loadPortalClients(); }
+  if(name==='degustations' && typeof degustationsLoad==='function'){ degustationsLoad(); }
   if(name==='formations'){ foLoadAgents(); }
   if(name==='defunts'){ dfLoad(); }
 }
@@ -1557,5 +1628,6 @@ document.addEventListener('input',function(e){
 })();
 document.getElementById('login-password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 </script>
+<script src="/js/degustations-admin.js" defer></script>
 </body>
 </html>
