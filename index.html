@@ -148,17 +148,19 @@ td strong{color:#fff}
         <h3>Créer un produit SuperAdmin</h3>
         <div class="grid2">
           <div><label class="f">Titre *</label><input class="f" id="pr-title"></div>
-          <div><label class="f">Type de tarif</label>
-            <select class="f" id="pr-billing">
+          <div><label class="f">Type de tarif / action</label>
+            <select class="f" id="pr-billing" onchange="prBillingChanged()">
               <option value="one_time">Paiement unique</option>
               <option value="subscription">Abonnement mensuel</option>
               <option value="both">Unique + abonnement mensuel</option>
+              <option value="appointment_free">Rendez-vous / rencontre gratuite — aucun prix affiché</option>
             </select>
+            <p class="hint" id="pr-billing-hint">Choisis le mode qui correspond réellement à l’offre.</p>
           </div>
-          <div><label class="f">Prix unique ($)</label><input class="f" type="number" id="pr-price" step="0.01"></div>
-          <div><label class="f">Abonnement mensuel ($)</label><input class="f" type="number" id="pr-price-month" step="0.01"></div>
+          <div id="pr-price-wrap"><label class="f">Prix unique ($)</label><input class="f" type="number" id="pr-price" step="0.01"></div>
+          <div id="pr-price-month-wrap"><label class="f">Abonnement mensuel ($)</label><input class="f" type="number" id="pr-price-month" step="0.01"></div>
           <div style="grid-column:1/-1"><label class="f">Description courte</label><input class="f" id="pr-desc"></div>
-          <div><label class="f">Lien d’offre</label><input class="f" id="pr-link" placeholder="https://..."></div>
+          <div><label class="f" id="pr-link-label">Lien d’offre</label><input class="f" id="pr-link" placeholder="https://..."><p class="hint" id="pr-link-hint">Page de vente ou lien principal de l’offre.</p></div>
           <div><label class="f">Image (URL)</label><input class="f" id="pr-img"></div>
           <div style="grid-column:1/-1"><label class="f">Guide de promotion</label><textarea class="f" id="pr-promo-guide" rows="3" placeholder="Publications, angles, message type…"></textarea></div>
           <div><label class="f">Cercle — type</label>
@@ -642,6 +644,7 @@ function btRenderTestimonialsEditor(){
 function btAddTestimonial(){
   BT_TESTIMONIALS.push({id:btTestimonialId(),type:'text',text:'',author:'',imageUrl:'',caption:''});
   btRenderTestimonialsEditor();
+prBillingChanged();
 }
 
 function btCleanTestimonials(){
@@ -966,17 +969,48 @@ async function delMember(id,role){
   await api('/api/members/delete','POST',{id:id});
   loadMembers(role,role==='admin'?'a-list':'p-list');
 }
+function prBillingChanged(){
+  var mode=(document.getElementById('pr-billing')&&document.getElementById('pr-billing').value)||'one_time';
+  var appointment=mode==='appointment_free';
+  var priceWrap=document.getElementById('pr-price-wrap');
+  var monthlyWrap=document.getElementById('pr-price-month-wrap');
+  var price=document.getElementById('pr-price');
+  var monthly=document.getElementById('pr-price-month');
+  var joinType=document.getElementById('pr-join-type');
+  var hint=document.getElementById('pr-billing-hint');
+  var linkLabel=document.getElementById('pr-link-label');
+  var linkHint=document.getElementById('pr-link-hint');
+
+  if(priceWrap)priceWrap.style.display=appointment?'none':'block';
+  if(monthlyWrap)monthlyWrap.style.display=appointment?'none':'block';
+
+  if(appointment){
+    if(price)price.value='';
+    if(monthly)monthly.value='';
+    if(joinType)joinType.value='free';
+    if(hint)hint.textContent='Rencontre gratuite : aucun prix n’est affiché dans le Répertoire.';
+    if(linkLabel)linkLabel.textContent='Lien de prise de rendez-vous';
+    if(linkHint)linkHint.textContent='Colle ici ton lien Systeme.io, Calendly ou autre page de réservation.';
+  }else{
+    if(hint)hint.textContent='Choisis le mode qui correspond réellement à l’offre.';
+    if(linkLabel)linkLabel.textContent='Lien d’offre';
+    if(linkHint)linkHint.textContent='Page de vente ou lien principal de l’offre.';
+  }
+}
+
 async function createProduct(){
+  var billingUi=(document.getElementById('pr-billing')&&document.getElementById('pr-billing').value)||'one_time';
+  var isAppointment=billingUi==='appointment_free';
   var body={
     title:document.getElementById('pr-title').value.trim(),
     description:document.getElementById('pr-desc').value.trim(),
-    price:document.getElementById('pr-price').value,
-    price_monthly:(document.getElementById('pr-price-month')&&document.getElementById('pr-price-month').value)||0,
-    billing_type:(document.getElementById('pr-billing')&&document.getElementById('pr-billing').value)||'one_time',
+    price:isAppointment?0:document.getElementById('pr-price').value,
+    price_monthly:isAppointment?0:((document.getElementById('pr-price-month')&&document.getElementById('pr-price-month').value)||0),
+    billing_type:billingUi,
     affiliateLink:document.getElementById('pr-link').value.trim(),
     imageUrl:document.getElementById('pr-img').value.trim(),
     promo_guide:(document.getElementById('pr-promo-guide')&&document.getElementById('pr-promo-guide').value||'').trim(),
-    join_type:(document.getElementById('pr-join-type')&&document.getElementById('pr-join-type').value)||'free',
+    join_type:isAppointment?'free':((document.getElementById('pr-join-type')&&document.getElementById('pr-join-type').value)||'free'),
     join_url:(document.getElementById('pr-join-url')&&document.getElementById('pr-join-url').value||'').trim(),
     status:'active'
   };
@@ -1085,7 +1119,8 @@ async function loadProducts(){
       var btnJoin=(jt==='paid')
         ? '<button class="btn btn-ghost" type="button" onclick="setJoinType(\''+esc(p.id)+'\',\'free\')">→ Gratuit</button> '
         : '<button class="btn btn-ghost" type="button" onclick="setJoinType(\''+esc(p.id)+'\',\'paid\')">→ Payant</button> ';
-      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(p.price)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+(st==='draft'?' (attente)':'')+'</td><td>'+esc(origin)+'</td><td style="white-space:nowrap">'+btnJoin+btnSt+'<button class="btn btn-danger" type="button" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
+      var priceDisplay=p.billing_type==='appointment_free'?'Rendez-vous gratuit':p.price;
+      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(priceDisplay)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+(st==='draft'?' (attente)':'')+'</td><td>'+esc(origin)+'</td><td style="white-space:nowrap">'+btnJoin+btnSt+'<button class="btn btn-danger" type="button" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
     }).join('')+'</table>';
   }catch(e){box.textContent=e.message;}
 }
