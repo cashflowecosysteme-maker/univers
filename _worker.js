@@ -1014,6 +1014,273 @@ async function handleDeletePortalClient(request, env) {
   return json({ success: true });
 }
 
+
+// ───────────── DÉGUSTATIONS & ACCÈS TEMPORAIRES NYXIA ─────────────
+// Administration centralisée. Les portails disponibles proviennent TOUJOURS de univers:portals.
+const DG_CAMPAIGNS_KEY = 'univers:degustations';
+const DG_PERMANENT_KEY = 'univers:access:permanent';
+const DG_GRANT_PREFIX = 'univers:access:grant:';
+const DG_ACTIVATION_PREFIX = 'univers:access:activation:';
+const DG_OWNER_EMAIL = 'magiquebusiness@gmail.com';
+
+function dgEmail(v) { return String(v || '').trim().toLowerCase(); }
+function dgId(v) { return String(v || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 100); }
+function dgText(v, max = 2000) { return String(v == null ? '' : v).trim().slice(0, max); }
+function dgUrl(v) {
+  const s = dgText(v, 2000); if (!s) return '';
+  try { const u = new URL(s); return ['http:','https:'].includes(u.protocol) ? u.toString() : ''; } catch (_) { return ''; }
+}
+function dgNumber(v, fallback = null) { if (v === '' || v == null) return fallback; const n = Number(v); return Number.isFinite(n) ? n : fallback; }
+function dgNow() { return new Date().toISOString(); }
+function dgGrantKey(email, campaignId, portalId) { return DG_GRANT_PREFIX + encodeURIComponent(dgEmail(email)) + ':' + dgId(campaignId) + ':' + dgId(portalId); }
+function dgActivationKey(email, campaignId) { return DG_ACTIVATION_PREFIX + encodeURIComponent(dgEmail(email)) + ':' + dgId(campaignId); }
+
+async function dgReadCampaigns(env) {
+  const raw = await env.CASHFLOW_KV.get(DG_CAMPAIGNS_KEY);
+  if (!raw) return [];
+  try { const list = JSON.parse(raw); return Array.isArray(list) ? list : []; } catch (_) { return []; }
+}
+async function dgWriteCampaigns(env, list) { await env.CASHFLOW_KV.put(DG_CAMPAIGNS_KEY, JSON.stringify(list)); }
+
+async function dgReadPermanent(env) {
+  let list = [];
+  const raw = await env.CASHFLOW_KV.get(DG_PERMANENT_KEY);
+  if (raw) { try { const p = JSON.parse(raw); if (Array.isArray(p)) list = p; } catch (_) {} }
+  const owner = list.find((x) => dgEmail(x && x.email) === DG_OWNER_EMAIL);
+  if (owner) {
+    owner.email = DG_OWNER_EMAIL; owner.role = 'owner'; owner.allPortals = true; owner.portalIds = []; owner.protected = true;
+    if (!owner.createdAt) owner.createdAt = dgNow();
+  } else {
+    list.unshift({ email: DG_OWNER_EMAIL, role: 'owner', allPortals: true, portalIds: [], note: 'OWNER NyXia — accès permanent protégé', protected: true, createdAt: dgNow(), updatedAt: dgNow() });
+  }
+  await env.CASHFLOW_KV.put(DG_PERMANENT_KEY, JSON.stringify(list));
+  return list;
+}
+async function dgWritePermanent(env, list) {
+  // L'OWNER ne peut jamais disparaître ni perdre l'accès aux futurs portails.
+  list = (Array.isArray(list) ? list : []).filter((x) => dgEmail(x && x.email) !== DG_OWNER_EMAIL);
+  list.unshift({ email: DG_OWNER_EMAIL, role: 'owner', allPortals: true, portalIds: [], note: 'OWNER NyXia — accès permanent protégé', protected: true, createdAt: dgNow(), updatedAt: dgNow() });
+  await env.CASHFLOW_KV.put(DG_PERMANENT_KEY, JSON.stringify(list));
+  return list;
+}
+
+async function dgNormalizeCampaign(env, body, existing) {
+  const portals = await getPortalsList(env);
+  const validIds = new Set((portals || []).map((p) => p.id));
+  const portalIds = Array.isArray(body.portalIds) ? body.portalIds.map(dgId).filter((id) => validIds.has(id)) : [];
+  const name = dgText(body.name, 180);
+  const durationHours = Math.max(1, Math.round(dgNumber(body.durationHours, 72) || 72));
+  const startMode = body.startMode === 'activation' ? 'activation' : 'first_login';
+  const status = ['draft','active','ended'].includes(body.status) ? body.status : 'draft';
+  const availableFrom = body.availableFrom && Number.isFinite(Date.parse(body.availableFrom)) ? new Date(body.availableFrom).toISOString() : '';
+  const availableUntil = body.availableUntil && Number.isFinite(Date.parse(body.availableUntil)) ? new Date(body.availableUntil).toISOString() : '';
+  if (availableFrom && availableUntil && Date.parse(availableUntil) < Date.parse(availableFrom)) throw new Error('La fin de disponibilité doit être après le début.');
+  const checkoutRaw = dgText(body.checkoutUrl, 2000); const checkoutUrl = checkoutRaw ? dgUrl(checkoutRaw) : '';
+  if (checkoutRaw && !checkoutUrl) throw new Error('Le lien de paiement est invalide.');
+  const afterIn = body.afterExpiry || {};
+  const afterType = ['offer','checkout','boutique','appointment','custom'].includes(afterIn.type) ? afterIn.type : 'offer';
+  const afterRaw = dgText(afterIn.url, 2000); let afterUrl = afterRaw ? dgUrl(afterRaw) : '';
+  if (afterRaw && !afterUrl) throw new Error('Le lien après expiration est invalide.');
+  if (afterType === 'boutique' && !afterUrl) afterUrl = 'https://boutique.nyxia.top';
+  const continuation = (Array.isArray(body.continuation) ? body.continuation : []).slice(0, 5).map((x) => {
+    const raw = dgText(x && x.url, 2000); const url = raw ? dgUrl(raw) : '';
+    if (raw && !url) throw new Error('Un lien de continuité est invalide.');
+    return { label: dgText(x && x.label, 120), price: dgNumber(x && x.price, null), url };
+  }).filter((x) => x.label || x.price != null || x.url);
+  return {
+    id: dgId(body.id) || (existing && existing.id) || crypto.randomUUID(),
+    name, status, portalIds, durationHours, startMode,
+    availableFrom, availableUntil,
+    price: dgNumber(body.price, null), currency: ['CAD','EUR','USD'].includes(body.currency) ? body.currency : 'CAD',
+    checkoutUrl, afterExpiry: { type: afterType, url: afterUrl }, continuation,
+    webhookKey: (existing && existing.webhookKey) || crypto.randomUUID().replace(/-/g, ''),
+    createdAt: (existing && existing.createdAt) || dgNow(), updatedAt: dgNow()
+  };
+}
+function dgCampaignObtainable(c) {
+  if (!c || c.status !== 'active') return false;
+  const now = Date.now();
+  if (c.availableFrom && Date.parse(c.availableFrom) > now) return false;
+  if (c.availableUntil && Date.parse(c.availableUntil) < now) return false;
+  return true;
+}
+
+async function dgCreateOrReuseActivation(env, campaign, email, source, forceAdmin) {
+  email = dgEmail(email);
+  if (!email) throw new Error('Courriel requis.');
+  if (!forceAdmin && !dgCampaignObtainable(campaign)) throw new Error('Cette dégustation n’est pas disponible actuellement.');
+  const aKey = dgActivationKey(email, campaign.id);
+  const oldRaw = await env.CASHFLOW_KV.get(aKey);
+  if (oldRaw) {
+    try { const old = JSON.parse(oldRaw); if (old && old.campaignId) return old; } catch (_) {}
+  }
+  const pending = campaign.startMode === 'first_login';
+  const startedAt = pending ? '' : dgNow();
+  const expiresAt = pending ? '' : new Date(Date.parse(startedAt) + Number(campaign.durationHours) * 3600000).toISOString();
+  const activation = { email, campaignId: campaign.id, campaignName: campaign.name, source: source || 'manual', pending, startedAt, expiresAt, createdAt: dgNow() };
+  await env.CASHFLOW_KV.put(aKey, JSON.stringify(activation));
+  for (const portalId of campaign.portalIds || []) {
+    const key = dgGrantKey(email, campaign.id, portalId);
+    const existingRaw = await env.CASHFLOW_KV.get(key);
+    if (existingRaw) continue; // jamais remettre le compteur à zéro
+    const grant = { key, email, campaignId: campaign.id, campaignName: campaign.name, portalId, pending, startedAt, expiresAt, createdAt: dgNow(), source: source || 'manual' };
+    await env.CASHFLOW_KV.put(key, JSON.stringify(grant));
+  }
+  return activation;
+}
+
+async function dgStartPendingCampaign(env, email, campaignId) {
+  email = dgEmail(email); campaignId = dgId(campaignId);
+  const campaigns = await dgReadCampaigns(env);
+  const campaign = campaigns.find((c) => c.id === campaignId);
+  if (!campaign) return null;
+  const aKey = dgActivationKey(email, campaignId);
+  let activation = null;
+  const raw = await env.CASHFLOW_KV.get(aKey);
+  if (raw) { try { activation = JSON.parse(raw); } catch (_) {} }
+  if (!activation) return null;
+  if (!activation.pending && activation.startedAt) return activation;
+  const startedAt = dgNow();
+  const expiresAt = new Date(Date.parse(startedAt) + Number(campaign.durationHours || 72) * 3600000).toISOString();
+  activation.pending = false; activation.startedAt = startedAt; activation.expiresAt = expiresAt; activation.updatedAt = dgNow();
+  await env.CASHFLOW_KV.put(aKey, JSON.stringify(activation));
+  // Même compteur pour TOUS les portails de cette campagne.
+  for (const portalId of campaign.portalIds || []) {
+    const key = dgGrantKey(email, campaignId, portalId);
+    const gRaw = await env.CASHFLOW_KV.get(key); if (!gRaw) continue;
+    try {
+      const g = JSON.parse(gRaw); g.pending = false; g.startedAt = startedAt; g.expiresAt = expiresAt; g.updatedAt = dgNow();
+      await env.CASHFLOW_KV.put(key, JSON.stringify(g));
+    } catch (_) {}
+  }
+  return activation;
+}
+
+async function dgListGrants(env) {
+  const list = await env.CASHFLOW_KV.list({ prefix: DG_GRANT_PREFIX });
+  const out = [];
+  for (const k of list.keys || []) {
+    const raw = await env.CASHFLOW_KV.get(k.name); if (!raw) continue;
+    try { const g = JSON.parse(raw); g.key = k.name; out.push(g); } catch (_) {}
+  }
+  out.sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  return out;
+}
+async function dgGrantsFor(env, email, portalId) {
+  const prefix = DG_GRANT_PREFIX + encodeURIComponent(dgEmail(email)) + ':';
+  const list = await env.CASHFLOW_KV.list({ prefix }); const out=[];
+  for (const k of list.keys || []) {
+    const raw=await env.CASHFLOW_KV.get(k.name); if(!raw)continue;
+    try { const g=JSON.parse(raw); if(g.portalId===portalId){g.key=k.name;out.push(g);} } catch(_){}
+  }
+  return out.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+}
+
+async function dgCheckAccess(env, email, portalId) {
+  email = dgEmail(email); portalId = dgId(portalId);
+  if (!email || !portalId) return { allowed:false, reason:'missing' };
+  // 1) OWNER / STAFF / TEST permanent.
+  const permanent = await dgReadPermanent(env);
+  const p = permanent.find((x) => dgEmail(x.email) === email);
+  if (p && (p.allPortals || (p.portalIds || []).includes(portalId))) return { allowed:true, accessType:'permanent', role:p.role || 'staff', expiresAt:null };
+  // 2) Accès déjà acheté / permanent existant dans le système client. Ne jamais le casser.
+  const clientRaw = await env.CASHFLOW_KV.get('client:' + email);
+  if (clientRaw) {
+    try {
+      const client = JSON.parse(clientRaw); const products = Array.isArray(client.products) ? client.products.map((x)=>String(x).toLowerCase()) : [];
+      if (client.active !== false && products.includes(portalId)) return { allowed:true, accessType:'purchased', role:client.role || 'client', expiresAt:null };
+    } catch (_) {}
+  }
+  // 3) Dégustation temporaire.
+  let grants = await dgGrantsFor(env, email, portalId);
+  const pending = grants.find((g) => g.pending);
+  if (pending) {
+    await dgStartPendingCampaign(env, email, pending.campaignId);
+    grants = await dgGrantsFor(env, email, portalId);
+  }
+  const active = grants.find((g) => g.expiresAt && Date.parse(g.expiresAt) > Date.now());
+  if (active) return { allowed:true, accessType:'temporary', campaignId:active.campaignId, campaignName:active.campaignName, startedAt:active.startedAt, expiresAt:active.expiresAt };
+  const expired = grants.find((g) => g.expiresAt && Date.parse(g.expiresAt) <= Date.now());
+  if (expired) {
+    const campaigns = await dgReadCampaigns(env); const c = campaigns.find((x)=>x.id===expired.campaignId) || {};
+    return { allowed:false, reason:'expired', campaignId:expired.campaignId, campaignName:expired.campaignName, expiresAt:expired.expiresAt, afterExpiry:c.afterExpiry || null, continuation:c.continuation || [] };
+  }
+  return { allowed:false, reason:'no_access' };
+}
+
+function dgExtractEmail(body) {
+  return dgEmail(body && (body.email || body.contact_email || body.contactEmail || (body.contact && body.contact.email) || (body.customer && body.customer.email) || (body.data && body.data.email) || (body.fields && body.fields.email)));
+}
+async function dgAccessCallerAllowed(request, env) {
+  if (await requireAdmin(request, env)) return true;
+  const expected = String(env.NYXIA_ACCESS_KEY || '').trim();
+  const got = String(request.headers.get('X-NyXia-Access-Key') || '').trim();
+  return !!expected && got === expected;
+}
+function dgCors(res) {
+  res.headers.set('Access-Control-Allow-Origin', '*');
+  res.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Univers-Token, X-NyXia-Access-Key');
+  return res;
+}
+
+async function handleDgMeta(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  return json({ success:true, ownerEmail:DG_OWNER_EMAIL, portals:await getPortalsList(env), campaigns:await dgReadCampaigns(env), permanent:await dgReadPermanent(env) });
+}
+async function handleDgCampaigns(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  if (request.method === 'GET') return json({ campaigns:await dgReadCampaigns(env) });
+  const body=await request.json().catch(()=>({})); const campaigns=await dgReadCampaigns(env);
+  const existing=body.id?campaigns.find((c)=>c.id===dgId(body.id)):null;
+  let c; try{c=await dgNormalizeCampaign(env,body,existing);}catch(e){return json({error:e.message},400);}
+  if(!c.name)return json({error:'Nom requis.'},400); if(!c.portalIds.length)return json({error:'Choisis au moins un portail actif.'},400);
+  const idx=campaigns.findIndex((x)=>x.id===c.id); if(idx>=0)campaigns[idx]=c;else campaigns.push(c);
+  await dgWriteCampaigns(env,campaigns); return json({success:true,campaign:c,campaigns});
+}
+async function handleDgDeleteCampaign(request, env) {
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
+  const b=await request.json().catch(()=>({})); const id=dgId(b.id); let list=await dgReadCampaigns(env); list=list.filter((c)=>c.id!==id); await dgWriteCampaigns(env,list); return json({success:true,campaigns:list});
+}
+async function handleDgPermanent(request, env) {
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
+  if(request.method==='GET')return json({permanent:await dgReadPermanent(env)});
+  const b=await request.json().catch(()=>({})); const email=dgEmail(b.email); if(!email)return json({error:'Courriel requis.'},400);
+  if(email===DG_OWNER_EMAIL)return json({error:'Le compte OWNER est protégé et possède déjà tous les accès.'},400);
+  const portals=await getPortalsList(env);const valid=new Set(portals.map((p)=>p.id));const portalIds=Array.isArray(b.portalIds)?b.portalIds.map(dgId).filter((id)=>valid.has(id)):[];
+  const allPortals=!!b.allPortals;if(!allPortals&&!portalIds.length)return json({error:'Choisis au moins un portail ou tous les portails.'},400);
+  let list=await dgReadPermanent(env);const old=list.find((x)=>dgEmail(x.email)===email);const row={email,role:['staff','test'].includes(b.role)?b.role:'staff',allPortals,portalIds:allPortals?[]:portalIds,note:dgText(b.note,300),protected:false,createdAt:(old&&old.createdAt)||dgNow(),updatedAt:dgNow()};
+  const i=list.findIndex((x)=>dgEmail(x.email)===email);if(i>=0)list[i]=row;else list.push(row);list=await dgWritePermanent(env,list);return json({success:true,permanent:list});
+}
+async function handleDgDeletePermanent(request, env) {
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
+  const b=await request.json().catch(()=>({}));const email=dgEmail(b.email);if(email===DG_OWNER_EMAIL)return json({error:'Impossible de retirer le compte OWNER.'},403);
+  let list=await dgReadPermanent(env);list=list.filter((x)=>dgEmail(x.email)!==email);list=await dgWritePermanent(env,list);return json({success:true,permanent:list});
+}
+async function handleDgGrants(request, env) {
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);return json({grants:await dgListGrants(env)});
+}
+async function handleDgGrantManual(request, env) {
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
+  const b=await request.json().catch(()=>({}));const email=dgEmail(b.email),campaignId=dgId(b.campaignId);const campaigns=await dgReadCampaigns(env);const c=campaigns.find((x)=>x.id===campaignId);if(!c)return json({error:'Campagne introuvable.'},404);
+  try{const activation=await dgCreateOrReuseActivation(env,c,email,'superadmin',true);return json({success:true,activation,grants:await dgListGrants(env)});}catch(e){return json({error:e.message},400);}
+}
+async function handleDgDeleteGrant(request, env) {
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
+  const b=await request.json().catch(()=>({}));const key=String(b.key||'');if(!key.startsWith(DG_GRANT_PREFIX))return json({error:'Clé invalide.'},400);await env.CASHFLOW_KV.delete(key);return json({success:true});
+}
+async function handleDgActivate(request, env) {
+  const url=new URL(request.url);const campaignId=dgId(url.searchParams.get('campaign'));const key=String(url.searchParams.get('key')||'');const campaigns=await dgReadCampaigns(env);const c=campaigns.find((x)=>x.id===campaignId);
+  if(!c||!key||key!==c.webhookKey)return dgCors(json({error:'Webhook invalide.'},403));
+  const b=await request.json().catch(()=>({}));const email=dgExtractEmail(b);if(!email)return dgCors(json({error:'Courriel introuvable dans le webhook.'},400));
+  try{const activation=await dgCreateOrReuseActivation(env,c,email,'systeme.io',false);return dgCors(json({success:true,activation}));}catch(e){return dgCors(json({error:e.message},400));}
+}
+async function handleDgAccessCheck(request, env) {
+  if (!(await dgAccessCallerAllowed(request,env))) return dgCors(json({error:'Non autorisé.'},401));
+  let b={};if(request.method==='GET'){const u=new URL(request.url);b={email:u.searchParams.get('email'),portalId:u.searchParams.get('portal')||u.searchParams.get('portalId')};}else b=await request.json().catch(()=>({}));
+  return dgCors(json(await dgCheckAccess(env,b.email,b.portalId||b.portal)));
+}
+
 // ───────────── FORMATIONS (KV partagé avec le Portail Alex) ─────────────
 // Les formations sont stockées dans le MÊME KV que le Portail Alex, à la clé
 // formation:{agent}:{id}. Le worker d'Alex les lit directement. Aucun contenu inventé ici :
@@ -1329,6 +1596,18 @@ export default {
       if (path === '/api/portal-clients' && request.method === 'GET') return await handleListPortalClients(request, env);
       if (path === '/api/portal-clients' && request.method === 'POST') return await handleCreatePortalClient(request, env);
       if (path === '/api/portal-clients/delete' && request.method === 'POST') return await handleDeletePortalClient(request, env);
+      if (path === '/api/degustations/meta' && request.method === 'GET') return await handleDgMeta(request, env);
+      if (path === '/api/degustations' && (request.method === 'GET' || request.method === 'POST')) return await handleDgCampaigns(request, env);
+      if (path === '/api/degustations/delete' && request.method === 'POST') return await handleDgDeleteCampaign(request, env);
+      if (path === '/api/access/permanent' && (request.method === 'GET' || request.method === 'POST')) return await handleDgPermanent(request, env);
+      if (path === '/api/access/permanent/delete' && request.method === 'POST') return await handleDgDeletePermanent(request, env);
+      if (path === '/api/access/grants' && request.method === 'GET') return await handleDgGrants(request, env);
+      if (path === '/api/access/grant' && request.method === 'POST') return await handleDgGrantManual(request, env);
+      if (path === '/api/access/grants/delete' && request.method === 'POST') return await handleDgDeleteGrant(request, env);
+      if (path === '/api/access/activate' && request.method === 'POST') return await handleDgActivate(request, env);
+      if (path === '/api/access/activate' && request.method === 'OPTIONS') return dgCors(new Response(null, { status: 204 }));
+      if (path === '/api/access/check' && (request.method === 'GET' || request.method === 'POST')) return await handleDgAccessCheck(request, env);
+      if (path === '/api/access/check' && request.method === 'OPTIONS') return dgCors(new Response(null, { status: 204 }));
       if (path === '/api/formations' && request.method === 'GET') return await handleListFormations(request, env);
       if (path === '/api/formations/save' && request.method === 'POST') return await handleSaveFormation(request, env);
       if (path === '/api/formations/delete' && request.method === 'POST') return await handleDeleteFormation(request, env);
