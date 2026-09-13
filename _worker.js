@@ -401,7 +401,7 @@ async function handleCreateProduct(request, env) {
   const catId = await ensureCategory(env);
   const id = generateId();
   const status = (body.status === 'draft') ? 'draft' : 'active';
-  const billing = ['one_time','subscription','both'].includes(String(body.billing_type || ''))
+  const billing = ['one_time','subscription','both','appointment_free'].includes(String(body.billing_type || ''))
     ? String(body.billing_type) : 'one_time';
   const priceMonthly = Number(body.price_monthly || body.priceMonthly || 0) || 0;
   try { await env.DB.prepare(`ALTER TABLE marketplace_products ADD COLUMN price_monthly REAL DEFAULT 0`).run(); } catch (_) {}
