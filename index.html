@@ -225,8 +225,13 @@ td strong{color:#fff}
           <div><label class="f">Petite image 2</label><input class="f" id="bt-image-2" placeholder="https://..."></div>
           <div><label class="f">Petite image 3</label><input class="f" id="bt-image-3" placeholder="https://..."></div>
           <div><label class="f">Petite image 4</label><input class="f" id="bt-image-4" placeholder="https://..."></div>
-          <div style="grid-column:1/-1"><label class="f">Témoignage</label><textarea class="f" id="bt-testimonial" rows="3"></textarea></div>
-          <div><label class="f">Nom du témoignage</label><input class="f" id="bt-testimonial-author"></div>
+          <div style="grid-column:1/-1;margin-top:4px;padding:16px;border:1px solid rgba(123,92,255,.18);border-radius:14px;background:rgba(15,28,63,.28)">
+            <label class="f">Titre de la section témoignages</label>
+            <input class="f" id="bt-testimonial-title" placeholder="Ex. Elles partagent leur expérience">
+            <p class="hint" style="margin:7px 0 14px">Preuve sociale : ajoute autant de témoignages que nécessaire, en texte ou en capture d’écran.</p>
+            <div id="bt-testimonials-editor"></div>
+            <button class="btn btn-ghost" type="button" onclick="btAddTestimonial()" style="margin-top:10px">＋ Ajouter un témoignage</button>
+          </div>
           <div style="grid-column:1/-1"><label class="f">Affichage sur la carte</label>
             <select class="f" id="bt-cta-type">
               <option value="auto">Automatique — prix présent : En savoir plus / sans prix : GRATUIT</option>
@@ -494,6 +499,7 @@ td strong{color:#fff}
 <script>
 var TOKEN=null, TOKEN_KEY='nyxia_univers_token';
 var BT_PRODUCTS=[];
+var BT_TESTIMONIALS=[];
 var BT_PORTALS=['nyxia','diane','eric','lena','selena','kael','alex'];
 
 function btPortalFields(portals){
@@ -576,6 +582,75 @@ function btTechnicalCta(uiType){
   return 'acheter';
 }
 
+function btTestimonialId(){
+  return 'tem-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);
+}
+
+function btNormalizeTestimonials(p){
+  var list=Array.isArray(p&&p.testimonials)?p.testimonials:[];
+  list=list.map(function(item){
+    var type=item&&item.type==='image'?'image':'text';
+    return{
+      id:String((item&&item.id)||btTestimonialId()),
+      type:type,
+      text:String((item&&item.text)||''),
+      author:String((item&&item.author)||''),
+      imageUrl:String((item&&item.imageUrl)||''),
+      caption:String((item&&item.caption)||'')
+    };
+  });
+  if(!list.length&&p){
+    if(p.testimonialQuote||p.testimonialAuthor){
+      list.push({id:btTestimonialId(),type:'text',text:p.testimonialQuote||'',author:p.testimonialAuthor||'',imageUrl:'',caption:''});
+    }
+    if(p.testimonialImageUrl){
+      list.push({id:btTestimonialId(),type:'image',text:'',author:'',imageUrl:p.testimonialImageUrl||'',caption:p.testimonialAuthor||''});
+    }
+  }
+  return list;
+}
+
+function btTestimonialEscape(value){
+  return String(value==null?'':value).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});
+}
+
+function btRenderTestimonialsEditor(){
+  var box=document.getElementById('bt-testimonials-editor');
+  if(!box)return;
+  if(!BT_TESTIMONIALS.length){
+    box.innerHTML='<div class="hint" style="padding:10px 0">Aucun témoignage ajouté pour ce produit.</div>';
+    return;
+  }
+  box.innerHTML=BT_TESTIMONIALS.map(function(t,index){
+    var type=t.type==='image'?'image':'text';
+    var fields=type==='image'
+      ?'<div style="grid-column:1/-1"><label class="f">URL de la capture / image *</label><input class="f bt-tem-field" data-index="'+index+'" data-key="imageUrl" value="'+btTestimonialEscape(t.imageUrl)+'" placeholder="https://..."></div>'
+       +'<div style="grid-column:1/-1"><label class="f">Légende ou nom (facultatif)</label><input class="f bt-tem-field" data-index="'+index+'" data-key="caption" value="'+btTestimonialEscape(t.caption)+'" placeholder="Ex. Avis cliente"></div>'
+      :'<div style="grid-column:1/-1"><label class="f">Texte du témoignage *</label><textarea class="f bt-tem-field" data-index="'+index+'" data-key="text" rows="3">'+btTestimonialEscape(t.text)+'</textarea></div>'
+       +'<div style="grid-column:1/-1"><label class="f">Nom / signature (facultatif)</label><input class="f bt-tem-field" data-index="'+index+'" data-key="author" value="'+btTestimonialEscape(t.author)+'"></div>';
+    return '<div style="margin:10px 0;padding:13px;border:1px solid rgba(167,139,250,.18);border-radius:12px;background:rgba(6,10,24,.35)">'
+      +'<div style="display:flex;gap:10px;align-items:end;justify-content:space-between;flex-wrap:wrap">'
+      +'<div style="min-width:220px;flex:1"><label class="f">Témoignage '+(index+1)+' — format</label><select class="f bt-tem-type" data-index="'+index+'"><option value="text"'+(type==='text'?' selected':'')+'>Texte</option><option value="image"'+(type==='image'?' selected':'')+'>Image / capture d’écran</option></select></div>'
+      +'<button class="btn btn-ghost bt-tem-delete" data-index="'+index+'" type="button" style="border-color:rgba(255,107,107,.28);color:#ff9b9b">Supprimer</button></div>'
+      +'<div class="grid2" style="margin-top:10px">'+fields+'</div></div>';
+  }).join('');
+  box.querySelectorAll('.bt-tem-type').forEach(function(el){el.addEventListener('change',function(){var i=Number(el.dataset.index);if(!BT_TESTIMONIALS[i])return;BT_TESTIMONIALS[i].type=el.value==='image'?'image':'text';btRenderTestimonialsEditor();});});
+  box.querySelectorAll('.bt-tem-field').forEach(function(el){el.addEventListener('input',function(){var i=Number(el.dataset.index),key=el.dataset.key;if(BT_TESTIMONIALS[i]&&key)BT_TESTIMONIALS[i][key]=el.value;});});
+  box.querySelectorAll('.bt-tem-delete').forEach(function(el){el.addEventListener('click',function(){BT_TESTIMONIALS.splice(Number(el.dataset.index),1);btRenderTestimonialsEditor();});});
+}
+
+function btAddTestimonial(){
+  BT_TESTIMONIALS.push({id:btTestimonialId(),type:'text',text:'',author:'',imageUrl:'',caption:''});
+  btRenderTestimonialsEditor();
+}
+
+function btCleanTestimonials(){
+  return BT_TESTIMONIALS.map(function(t){
+    if(t.type==='image')return{id:t.id||btTestimonialId(),type:'image',imageUrl:String(t.imageUrl||'').trim(),caption:String(t.caption||'').trim()};
+    return{id:t.id||btTestimonialId(),type:'text',text:String(t.text||'').trim(),author:String(t.author||'').trim()};
+  }).filter(function(t){return t.type==='image'?!!t.imageUrl:!!t.text;});
+}
+
 function btProductBody(source){
   if(source)return Object.assign({},source,{images:Array.isArray(source.images)?source.images:[]});
   var numberOrNull=function(id){var value=document.getElementById(id).value;return value===''?null:Number(value);};
@@ -605,8 +680,10 @@ function btProductBody(source){
     priceLabel:priceLabel,
     imageMain:document.getElementById('bt-image-main').value.trim(),
     images:[1,2,3,4].map(function(n){return document.getElementById('bt-image-'+n).value.trim();}),
-    testimonialQuote:document.getElementById('bt-testimonial').value.trim(),
-    testimonialAuthor:document.getElementById('bt-testimonial-author').value.trim(),
+    testimonialTitle:document.getElementById('bt-testimonial-title').value.trim(),
+    testimonials:btCleanTestimonials(),
+    testimonialQuote:(btCleanTestimonials().find(function(t){return t.type==='text';})||{}).text||'',
+    testimonialAuthor:(btCleanTestimonials().find(function(t){return t.type==='text';})||{}).author||'',
     ctaType:btTechnicalCta(uiCta),
     ctaUrl:document.getElementById('bt-cta-url').value.trim(),
     promoCode:document.getElementById('bt-promo-code').value.trim(),
@@ -654,8 +731,9 @@ function btEditProduct(id){
   document.getElementById('bt-price-label').value=(uiCta==='gratuit')?'':(p.priceLabel||'');
   document.getElementById('bt-image-main').value=p.imageMain||'';
   [1,2,3,4].forEach(function(n){document.getElementById('bt-image-'+n).value=(p.images||[])[n-1]||'';});
-  document.getElementById('bt-testimonial').value=p.testimonialQuote||'';
-  document.getElementById('bt-testimonial-author').value=p.testimonialAuthor||'';
+  document.getElementById('bt-testimonial-title').value=p.testimonialTitle||'';
+  BT_TESTIMONIALS=btNormalizeTestimonials(p);
+  btRenderTestimonialsEditor();
   document.getElementById('bt-cta-type').value=uiCta;
   document.getElementById('bt-cta-url').value=p.ctaUrl||'';
   document.getElementById('bt-promo-code').value=p.promoCode||'';
@@ -671,11 +749,14 @@ function btEditProduct(id){
 
 function btResetProduct(clearMessage){
   document.getElementById('bt-id').value='';
-  ['bt-category','bt-product-title','bt-short-description','bt-description','bt-price','bt-old-price','bt-price-label','bt-image-main','bt-image-1','bt-image-2','bt-image-3','bt-image-4','bt-testimonial','bt-testimonial-author','bt-cta-url','bt-promo-code','bt-promo-text','bt-promo-expires'].forEach(function(id){document.getElementById(id).value='';});
+  ['bt-category','bt-product-title','bt-short-description','bt-description','bt-price','bt-old-price','bt-price-label','bt-image-main','bt-image-1','bt-image-2','bt-image-3','bt-image-4','bt-testimonial-title','bt-cta-url','bt-promo-code','bt-promo-text','bt-promo-expires'].forEach(function(id){document.getElementById(id).value='';});
+  BT_TESTIMONIALS=[];btRenderTestimonialsEditor();
   document.getElementById('bt-portal').value='nyxia';document.getElementById('bt-type').value='formation';document.getElementById('bt-currency').value='CAD';document.getElementById('bt-cta-type').value='auto';document.getElementById('bt-order').value='0';document.getElementById('bt-active').checked=false;document.getElementById('bt-featured').checked=false;
   document.getElementById('bt-editor-title').textContent='Ajouter un produit, service ou événement';document.getElementById('bt-cancel').style.display='none';
   if(clearMessage!==false){var m=document.getElementById('bt-product-msg');m.style.display='none';}
 }
+
+btRenderTestimonialsEditor();
 
 async function btToggleProduct(id){
   var p=BT_PRODUCTS.find(function(item){return item.id===id;});if(!p)return;
