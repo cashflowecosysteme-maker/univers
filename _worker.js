@@ -540,6 +540,58 @@ function boutiqueSlug(value) {
     .replace(/^-+|-+$/g, '').slice(0, 80) || 'produit';
 }
 
+function boutiqueTestimonials(body, old) {
+  const source = Array.isArray(body.testimonials)
+    ? body.testimonials
+    : (old && Array.isArray(old.testimonials) ? old.testimonials : []);
+  const items = [];
+  let invalidImage = false;
+
+  for (const raw of source.slice(0, 30)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const type = raw.type === 'image' ? 'image' : 'text';
+    const id = boutiqueText(raw.id, 100).replace(/[^a-zA-Z0-9_-]/g, '') || crypto.randomUUID();
+    if (type === 'image') {
+      const original = boutiqueText(raw.imageUrl, 2000);
+      if (!original) continue;
+      const imageUrl = boutiqueUrl(original);
+      if (!imageUrl) { invalidImage = true; continue; }
+      items.push({
+        id,
+        type: 'image',
+        imageUrl,
+        caption: boutiqueText(raw.caption, 240)
+      });
+    } else {
+      const text = boutiqueText(raw.text, 3000);
+      if (!text) continue;
+      items.push({
+        id,
+        type: 'text',
+        text,
+        author: boutiqueText(raw.author, 180)
+      });
+    }
+  }
+
+  /* Compatibilité avec les anciens produits à un seul témoignage. */
+  if (!items.length && !Array.isArray(body.testimonials)) {
+    const legacyQuote = boutiqueText(
+      body.testimonialQuote !== undefined ? body.testimonialQuote : (old && old.testimonialQuote),
+      1200
+    );
+    const legacyAuthor = boutiqueText(
+      body.testimonialAuthor !== undefined ? body.testimonialAuthor : (old && old.testimonialAuthor),
+      120
+    );
+    if (legacyQuote) {
+      items.push({ id: crypto.randomUUID(), type: 'text', text: legacyQuote, author: legacyAuthor });
+    }
+  }
+
+  return { items, invalidImage };
+}
+
 function boutiqueCors(response) {
   response.headers.set('Access-Control-Allow-Origin', '*');
   response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -645,10 +697,18 @@ async function handleBoutiqueProductSave(request, env) {
   const oldPrice = boutiqueNumber(body.oldPrice);
   if ((price != null && price < 0) || (oldPrice != null && oldPrice < 0)) return json({ error: 'Le prix ne peut pas être négatif.' }, 400);
 
+  const testimonialData = boutiqueTestimonials(body, old);
+  if (testimonialData.invalidImage) return json({ error: 'Une image de témoignage contient un lien invalide. Utilise une adresse https:// complète.' }, 400);
+  const testimonials = testimonialData.items;
+  const testimonialTitle = body.testimonialTitle !== undefined
+    ? boutiqueText(body.testimonialTitle, 180)
+    : boutiqueText(old && old.testimonialTitle, 180);
+  const firstTextTestimonial = testimonials.find((item) => item.type === 'text') || null;
+
   const ctaType = BOUTIQUE_CTA_TYPES.includes(body.ctaType) ? body.ctaType : 'en-savoir-plus';
   const now = new Date().toISOString();
   const product = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id,
     slug: boutiqueSlug(body.slug || title),
     portal,
@@ -663,8 +723,10 @@ async function handleBoutiqueProductSave(request, env) {
     currency: ['CAD', 'EUR', 'USD'].includes(body.currency) ? body.currency : 'CAD',
     imageMain: boutiqueUrl(imageMainRaw),
     images: imageValues.map(boutiqueUrl).filter(Boolean).slice(0, 4),
-    testimonialQuote: boutiqueText(body.testimonialQuote, 1200),
-    testimonialAuthor: boutiqueText(body.testimonialAuthor, 120),
+    testimonialTitle,
+    testimonials,
+    testimonialQuote: firstTextTestimonial ? boutiqueText(firstTextTestimonial.text, 1200) : '',
+    testimonialAuthor: firstTextTestimonial ? boutiqueText(firstTextTestimonial.author, 120) : '',
     ctaType,
     ctaUrl: boutiqueUrl(ctaUrlRaw),
     order: Math.max(0, Math.trunc(boutiqueNumber(body.order, 0))),
