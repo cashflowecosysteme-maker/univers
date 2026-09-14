@@ -49,14 +49,14 @@
     <main class="content">
       <section class="view active" id="view-dashboard">
         <div class="hero">
-          <div><h1>Le studio marketing de NyXia</h1><p>Super Admin 1 reste intact. Ici, on construit les campagnes, les créatifs et les vidéos à très faible coût, sans autoriser NyXia à brûler le budget dans de la génération vidéo payante.</p></div>
+          <div><h1>Le studio marketing de NyXia</h1><p>Super Admin 1 reste intact. Ici, on construit les campagnes, les créatifs et les vidéos. La vidéo IA premium reste sous ton contrôle : aucune dépense ne part sans ton clic explicite.</p></div>
           <div class="actions"><button class="btn" data-open-event>+ Nouvel événement</button></div>
         </div>
         <div class="stat-grid">
           <div class="stat"><span>Événements</span><b id="statEvents">0</b></div>
           <div class="stat"><span>Campagnes verrouillées</span><b id="statLocked">0</b></div>
           <div class="stat"><span>Contenus préparés</span><b id="statPosts">0</b></div>
-          <div class="stat"><span>Vidéo IA payante</span><b style="color:var(--green)">0 $</b></div>
+          <div class="stat"><span>Vidéo IA premium</span><b id="statPaidVideo">OFF</b></div>
         </div>
         <div class="card" style="margin-top:16px">
           <h2>Règles du studio</h2>
@@ -107,8 +107,8 @@
         <div class="hero"><div><h1>Ressources gratuites</h1><p>Pexels et Unsplash sont des outils de recherche pour NyXia. Ils ne remplacent pas la création : ils lui donnent des matériaux gratuits à intégrer dans tes publicités.</p></div></div>
         <div class="card">
           <div class="grid3">
-            <div><label class="f">Source</label><select class="f" id="assetProvider"><option value="pexels">Pexels</option><option value="unsplash">Unsplash</option></select></div>
-            <div><label class="f">Type</label><select class="f" id="assetType"><option value="image">Image</option><option value="video">Vidéo</option></select></div>
+            <div><label class="f">Source</label><select class="f" id="assetProvider"><option value="pexels">Pexels</option><option value="unsplash">Unsplash</option><option value="freesound">Freesound</option></select></div>
+            <div><label class="f">Type</label><select class="f" id="assetType"><option value="image">Image</option><option value="video">Vidéo</option><option value="audio">Audio</option></select></div>
             <div><label class="f">Recherche</label><input class="f" id="assetQuery" placeholder="ex. femme ordinateur maison"></div>
           </div>
           <div class="actions" style="margin-top:10px"><button class="btn" id="assetSearchBtn">Rechercher</button></div>
@@ -149,12 +149,14 @@
             <div><label class="f">Contrôle</label><input class="f" id="setControlModel"></div>
             <div><label class="f">Image principale</label><input class="f" id="setImageModel"></div>
             <div><label class="f">Image secours</label><input class="f" id="setImageFallback"></div>
+            <div><label class="f">Vidéo IA premium · texte → vidéo</label><input class="f" id="setVideoModel" placeholder="ex. kling-video/v1.6/standard/text-to-video"></div>
           </div>
           <div class="grid3" style="margin-top:10px">
             <label><input type="checkbox" id="setStrictControl" checked> Contrôle strict avant production</label>
             <label><input type="checkbox" id="setImageEnabled" checked> Génération d’images autorisée</label>
-            <label style="opacity:.7"><input type="checkbox" checked disabled> Vidéo IA payante interdite</label>
+            <label><input type="checkbox" id="setPaidVideoEnabled"> Autoriser la vidéo IA premium sur clic manuel</label>
           </div>
+          <div class="strong-note" style="margin-top:12px"><strong>Protection budget :</strong> même activée, NyXia ne lance jamais une vidéo payante toute seule. Chaque clip premium exige ton clic et une confirmation.</div>
           <div class="actions" style="margin-top:14px"><button class="btn" id="saveSettingsBtn">Enregistrer les réglages</button></div>
         </div>
       </section>
