@@ -2,9 +2,11 @@
 'use strict';
 const API='/api/superadmin2';
 const TOKEN_KEY='nyxia_super2_token';
+const REFRESH_KEY='nyxia_super2_refresh';
 const CHAR_KEYS=['nyxia','diane','eric','lena','selena','kael','alex'];
 const CHAR_NAMES={nyxia:'NyXia',diane:'Diane',eric:'Éric',lena:'Léna',selena:'Séléna',kael:'Kael',alex:'Alex'};
 let TOKEN=sessionStorage.getItem(TOKEN_KEY)||localStorage.getItem(TOKEN_KEY)||'';
+let REFRESH=localStorage.getItem(REFRESH_KEY)||'';
 const STATE={events:[],settings:null,bindings:{},plan:null,currentEvent:null,heartMedia:[],videoPost:null,videoScenes:[],activeScene:0};
 
 const $=id=>document.getElementById(id);
@@ -22,7 +24,11 @@ async function api(path,method='GET',body){
   const opts={
     method,
     credentials:'same-origin',
-    headers:{'Accept':'application/json','X-Univers-Token':TOKEN||''}
+    headers:{
+      'Accept':'application/json',
+      'X-Univers-Token':TOKEN||'',
+      'X-Univers-Refresh':REFRESH||''
+    }
   };
   if(body!==undefined){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body)}
   const r=await fetch(API+path,opts);
@@ -41,6 +47,15 @@ async function checkAuth(){
   try{
     const d=await api('/check-auth','POST',{});
     if(d.valid){
+      if(d.token){
+        TOKEN=d.token;
+        sessionStorage.setItem(TOKEN_KEY,TOKEN);
+        localStorage.setItem(TOKEN_KEY,TOKEN);
+      }
+      if(d.refreshToken){
+        REFRESH=d.refreshToken;
+        localStorage.setItem(REFRESH_KEY,REFRESH);
+      }
       showApp();
       await init();
       return true;
@@ -66,9 +81,13 @@ async function doLogin(){
     const d=await readJsonResponse(r);
     if(!r.ok)throw new Error(d.error||d.detail||('Connexion refusée ('+r.status+')'));
     TOKEN=d.token||'';
+    REFRESH=d.refreshToken||REFRESH||'';
     if(TOKEN){
       sessionStorage.setItem(TOKEN_KEY,TOKEN);
       localStorage.setItem(TOKEN_KEY,TOKEN);
+    }
+    if(REFRESH){
+      localStorage.setItem(REFRESH_KEY,REFRESH);
     }
     $('loginMsg').textContent='';
     showApp();
@@ -78,8 +97,10 @@ async function doLogin(){
 async function doLogout(){
   try{await api('/logout','POST',{})}catch(_){}
   TOKEN='';
+  REFRESH='';
   sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_KEY);
   showLogin();
 }
 
