@@ -44,28 +44,57 @@ async function api(path,method='GET',body){
   return d;
 }
 async function checkAuth(){
+  let d;
+
+  // Vérifie la connexion SEULEMENT.
   try{
-    const d=await api('/check-auth','POST',{});
-    if(d.valid){
-      if(d.token){
-        TOKEN=d.token;
-        sessionStorage.setItem(TOKEN_KEY,TOKEN);
-        localStorage.setItem(TOKEN_KEY,TOKEN);
-      }
-      if(d.refreshToken){
-        REFRESH=d.refreshToken;
-        localStorage.setItem(REFRESH_KEY,REFRESH);
-      }
+    d=await api('/check-auth','POST',{});
+  }catch(e){
+    console.error('Vérification de session Super Admin 2 :',e);
+    if(TOKEN||REFRESH){
       showApp();
-      await init();
+      try{
+        await init();
+      }catch(initErr){
+        console.error('Chargement Super Admin 2 :',initErr);
+        showApp();
+        try{toast('Connexion conservée. Un élément du tableau de bord n’a pas pu charger.',false)}catch(_){}
+      }
       return true;
     }
-  }catch(_){}
-  TOKEN='';
-  sessionStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(TOKEN_KEY);
-  showLogin();
-  return false;
+    showLogin();
+    return false;
+  }
+
+  if(!d||!d.valid){
+    TOKEN='';
+    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    showLogin();
+    return false;
+  }
+
+  if(d.token){
+    TOKEN=d.token;
+    sessionStorage.setItem(TOKEN_KEY,TOKEN);
+    localStorage.setItem(TOKEN_KEY,TOKEN);
+  }
+  if(d.refreshToken){
+    REFRESH=d.refreshToken;
+    localStorage.setItem(REFRESH_KEY,REFRESH);
+  }
+
+  // À partir d'ici la connexion EST valide.
+  // Une erreur dans le chargement du dashboard ne doit jamais renvoyer au mot de passe.
+  showApp();
+  try{
+    await init();
+  }catch(e){
+    console.error('Chargement Super Admin 2 :',e);
+    showApp();
+    try{toast('Tu es bien connectée. Un élément du tableau de bord n’a simplement pas pu charger.',false)}catch(_){}
+  }
+  return true;
 }
 function showLogin(){$('login').classList.remove('hidden');$('app').classList.add('hidden')}
 function showApp(){$('login').classList.add('hidden');$('app').classList.remove('hidden')}
