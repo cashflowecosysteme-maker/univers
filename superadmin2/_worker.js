@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS = {
   controlModel: 'openai/gpt-5.3-chat',
   imageModel: 'openai/gpt-image-2.5-sunburst',
   imageFallbackModel: 'openai/gpt-image-1.5',
+  videoModel: 'kling-video/v1.6/standard/text-to-video',
   strictControl: true,
   imageGenerationEnabled: true,
   paidVideoGenerationEnabled: false,
@@ -242,8 +243,7 @@ async function getSettings(env) {
         ...structuredClone(DEFAULT_SETTINGS.brand.characterReferences),
         ...((saved.brand && saved.brand.characterReferences) || {})
       }
-    },
-    paidVideoGenerationEnabled: false
+    }
   };
 }
 async function handleSettings(request, env) {
@@ -261,9 +261,10 @@ async function handleSettings(request, env) {
     controlModel: safeText(body.controlModel || current.controlModel, 120),
     imageModel: safeText(body.imageModel || current.imageModel, 120),
     imageFallbackModel: safeText(body.imageFallbackModel || current.imageFallbackModel, 120),
+    videoModel: safeText(body.videoModel || current.videoModel, 160),
     strictControl: body.strictControl !== false,
     imageGenerationEnabled: body.imageGenerationEnabled !== false,
-    paidVideoGenerationEnabled: false,
+    paidVideoGenerationEnabled: body.paidVideoGenerationEnabled === true,
     defaultVideoDuration: clampNumber(body.defaultVideoDuration, 15, 60, current.defaultVideoDuration),
     brand: {
       ...current.brand,
@@ -292,7 +293,8 @@ function bindingStatus(env) {
     mediaBucket: !!env.MEDIA_BUCKET,
     aimlapi: !!env.AIMLAPI_CREATOR_KEY,
     pexels: !!env.PEXELS_KEY,
-    unsplash: !!(env.UNSPLASH_ACCES_KEY || env.UNSPLASH_ACCESS_KEY || env.UNSPLASH_KEY)
+    unsplash: !!(env.UNSPLASH_ACCES_KEY || env.UNSPLASH_ACCESS_KEY || env.UNSPLASH_KEY),
+    freesound: !!env.FREESOUND_API_KEY
   };
 }
 
@@ -451,11 +453,12 @@ async function handleMediaUpload(request, env) {
   const eventId = safeText(form.get('eventId'), 100).replace(/[^a-zA-Z0-9_-]/g, '') || 'general';
   if (!file || typeof file === 'string') return json({ error: 'Fichier requis.' }, 400);
   const type = String(file.type || 'application/octet-stream');
-  if (!type.startsWith('image/') && !type.startsWith('video/')) return json({ error: 'Seulement image ou vidéo.' }, 400);
+  if (!type.startsWith('image/') && !type.startsWith('video/') && !type.startsWith('audio/')) return json({ error: 'Seulement image, vidéo ou audio.' }, 400);
   if (file.size > 80 * 1024 * 1024) return json({ error: 'Fichier trop volumineux (80 Mo maximum par envoi).' }, 413);
   const key = `super2/${eventId}/${Date.now()}-${uid('').slice(0,8)}-${slugFile(file.name)}`;
   await env.MEDIA_BUCKET.put(key, file.stream(), { httpMetadata: { contentType: type }, customMetadata: { originalName: file.name || '' } });
-  return json({ success: true, media: { key, url: `${API}/media/file/${encodeURIComponent(key)}`, type: type.startsWith('video/') ? 'video' : 'image', originalName: file.name || '' } });
+  const mediaType = type.startsWith('video/') ? 'video' : type.startsWith('audio/') ? 'audio' : 'image';
+  return json({ success: true, media: { key, url: `${API}/media/file/${encodeURIComponent(key)}`, type: mediaType, originalName: file.name || '' } });
 }
 async function handleMediaImport(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
@@ -469,13 +472,14 @@ async function handleMediaImport(request, env) {
   const r = await fetch(u.toString(), { headers: { 'User-Agent': 'NyXiaCreator/1.0' } });
   if (!r.ok || !r.body) return json({ error: 'Impossible de récupérer ce média.' }, 400);
   const ct = r.headers.get('content-type') || 'application/octet-stream';
-  if (!ct.startsWith('image/') && !ct.startsWith('video/')) return json({ error: 'La ressource distante n’est pas une image/vidéo reconnue.' }, 400);
+  if (!ct.startsWith('image/') && !ct.startsWith('video/') && !ct.startsWith('audio/')) return json({ error: 'La ressource distante n’est pas une image, vidéo ou audio reconnue.' }, 400);
   const len = Number(r.headers.get('content-length') || 0);
   if (len && len > 80 * 1024 * 1024) return json({ error: 'Média distant trop volumineux.' }, 413);
-  const ext = ct.includes('png') ? '.png' : ct.includes('jpeg') ? '.jpg' : ct.includes('webp') ? '.webp' : ct.includes('mp4') ? '.mp4' : ct.includes('webm') ? '.webm' : '';
+  const ext = ct.includes('png') ? '.png' : ct.includes('jpeg') ? '.jpg' : ct.includes('webp') ? '.webp' : ct.includes('mp4') ? '.mp4' : ct.includes('webm') ? '.webm' : ct.includes('mpeg') ? '.mp3' : ct.includes('ogg') ? '.ogg' : ct.includes('wav') ? '.wav' : '';
   const key = `super2/${eventId}/${Date.now()}-${uid('').slice(0,8)}-import${ext}`;
   await env.MEDIA_BUCKET.put(key, r.body, { httpMetadata: { contentType: ct }, customMetadata: { sourceUrl: u.toString() } });
-  return json({ success: true, media: { key, url: `${API}/media/file/${encodeURIComponent(key)}`, type: ct.startsWith('video/') ? 'video' : 'image', originalName: safeText(body.label, 300) || 'Import' } });
+  const mediaType = ct.startsWith('video/') ? 'video' : ct.startsWith('audio/') ? 'audio' : 'image';
+  return json({ success: true, media: { key, url: `${API}/media/file/${encodeURIComponent(key)}`, type: mediaType, originalName: safeText(body.label, 300) || 'Import' } });
 }
 async function handleMediaFile(request, env, encodedKey) {
   if (!env.MEDIA_BUCKET) return new Response('MEDIA_BUCKET absent', { status: 404 });
@@ -523,6 +527,31 @@ async function handleAssetSearch(request, env) {
       return json({ results });
     }
     const results = (d.photos || []).map(p => ({ provider: 'pexels', type: 'image', id: String(p.id), preview: p.src && (p.src.medium || p.src.small) || '', url: p.src && (p.src.large2x || p.src.large || p.src.original) || '', author: p.photographer || '', sourcePage: p.url || '' })).filter(x => x.url);
+    return json({ results });
+  }
+  if (provider === 'freesound') {
+    if (!env.FREESOUND_API_KEY) return json({ error: 'FREESOUND_API_KEY absent.' }, 503);
+    if (type !== 'audio') return json({ error: 'Freesound est utilisé ici pour les sons.' }, 400);
+    const endpoint = `https://freesound.org/apiv2/search/?query=${encodeURIComponent(q)}&page_size=12&fields=id,name,previews,username,url,duration,license`;
+    const r = await fetch(endpoint, { headers: { Authorization: `Token ${env.FREESOUND_API_KEY}` } });
+    if (!r.ok) return json({ error: 'Freesound a refusé la recherche.', detail: (await r.text()).slice(0,800) }, 502);
+    const d = await r.json();
+    const results = (d.results || []).map(s => {
+      const p = s.previews || {};
+      const audioUrl = p['preview-hq-mp3'] || p['preview-lq-mp3'] || p['preview-hq-ogg'] || p['preview-lq-ogg'] || '';
+      return {
+        provider: 'freesound',
+        type: 'audio',
+        id: String(s.id || ''),
+        name: safeText(s.name, 300),
+        preview: audioUrl,
+        url: audioUrl,
+        author: safeText(s.username, 200),
+        sourcePage: safeText(s.url, 1000),
+        duration: Number(s.duration || 0),
+        license: safeText(s.license, 500)
+      };
+    }).filter(x => x.url);
     return json({ results });
   }
   if (provider === 'unsplash') {
@@ -638,6 +667,10 @@ function normalizePlan(raw, event) {
     fidelityScore: clampNumber(p.fidelityScore, 0, 100, 0),
     generatedImageUrl: safeText(p.generatedImageUrl, 5000),
     generatedImageStorageKey: safeText(p.generatedImageStorageKey, 1000),
+    generatedVideoUrl: safeText(p.generatedVideoUrl, 5000),
+    generatedVideoStorageKey: safeText(p.generatedVideoStorageKey, 1000),
+    generatedVideoJobId: safeText(p.generatedVideoJobId, 300),
+    generatedVideoStatus: safeText(p.generatedVideoStatus, 80),
     createdAt: p.createdAt || nowIso()
   }));
   return { posts, summary: safeText(raw && raw.summary, 5000), updatedAt: nowIso() };
@@ -653,7 +686,7 @@ async function handleGeneratePlan(request, env) {
   const count = Math.round(clampNumber(body.count, 1, 60, 14));
   const instructions = `Tu es NyXia Créatrice. Tu ne redéfinis JAMAIS la campagne.\n
 RÈGLE ABSOLUE : les faits contenus dans CAMPAGNE_VERROUILLEE ci-dessous sont la seule vérité. Si une information n'y est pas, tu ne l'inventes pas. Tu es créative sur la forme, jamais sur les faits.\n
-Pour les vidéos : aucune génération vidéo IA payante. Le fond vidéo officiel ciel étoilé + étoiles filantes est fixe; tu composes par-dessus avec texte glow, images, médias cœur, Pexels/Unsplash, captures et animations.\n
+Pour les vidéos : ${settings.paidVideoGenerationEnabled ? 'la génération vidéo IA premium est autorisée uniquement sur action manuelle de la propriétaire; tu peux prévoir des concepts qui pourraient bénéficier d’un clip premium, mais tu ne déclenches jamais toi-même une dépense' : 'aucune génération vidéo IA payante'}. Le fond vidéo officiel ciel étoilé + étoiles filantes reste la signature; tu composes par-dessus avec texte glow, images, médias cœur, Pexels/Unsplash, captures et animations.\n
 Pour les personnages : si tu proposes un visuel contenant un personnage officiel, renseigne characterReferences avec son identifiant exact (nyxia,diane,eric,lena,selena,kael,alex). Son visage ne doit jamais être recréé sans référence.\n
 Crée ${count} contenus distincts, sans répétition d'angle, adaptés aux plateformes activées. Respecte l'heure programmée. Les formats possibles sont facebook-image, short-video, text-only.\n
 Pour chaque contenu retourne : id,date,publishTime,platform,format,angle,objective,hook,caption,hashtags,cta,imagePrompt,characterReferences,mediaHeartIds,video{duration,voiceover,scenes[{seconds,text,visualType,searchQuery,mediaHeartIds}]},fidelityScore.\n
@@ -668,7 +701,7 @@ Retourne UNIQUEMENT un objet JSON {summary,posts:[...]}.`;
   if (settings.strictControl && plan.posts.length) {
     const controlPrompt = `Tu es NyXia Contrôle. Tu n'es pas créatrice. Tu vérifies la fidélité factuelle d'un plan publicitaire à une campagne verrouillée.\n
 Tu dois REFUSER tout élément qui invente un contenu d'événement, change le thème, change la promesse, fait de Studio Prompt un sujet principal si la campagne ne le dit pas, invente une fonctionnalité, un prix, une date ou un bénéfice non fourni.\n
-Tu vérifies aussi : palette NyXia obligatoire; fond ciel étoilé + étoiles filantes obligatoire pour vidéo; visages officiels verrouillés; aucune vidéo IA payante.\n
+Tu vérifies aussi : palette NyXia obligatoire; fond ciel étoilé + étoiles filantes comme signature vidéo; visages officiels verrouillés; ${settings.paidVideoGenerationEnabled ? 'vidéo IA premium permise seulement comme dépense manuelle explicitement déclenchée par la propriétaire' : 'aucune vidéo IA payante'}.\n
 Corrige uniquement ce qui dérape sans modifier la stratégie définie par l'utilisateur. Retourne UNIQUEMENT JSON : {pass:boolean,issues:[...],correctedPlan:{summary,posts:[...]}}.`;
     const controlText = await aimlChat(env, settings.controlModel, [
       { role: 'system', content: controlPrompt },
@@ -796,6 +829,152 @@ async function handleGenerateImage(request, env) {
   return json({ success: true, image: { url: post.generatedImageUrl, storageKey: post.generatedImageStorageKey, transient: !stored.storageKey }, post });
 }
 
+async function storeGeneratedVideo(env, eventId, rawUrl) {
+  if (!rawUrl) return { url: '', storageKey: '' };
+  if (!env.MEDIA_BUCKET) return { url: rawUrl, storageKey: '' };
+
+  const r = await fetch(rawUrl, { headers: { 'User-Agent': 'NyXiaCreator/1.0' } });
+  if (!r.ok || !r.body) return { url: rawUrl, storageKey: '' };
+
+  let ct = r.headers.get('content-type') || '';
+  if (!ct.startsWith('video/')) ct = 'video/mp4';
+  const len = Number(r.headers.get('content-length') || 0);
+  if (len && len > 250 * 1024 * 1024) return { url: rawUrl, storageKey: '' };
+
+  const ext = ct.includes('webm') ? '.webm' : '.mp4';
+  const key = `super2/${eventId}/${Date.now()}-${uid('').slice(0,8)}-ai-video${ext}`;
+  await env.MEDIA_BUCKET.put(key, r.body, {
+    httpMetadata: { contentType: ct },
+    customMetadata: { sourceUrl: rawUrl, source: 'aimlapi-video' }
+  });
+  return { url: `${API}/media/file/${encodeURIComponent(key)}`, storageKey: key };
+}
+
+function premiumVideoPrompt(event, settings, post) {
+  const sceneIdeas = ((post.video && post.video.scenes) || [])
+    .map(s => s.searchQuery || s.text || '')
+    .filter(Boolean)
+    .slice(0,4)
+    .join(' | ');
+  const idea = sceneIdeas || post.imagePrompt || post.hook || post.angle || event.exactTheme;
+  return safeText(
+    `Vertical cinematic marketing clip, visually strong, premium and modern. No readable text inside the generated footage because NyXia adds typography later. ` +
+    `Campaign subject: ${event.exactTheme}. Visual idea: ${idea}. ` +
+    `Palette inspiration: ${settings.brand.night}, ${settings.brand.violet}, ${settings.brand.lavender}, subtle golden light ${settings.brand.gold}. ` +
+    `${settings.brand.visualRule}. Do not create or imitate any official NyXia character or recognizable face. ` +
+    `The generated clip will be used as a visual insert inside the NyXia fixed starry-sky video identity.`,
+    7000
+  );
+}
+
+async function handleGenerateVideoStart(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const event = await readEvent(env, safeText(body.eventId, 100));
+  if (!event || !event.locked) return json({ error: 'Campagne verrouillée requise.' }, 409);
+
+  const settings = await getSettings(env);
+  if (!settings.paidVideoGenerationEnabled) return json({ error: 'Vidéo IA premium désactivée dans Charte & moteurs.' }, 403);
+  if (!env.AIMLAPI_CREATOR_KEY) return json({ error: 'AIMLAPI_CREATOR_KEY absent.' }, 503);
+  if (!settings.videoModel) return json({ error: 'Choisis un moteur vidéo AIMLAPI dans Charte & moteurs.' }, 400);
+
+  const plan = await readJsonKV(env, PLAN_PREFIX + event.id, null);
+  const post = plan && Array.isArray(plan.posts) ? plan.posts.find(p => p.id === body.postId) : null;
+  if (!post) return json({ error: 'Contenu introuvable dans le plan.' }, 404);
+  if (post.format !== 'short-video') return json({ error: 'Ce contenu n’est pas un format vidéo.' }, 400);
+  if ((post.characterReferences || []).length) {
+    return json({ error: 'Clip IA premium bloqué pour ce contenu : il contient un personnage officiel. Utilise le Studio vidéo avec sa vraie image pour préserver son visage.' }, 409);
+  }
+
+  const prompt = safeText(body.prompt, 7000) || premiumVideoPrompt(event, settings, post);
+  const r = await fetch('https://api.aimlapi.com/v2/video/generations', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.AIMLAPI_CREATOR_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ model: settings.videoModel, prompt })
+  });
+  if (!r.ok) return json({ error: 'AIMLAPI a refusé la génération vidéo.', detail: (await r.text()).slice(0,1000) }, 502);
+  const d = await r.json();
+  const generationId = safeText(d && (d.id || d.generation_id), 300);
+  if (!generationId) return json({ error: 'AIMLAPI n’a retourné aucun identifiant de génération.' }, 502);
+
+  post.generatedVideoJobId = generationId;
+  post.generatedVideoStatus = safeText(d.status, 80) || 'queued';
+  post.updatedAt = nowIso();
+  plan.updatedAt = nowIso();
+  await writeJsonKV(env, PLAN_PREFIX + event.id, plan);
+
+  return json({
+    success: true,
+    generationId,
+    status: post.generatedVideoStatus,
+    model: settings.videoModel,
+    prompt
+  });
+}
+
+async function handleGenerateVideoStatus(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.AIMLAPI_CREATOR_KEY) return json({ error: 'AIMLAPI_CREATOR_KEY absent.' }, 503);
+
+  const u = new URL(request.url);
+  const eventId = safeText(u.searchParams.get('eventId'), 100);
+  const postId = safeText(u.searchParams.get('postId'), 100);
+  const event = await readEvent(env, eventId);
+  if (!event) return json({ error: 'Événement introuvable.' }, 404);
+
+  const plan = await readJsonKV(env, PLAN_PREFIX + event.id, null);
+  const post = plan && Array.isArray(plan.posts) ? plan.posts.find(p => p.id === postId) : null;
+  if (!post) return json({ error: 'Contenu introuvable.' }, 404);
+
+  const generationId = safeText(u.searchParams.get('generationId'), 300) || post.generatedVideoJobId;
+  if (!generationId) return json({ error: 'Identifiant de génération manquant.' }, 400);
+
+  if (post.generatedVideoUrl && post.generatedVideoStatus === 'completed') {
+    return json({
+      success: true,
+      status: 'completed',
+      video: { url: post.generatedVideoUrl, storageKey: post.generatedVideoStorageKey || '' },
+      post
+    });
+  }
+
+  const r = await fetch(`https://api.aimlapi.com/v2/video/generations?generation_id=${encodeURIComponent(generationId)}`, {
+    headers: { Authorization: `Bearer ${env.AIMLAPI_CREATOR_KEY}` }
+  });
+  if (!r.ok) return json({ error: 'Impossible de vérifier la vidéo AIMLAPI.', detail: (await r.text()).slice(0,1000) }, 502);
+  const d = await r.json();
+
+  const status = safeText(d && d.status, 80) || 'processing';
+  post.generatedVideoJobId = generationId;
+  post.generatedVideoStatus = status;
+
+  let finalUrl = '';
+  if (d && d.video && d.video.url) finalUrl = safeText(d.video.url, 5000);
+  else if (d && d.data && d.data.video && d.data.video.url) finalUrl = safeText(d.data.video.url, 5000);
+  else if (d && d.url) finalUrl = safeText(d.url, 5000);
+
+  if (status === 'completed' && finalUrl) {
+    const stored = await storeGeneratedVideo(env, event.id, finalUrl);
+    post.generatedVideoUrl = stored.url || finalUrl;
+    post.generatedVideoStorageKey = stored.storageKey || '';
+  }
+
+  post.updatedAt = nowIso();
+  plan.updatedAt = nowIso();
+  await writeJsonKV(env, PLAN_PREFIX + event.id, plan);
+
+  return json({
+    success: true,
+    status,
+    error: d && d.error || null,
+    video: post.generatedVideoUrl ? { url: post.generatedVideoUrl, storageKey: post.generatedVideoStorageKey || '' } : null,
+    post
+  });
+}
+
 async function handlePortalRegistry(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const portals = await readJsonKV(env, 'univers:portals', []);
@@ -834,6 +1013,8 @@ export default {
       if (path === API + '/creator/plan' && request.method === 'GET') return await handleGetPlan(request, env);
       if (path === API + '/creator/plan/save' && request.method === 'POST') return await handleSavePlan(request, env);
       if (path === API + '/creator/image' && request.method === 'POST') return await handleGenerateImage(request, env);
+      if (path === API + '/creator/video/start' && request.method === 'POST') return await handleGenerateVideoStart(request, env);
+      if (path === API + '/creator/video/status' && request.method === 'GET') return await handleGenerateVideoStatus(request, env);
       if (path === API + '/portals' && request.method === 'GET') return await handlePortalRegistry(request, env);
 
       return json({ error: 'Route Super Admin 2 introuvable.' }, 404);
