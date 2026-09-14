@@ -4,6 +4,8 @@
 const API = '/api/superadmin2';
 const SESSION_TTL = 60 * 60 * 12;
 const COOKIE_NAME = 'nyxia_univers';
+const REFRESH_COOKIE_NAME = 'nyxia_super2_refresh';
+const REFRESH_HEADER = 'X-Univers-Refresh';
 const EVENT_INDEX_KEY = 'super2:creator:events:index';
 const EVENT_PREFIX = 'super2:creator:event:';
 const PLAN_PREFIX = 'super2:creator:plan:';
@@ -61,28 +63,97 @@ function slugFile(name) {
 }
 function randomToken() { return crypto.randomUUID() + crypto.randomUUID(); }
 
+function b64urlEncodeBytes(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+function b64urlDecodeBytes(value) {
+  let s = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const raw = atob(s);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+async function hmacKey(env) {
+  if (!env.ADMIN_INITIAL_PASSWORD) return null;
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(env.ADMIN_INITIAL_PASSWORD),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
+}
+async function createRefreshToken(env) {
+  const key = await hmacKey(env);
+  if (!key) return '';
+  const payload = {
+    scope: 'superadmin2',
+    exp: Date.now() + SESSION_TTL * 1000,
+    nonce: crypto.randomUUID()
+  };
+  const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
+  const payload64 = b64urlEncodeBytes(payloadBytes);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload64));
+  return payload64 + '.' + b64urlEncodeBytes(new Uint8Array(sig));
+}
+async function verifyRefreshToken(value, env) {
+  try {
+    const token = String(value || '');
+    const parts = token.split('.');
+    if (parts.length !== 2) return false;
+    const key = await hmacKey(env);
+    if (!key) return false;
+    const ok = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      b64urlDecodeBytes(parts[1]),
+      new TextEncoder().encode(parts[0])
+    );
+    if (!ok) return false;
+    const payload = JSON.parse(new TextDecoder().decode(b64urlDecodeBytes(parts[0])));
+    return payload && payload.scope === 'superadmin2' && Number(payload.exp) > Date.now();
+  } catch (_) {
+    return false;
+  }
+}
+function getCookie(request, name) {
+  const cookies = request.headers.get('Cookie') || '';
+  const safe = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = cookies.match(new RegExp('(?:^|;\\\\s*)' + safe + '=([^;]+)'));
+  return m ? m[1] : '';
+}
 function getTokenFromRequest(request) {
   const h = request.headers.get('X-Univers-Token');
   if (h) return h;
-  const cookies = request.headers.get('Cookie') || '';
-  const m = cookies.match(/(?:^|;\s*)nyxia_univers=([^;]+)/);
-  return m ? m[1] : null;
+  return getCookie(request, COOKIE_NAME) || null;
 }
-function buildSessionCookie(token, maxAge, requestUrl) {
-  const parts = [`${COOKIE_NAME}=${token}`, 'Path=/', `Max-Age=${maxAge}`, 'HttpOnly', 'Secure', 'SameSite=Lax'];
+function getRefreshFromRequest(request) {
+  return request.headers.get(REFRESH_HEADER) || getCookie(request, REFRESH_COOKIE_NAME) || '';
+}
+function cookieDomain(requestUrl) {
   try {
     const host = new URL(requestUrl).hostname;
-    if (host === 'nyxia.top' || host.endsWith('.nyxia.top')) parts.push('Domain=.nyxia.top');
+    if (host === 'nyxia.top' || host.endsWith('.nyxia.top')) return 'Domain=.nyxia.top';
   } catch (_) {}
+  return '';
+}
+function buildCookie(name, value, maxAge, requestUrl) {
+  const parts = [`${name}=${value}`, 'Path=/', `Max-Age=${maxAge}`, 'HttpOnly', 'Secure', 'SameSite=Lax'];
+  const domain = cookieDomain(requestUrl);
+  if (domain) parts.push(domain);
   return parts.join('; ');
 }
-function clearSessionCookie(requestUrl) {
-  let domain = '';
-  try {
-    const host = new URL(requestUrl).hostname;
-    if (host === 'nyxia.top' || host.endsWith('.nyxia.top')) domain = '; Domain=.nyxia.top';
-  } catch (_) {}
-  return `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax${domain}`;
+function clearCookie(name, requestUrl) {
+  const parts = [`${name}=`, 'Path=/', 'Max-Age=0', 'HttpOnly', 'Secure', 'SameSite=Lax'];
+  const domain = cookieDomain(requestUrl);
+  if (domain) parts.push(domain);
+  return parts.join('; ');
+}
+function buildSessionCookie(token, maxAge, requestUrl) {
+  return buildCookie(COOKIE_NAME, token, maxAge, requestUrl);
 }
 async function requireAdmin(request, env) {
   if (!env.CASHFLOW_KV) return false;
@@ -90,25 +161,62 @@ async function requireAdmin(request, env) {
   if (!token) return false;
   return !!(await env.CASHFLOW_KV.get('univers:session:' + token));
 }
+async function createServerSession(env) {
+  const token = randomToken();
+  await env.CASHFLOW_KV.put(
+    'univers:session:' + token,
+    JSON.stringify({ role: 'superadmin', source: 'super2', at: nowIso() }),
+    { expirationTtl: SESSION_TTL }
+  );
+  return token;
+}
 async function handleLogin(request, env) {
   const body = await request.json().catch(() => ({}));
   const password = body.password || '';
   if (!env.ADMIN_INITIAL_PASSWORD) return json({ error: 'Secret ADMIN_INITIAL_PASSWORD absent du Worker Super 2.' }, 503);
+  if (!env.CASHFLOW_KV) return json({ error: 'CASHFLOW_KV absent.' }, 503);
   if (password !== env.ADMIN_INITIAL_PASSWORD) return json({ error: 'Mot de passe incorrect.' }, 401);
-  const token = randomToken();
-  await env.CASHFLOW_KV.put('univers:session:' + token, JSON.stringify({ role: 'superadmin', source: 'super2', at: nowIso() }), { expirationTtl: SESSION_TTL });
-  const res = json({ success: true, token });
+
+  const token = await createServerSession(env);
+  const refreshToken = await createRefreshToken(env);
+
+  const res = json({ success: true, token, refreshToken, expiresIn: SESSION_TTL });
   res.headers.append('Set-Cookie', buildSessionCookie(token, SESSION_TTL, request.url));
+  if (refreshToken) {
+    res.headers.append('Set-Cookie', buildCookie(REFRESH_COOKIE_NAME, refreshToken, SESSION_TTL, request.url));
+  }
   return res;
 }
 async function handleCheckAuth(request, env) {
-  return json({ valid: await requireAdmin(request, env), role: 'superadmin' });
+  if (await requireAdmin(request, env)) {
+    return json({ valid: true, role: 'superadmin' });
+  }
+
+  const refreshToken = getRefreshFromRequest(request);
+  if (refreshToken && await verifyRefreshToken(refreshToken, env)) {
+    if (!env.CASHFLOW_KV) return json({ valid: false, error: 'CASHFLOW_KV absent.' }, 503);
+    const token = await createServerSession(env);
+    const res = json({
+      valid: true,
+      role: 'superadmin',
+      token,
+      refreshToken,
+      restored: true,
+      expiresIn: SESSION_TTL
+    });
+    res.headers.append('Set-Cookie', buildSessionCookie(token, SESSION_TTL, request.url));
+    res.headers.append('Set-Cookie', buildCookie(REFRESH_COOKIE_NAME, refreshToken, SESSION_TTL, request.url));
+    return res;
+  }
+
+  return json({ valid: false, role: 'superadmin' });
 }
 async function handleLogout(request, env) {
   const token = getTokenFromRequest(request);
   if (token && env.CASHFLOW_KV) await env.CASHFLOW_KV.delete('univers:session:' + token);
   const res = json({ success: true });
-  res.headers.append('Set-Cookie', clearSessionCookie(request.url));
+  res.headers.append('Set-Cookie', clearCookie(COOKIE_NAME, request.url));
+  res.headers.append('Set-Cookie', clearCookie(REFRESH_COOKIE_NAME, request.url));
   return res;
 }
 
