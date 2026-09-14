@@ -1,30 +1,37 @@
-name = "univers-superadmin2"
+name = "univers"
 main = "_worker.js"
-compatibility_date = "2026-09-01"
+compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Worker 2 uniquement pour les API de Super Admin 2.
-# Super Admin 1 reste à la racine du dépôt et n'est pas modifié.
-routes = [
-  { pattern = "univers.nyxia.top/api/superadmin2/*", zone_name = "nyxia.top" }
-]
+[assets]
+directory = "."
+binding = "ASSETS"
 
-# Même KV que Super Admin 1 uniquement lorsque le partage est volontaire.
 [[kv_namespaces]]
 binding = "CASHFLOW_KV"
 id = "106db6da016d49d2b480452f19bad695"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "nyxia-cercles-db"
+database_id = "a21fd813-06fa-41f1-b744-07bf1c5c7951"
+
 [vars]
 SITE_URL = "https://univers.nyxia.top"
+# ── À AJOUTER dans le wrangler.toml du Super Admin (univers) pour la vectorisation ──
+# (garde tout ce que tu as déjà : CASHFLOW_KV, DB, assets…)
 
-# Optionnel plus tard pour téléverser directement les médias cœur et le fond officiel :
-# [[r2_buckets]]
-# binding = "MEDIA_BUCKET"
-# bucket_name = "nyxia-superadmin2-media"
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "nyxia-superadmin2-media"
 
-# Secrets à définir dans l'environnement Cloudflare du Worker Super 2 :
-# ADMIN_INITIAL_PASSWORD
-# AIMLAPI_CREATOR_KEY
-# PEXELS_KEY
-# UNSPLASH_ACCES_KEY
-# (le Worker accepte aussi UNSPLASH_ACCESS_KEY ou UNSPLASH_KEY)
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "univers-livres"
+
+[ai]
+binding = "AI"
+
+# L'index "univers-livres" doit déjà exister (1024 dimensions, cosine, modèle @cf/baai/bge-m3).
+# Sans ces deux bindings, la gestion des personnages marche quand même ; seule la vectorisation
+# affiche un avertissement tant qu'ils ne sont pas ajoutés.
