@@ -23,7 +23,13 @@ canvas#starry-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
 .app.visible{display:flex;flex-direction:column;height:100%;max-height:100vh;min-height:0}
 .header{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid rgba(123,92,255,.15);background:rgba(15,28,63,.85)}
 .header h1{font-family:Orbitron,monospace;font-size:18px;background:linear-gradient(135deg,#a78bfa,var(--p3));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.super-switch{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.super-switch a{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;border-radius:9px;text-decoration:none;font-size:12px;font-weight:700;white-space:nowrap;transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.super-switch .active{color:#fff;background:rgba(123,92,255,.18);border:1px solid rgba(123,92,255,.44);box-shadow:0 0 16px rgba(123,92,255,.12)}
+.super-switch .to-super2{color:#f8dc91;background:rgba(6,10,24,.72);border:1px solid rgba(244,200,106,.46);box-shadow:0 0 16px rgba(123,92,255,.10)}
+.super-switch .to-super2:hover{transform:translateY(-2px);border-color:rgba(244,200,106,.9);box-shadow:0 0 24px rgba(123,92,255,.28),0 0 12px rgba(244,200,106,.12)}
 .btn-out{padding:8px 12px;border-radius:8px;border:1px solid rgba(255,107,107,.3);background:rgba(255,107,107,.1);color:var(--red);font-size:12px;cursor:pointer}
+@media(max-width:760px){.header{gap:10px;flex-wrap:wrap}.header h1{width:100%}.super-switch{width:100%;justify-content:flex-start}}
 .module-nav{display:flex;gap:4px;padding:10px 16px 0;overflow-x:auto;border-bottom:1px solid rgba(123,92,255,.12);background:rgba(15,28,63,.5)}
 .module-tab{padding:10px 14px;border:none;border-radius:10px 10px 0 0;background:transparent;color:var(--t3);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .module-tab.active{background:rgba(123,92,255,.18);color:#fff}
@@ -68,7 +74,11 @@ td strong{color:#fff}
 <div class="app" id="app">
   <div class="header">
     <h1>NyXia · Univers</h1>
-    <button class="btn-out" onclick="doLogout()">Déconnexion</button>
+    <div class="super-switch">
+      <a href="/" class="active" aria-current="page">Super Admin 1 · Gestion</a>
+      <a href="/superadmin2/" class="to-super2">Super Admin 2 · Création</a>
+      <button class="btn-out" onclick="doLogout()">Déconnexion</button>
+    </div>
   </div>
   <nav class="module-nav">
     <button class="module-tab active" data-module="pourcentages" onclick="switchModule('pourcentages')">% des 3 cercles</button>
