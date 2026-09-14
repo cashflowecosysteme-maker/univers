@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NyXia · Super Admin 2</title>
+  <link rel="icon" href="/FavIcon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/superadmin2/css/superadmin2.css">
+</head>
+<body>
+<canvas id="stars"></canvas>
+
+<div class="login" id="login">
+  <div class="login-card">
+    <img src="/NyXia.png" alt="NyXia">
+    <h1>Super Admin 2</h1>
+    <p>Événements · Promotions · NyXia Créatrice</p>
+    <div class="field"><label class="f">Mot de passe Super Admin</label><input class="f" type="password" id="loginPassword" autocomplete="current-password"></div>
+    <button class="btn" id="loginBtn">Entrer</button>
+    <div class="subtle" id="loginMsg" style="margin-top:10px;text-align:center"></div>
+  </div>
+</div>
+
+<div class="shell hidden" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <img src="/NyXia.png" alt="NyXia">
+      <div><strong>NyXia · Super Admin 2</strong><span>Événements, promotions et création</span></div>
+    </div>
+    <div class="super-switch">
+      <a href="/">Super 1 · Gestion</a>
+      <a href="/superadmin2/" class="active">Super 2 · Création</a>
+      <button class="logout" id="logoutBtn">Déconnexion</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <button class="navbtn active" data-view="dashboard">✨ Vue d’ensemble</button>
+      <button class="navbtn" data-view="events">📅 Événements</button>
+      <button class="navbtn" data-view="creator">🪄 NyXia Créatrice</button>
+      <button class="navbtn" data-view="resources">🎞️ Ressources</button>
+      <button class="navbtn" data-view="settings">🎨 Charte & moteurs</button>
+    </aside>
+
+    <main class="content">
+      <section class="view active" id="view-dashboard">
+        <div class="hero">
+          <div><h1>Le studio marketing de NyXia</h1><p>Super Admin 1 reste intact. Ici, on construit les campagnes, les créatifs et les vidéos à très faible coût, sans autoriser NyXia à brûler le budget dans de la génération vidéo payante.</p></div>
+          <div class="actions"><button class="btn" data-open-event>+ Nouvel événement</button></div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><span>Événements</span><b id="statEvents">0</b></div>
+          <div class="stat"><span>Campagnes verrouillées</span><b id="statLocked">0</b></div>
+          <div class="stat"><span>Contenus préparés</span><b id="statPosts">0</b></div>
+          <div class="stat"><span>Vidéo IA payante</span><b style="color:var(--green)">0 $</b></div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h2>Règles du studio</h2>
+          <div class="grid3">
+            <div class="strong-note"><strong>La vérité est verrouillée.</strong><br>NyXia ne redéfinit jamais ton événement. Elle crée la forme, pas les faits.</div>
+            <div class="strong-note"><strong>Le fond vidéo est fixe.</strong><br>Ciel étoilé NyXia + étoiles filantes. Les textes, images et clips viennent par-dessus.</div>
+            <div class="strong-note"><strong>Les visages ne bougent pas.</strong><br>Un personnage officiel doit toujours être généré à partir de sa référence officielle.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Infrastructure</h2>
+          <div class="binding-grid" id="bindingGrid"></div>
+        </div>
+        <div class="card">
+          <h2>Derniers événements</h2>
+          <div class="event-list" id="dashboardEvents"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-events">
+        <div class="hero">
+          <div><h1>Événements & Promotions</h1><p>Une fiche maître par campagne. Tant qu’elle n’est pas verrouillée, NyXia Créatrice refuse de produire du contenu.</p></div>
+          <div class="actions"><button class="btn" data-open-event>+ Créer un événement</button></div>
+        </div>
+        <div class="event-list" id="eventList"></div>
+      </section>
+
+      <section class="view" id="view-creator">
+        <div class="hero">
+          <div><h1>NyXia Créatrice</h1><p>Choisis une campagne verrouillée. NyXia prépare des angles distincts, textes Facebook, scripts courts, prompts d’images et storyboards vidéo. Tu publies ou programmes ensuite toi-même.</p></div>
+        </div>
+        <div class="card">
+          <div class="grid3">
+            <div><label class="f">Campagne verrouillée</label><select class="f" id="creatorEvent"></select></div>
+            <div><label class="f">Nombre de contenus à préparer</label><input class="f" id="creatorCount" type="number" min="1" max="60" value="14"></div>
+            <div style="display:flex;align-items:end"><button class="btn" id="generatePlanBtn" style="width:100%">✨ Préparer la campagne</button></div>
+          </div>
+          <div class="subtle" style="margin-top:8px">Deux étapes : NyXia Créatrice produit → NyXia Contrôle vérifie la fidélité à ta fiche verrouillée.</div>
+        </div>
+        <div class="card" id="controlCard">
+          <h2>Contrôle de fidélité</h2>
+          <div id="controlResult" class="subtle">Aucun plan chargé.</div>
+        </div>
+        <div class="plan-grid" id="planGrid"></div>
+      </section>
+
+      <section class="view" id="view-resources">
+        <div class="hero"><div><h1>Ressources gratuites</h1><p>Pexels et Unsplash sont des outils de recherche pour NyXia. Ils ne remplacent pas la création : ils lui donnent des matériaux gratuits à intégrer dans tes publicités.</p></div></div>
+        <div class="card">
+          <div class="grid3">
+            <div><label class="f">Source</label><select class="f" id="assetProvider"><option value="pexels">Pexels</option><option value="unsplash">Unsplash</option></select></div>
+            <div><label class="f">Type</label><select class="f" id="assetType"><option value="image">Image</option><option value="video">Vidéo</option></select></div>
+            <div><label class="f">Recherche</label><input class="f" id="assetQuery" placeholder="ex. femme ordinateur maison"></div>
+          </div>
+          <div class="actions" style="margin-top:10px"><button class="btn" id="assetSearchBtn">Rechercher</button></div>
+          <div class="search-results" id="assetResults"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-settings">
+        <div class="hero"><div><h1>Charte NyXia & moteurs</h1><p>Les couleurs, le fond vidéo et les visages officiels sont des contraintes techniques, pas des suggestions dans un prompt.</p></div></div>
+        <div class="card">
+          <h2>Palette verrouillée</h2>
+          <div class="palette" id="palettePreview"></div>
+          <div class="grid4" style="margin-top:12px">
+            <div><label class="f">Bleu nuit</label><input class="f" id="setNight"></div>
+            <div><label class="f">Violet</label><input class="f" id="setViolet"></div>
+            <div><label class="f">Lavande</label><input class="f" id="setLavender"></div>
+            <div><label class="f">Doré</label><input class="f" id="setGold"></div>
+          </div>
+          <div class="field"><label class="f">Règle visuelle</label><textarea class="f" id="setVisualRule"></textarea></div>
+        </div>
+        <div class="card locked-box">
+          <h2>Fond vidéo officiel — verrou absolu</h2>
+          <p class="subtle">Toutes les vidéos sont composées sur CE fond. NyXia peut mettre du contenu par-dessus ou parfois laisser seulement le fond + texte glow.</p>
+          <div class="grid2">
+            <div><label class="f">URL du fond vidéo ciel étoilé + étoiles filantes</label><input class="f" id="setBackgroundVideo" placeholder="/api/superadmin2/media/file/... ou https://..."></div>
+            <div style="display:flex;align-items:end"><button class="btn ghost" id="uploadBackgroundBtn" style="width:100%">Téléverser le fond officiel</button><input type="file" id="backgroundFile" accept="video/*" hidden></div>
+          </div>
+          <div id="backgroundPreview" style="margin-top:12px"></div>
+        </div>
+        <div class="card locked-box">
+          <h2>Visages officiels — verrou absolu</h2>
+          <div class="grid4" id="characterRefs"></div>
+        </div>
+        <div class="card">
+          <h2>Moteurs AIMLAPI</h2>
+          <div class="grid2">
+            <div><label class="f">Cerveau</label><input class="f" id="setBrainModel"></div>
+            <div><label class="f">Contrôle</label><input class="f" id="setControlModel"></div>
+            <div><label class="f">Image principale</label><input class="f" id="setImageModel"></div>
+            <div><label class="f">Image secours</label><input class="f" id="setImageFallback"></div>
+          </div>
+          <div class="grid3" style="margin-top:10px">
+            <label><input type="checkbox" id="setStrictControl" checked> Contrôle strict avant production</label>
+            <label><input type="checkbox" id="setImageEnabled" checked> Génération d’images autorisée</label>
+            <label style="opacity:.7"><input type="checkbox" checked disabled> Vidéo IA payante interdite</label>
+          </div>
+          <div class="actions" style="margin-top:14px"><button class="btn" id="saveSettingsBtn">Enregistrer les réglages</button></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="modal hidden" id="eventModal">
+  <div class="modal-card">
+    <div class="modal-head"><div><h2 id="eventModalTitle" style="margin:0">Nouvel événement</h2><div class="subtle">Fiche Maîtresse de NyXia Créatrice</div></div><button class="btn ghost" id="closeEventModal">Fermer</button></div>
+    <input type="hidden" id="eventId">
+    <div class="card">
+      <h3>1 · Identité & calendrier</h3>
+      <div class="grid3">
+        <div><label class="f">Nom de la campagne *</label><input class="f" id="evName"></div>
+        <div><label class="f">Début événement</label><input class="f" id="evStart" type="date"></div>
+        <div><label class="f">Fin événement</label><input class="f" id="evEnd" type="date"></div>
+        <div><label class="f">Début contenus</label><input class="f" id="evContentStart" type="date"></div>
+        <div><label class="f">Fin contenus</label><input class="f" id="evContentEnd" type="date"></div>
+        <div><label class="f">Heure régulière</label><input class="f" id="evTime" type="time" value="19:30"></div>
+      </div>
+      <div class="actions"><label><input type="checkbox" id="evFacebook" checked> Facebook</label><label><input type="checkbox" id="evTikTok" checked> TikTok</label><label><input type="checkbox" id="evFacebookImage" checked> Image + texte</label><label><input type="checkbox" id="evShortVideo" checked> Vidéo 15–60 sec</label></div>
+    </div>
+    <div class="card locked-box">
+      <h3>2 · Vérité de la campagne — ce bloc sera verrouillé</h3>
+      <div class="field"><label class="f">Thème EXACT *</label><textarea class="f" id="evTheme" placeholder="Ce dont l’événement parle réellement."></textarea></div>
+      <div class="grid2">
+        <div><label class="f">Public</label><textarea class="f" id="evAudience"></textarea></div>
+        <div><label class="f">Promesse réelle</label><textarea class="f" id="evPromise"></textarea></div>
+      </div>
+      <div class="field"><label class="f">Ce qui sera réellement fait pendant l’événement</label><textarea class="f" id="evReality" rows="5"></textarea></div>
+      <div class="grid3">
+        <div><label class="f">Jour 1</label><textarea class="f" id="evDay1"></textarea></div>
+        <div><label class="f">Jour 2</label><textarea class="f" id="evDay2"></textarea></div>
+        <div><label class="f">Jour 3</label><textarea class="f" id="evDay3"></textarea></div>
+      </div>
+      <div class="grid2">
+        <div><label class="f">CTA principal</label><textarea class="f" id="evCta"></textarea></div>
+        <div><label class="f">Éléments obligatoires</label><textarea class="f" id="evMandatory"></textarea></div>
+        <div><label class="f">Interdits / ne jamais inventer</label><textarea class="f" id="evForbidden"></textarea></div>
+        <div><label class="f">Rôle réel de Studio Prompt</label><textarea class="f" id="evStudioRole"></textarea></div>
+        <div><label class="f">VIP / offre liée</label><textarea class="f" id="evVip"></textarea></div>
+        <div><label class="f">Notes internes</label><textarea class="f" id="evNotes"></textarea></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="modal-head"><div><h3 style="margin:0">3 · Médias cœur de l’événement</h3><div class="subtle">Plusieurs images et vidéos, chacune avec ses propres règles.</div></div><button class="btn ghost" id="addHeartMediaBtn">+ Ajouter un média</button></div>
+      <div class="actions" style="margin-bottom:10px"><button class="btn ghost" id="uploadHeartMediaBtn">Téléverser un fichier</button><input type="file" id="heartMediaFile" accept="image/*,video/*" hidden><span class="subtle">R2 requis pour le téléversement direct. Sinon, colle une URL dans une ligne média.</span></div>
+      <div class="media-editor" id="heartMediaEditor"></div>
+    </div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" id="cancelEventBtn">Annuler</button><button class="btn" id="saveEventBtn">Enregistrer</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="videoModal">
+  <div class="modal-card">
+    <div class="modal-head"><div><h2 style="margin:0">Studio Vidéo NyXia</h2><div class="subtle">Fond officiel fixe + textes glow + médias. Aucune génération vidéo IA payante.</div></div><button class="btn ghost" id="closeVideoModal">Fermer</button></div>
+    <div class="video-workspace">
+      <div>
+        <div class="phone-wrap"><div class="phone" id="phonePreview"><video class="bg" id="videoBg" muted loop playsinline></video><div class="phone-overlay"><div class="glow-text" id="previewText">NyXia</div></div></div></div>
+        <div class="actions" style="justify-content:center;margin-top:12px"><button class="btn" id="exportVideoBtn">Exporter la vidéo</button></div>
+        <div class="subtle" id="exportStatus" style="text-align:center;margin-top:7px"></div>
+      </div>
+      <div>
+        <div class="card"><h3>Storyboard</h3><div class="scene-list" id="sceneList"></div></div>
+        <div class="card"><h3>Texte de la scène</h3><textarea class="f" id="sceneText" rows="4"></textarea><div class="grid2" style="margin-top:10px"><div><label class="f">Durée scène (sec)</label><input class="f" id="sceneSeconds" type="number" min="2" max="15"></div><div><label class="f">Média URL (facultatif)</label><input class="f" id="sceneMediaUrl"></div></div><div class="actions" style="margin-top:10px"><button class="btn ghost" id="saveSceneBtn">Appliquer à la scène</button></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+<script src="/superadmin2/js/superadmin2.js" defer></script>
+</body>
+</html>
