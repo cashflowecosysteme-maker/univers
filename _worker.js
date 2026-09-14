@@ -1,3 +1,4 @@
+import superAdmin2 from './superadmin2/_worker.js';
 // NyXia Univers — SuperAdmin central (système complet jumelé Cercles + Répertoire)
 const SESSION_TTL = 60 * 60 * 12;
 const COOKIE_NAME = 'nyxia_univers';
@@ -1564,6 +1565,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
+
+    // Super Admin 2 reste dans son propre fichier.
+    // Le Worker principal fait uniquement l'aiguillage de ses routes API.
+    if (path === '/api/superadmin2' || path.startsWith('/api/superadmin2/')) {
+      return superAdmin2.fetch(request, env);
+    }
+
     try {
       if (path === '/api/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/logout' && request.method === 'POST') return await handleLogout(request, env);
