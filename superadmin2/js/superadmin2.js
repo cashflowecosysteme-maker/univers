@@ -4,7 +4,7 @@ const API='/api/superadmin2';
 const TOKEN_KEY='nyxia_super2_token';
 const CHAR_KEYS=['nyxia','diane','eric','lena','selena','kael','alex'];
 const CHAR_NAMES={nyxia:'NyXia',diane:'Diane',eric:'Éric',lena:'Léna',selena:'Séléna',kael:'Kael',alex:'Alex'};
-let TOKEN=sessionStorage.getItem(TOKEN_KEY)||'';
+let TOKEN=sessionStorage.getItem(TOKEN_KEY)||localStorage.getItem(TOKEN_KEY)||'';
 const STATE={events:[],settings:null,bindings:{},plan:null,currentEvent:null,heartMedia:[],videoPost:null,videoScenes:[],activeScene:0};
 
 const $=id=>document.getElementById(id);
@@ -13,30 +13,75 @@ function toast(msg,ok=true){const t=$('toast');t.textContent=msg;t.className='to
 function fmtDate(v){if(!v)return '—';try{return new Date(v+'T12:00:00').toLocaleDateString('fr-CA')}catch(_){return v}}
 function uid(prefix=''){return prefix+(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2))}
 
+async function readJsonResponse(r){
+  const text=await r.text();
+  if(!text)return {};
+  try{return JSON.parse(text)}catch(_){return {error:'Réponse serveur invalide.',detail:text.slice(0,500)}}
+}
 async function api(path,method='GET',body){
-  const opts={method,headers:{'Accept':'application/json','X-Univers-Token':TOKEN||''}};
+  const opts={
+    method,
+    credentials:'same-origin',
+    headers:{'Accept':'application/json','X-Univers-Token':TOKEN||''}
+  };
   if(body!==undefined){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body)}
   const r=await fetch(API+path,opts);
-  let d={};try{d=await r.json()}catch(_){d={error:'Réponse serveur invalide.'}}
-  if(r.status===401){showLogin();throw new Error(d.error||'Session expirée')}
+  const d=await readJsonResponse(r);
+  if(r.status===401){
+    TOKEN='';
+    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    showLogin();
+    throw new Error(d.error||'Session expirée');
+  }
   if(!r.ok)throw new Error(d.detail||d.error||('Erreur '+r.status));
   return d;
 }
 async function checkAuth(){
-  try{const d=await api('/check-auth','POST',{});if(d.valid){showApp();await init();return true}}catch(_){}
-  showLogin();return false;
+  try{
+    const d=await api('/check-auth','POST',{});
+    if(d.valid){
+      showApp();
+      await init();
+      return true;
+    }
+  }catch(_){}
+  TOKEN='';
+  sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  showLogin();
+  return false;
 }
 function showLogin(){$('login').classList.remove('hidden');$('app').classList.add('hidden')}
 function showApp(){$('login').classList.add('hidden');$('app').classList.remove('hidden')}
 async function doLogin(){
   const pw=$('loginPassword').value;$('loginMsg').textContent='Connexion…';
   try{
-    const r=await fetch(API+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-    const d=await r.json();if(!r.ok)throw new Error(d.error||'Connexion refusée');
-    TOKEN=d.token||'';sessionStorage.setItem(TOKEN_KEY,TOKEN);$('loginMsg').textContent='';showApp();await init();
+    const r=await fetch(API+'/login',{
+      method:'POST',
+      credentials:'same-origin',
+      headers:{'Accept':'application/json','Content-Type':'application/json'},
+      body:JSON.stringify({password:pw})
+    });
+    const d=await readJsonResponse(r);
+    if(!r.ok)throw new Error(d.error||d.detail||('Connexion refusée ('+r.status+')'));
+    TOKEN=d.token||'';
+    if(TOKEN){
+      sessionStorage.setItem(TOKEN_KEY,TOKEN);
+      localStorage.setItem(TOKEN_KEY,TOKEN);
+    }
+    $('loginMsg').textContent='';
+    showApp();
+    await init();
   }catch(e){$('loginMsg').textContent=e.message}
 }
-async function doLogout(){try{await api('/logout','POST',{})}catch(_){}TOKEN='';sessionStorage.removeItem(TOKEN_KEY);showLogin()}
+async function doLogout(){
+  try{await api('/logout','POST',{})}catch(_){}
+  TOKEN='';
+  sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  showLogin();
+}
 
 function switchView(name){
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
