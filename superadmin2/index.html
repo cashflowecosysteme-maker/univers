@@ -42,7 +42,11 @@
       <button class="navbtn active" data-view="dashboard">✨ Vue d’ensemble</button>
       <button class="navbtn" data-view="events">📅 Événements</button>
       <button class="navbtn" data-view="creator">🪄 NyXia Créatrice</button>
+      <button class="navbtn" data-view="chat">💬 Parler à NyXia</button>
+      <button class="navbtn" data-view="radar">👁️ Radar & captures</button>
       <button class="navbtn" data-view="resources">🎞️ Ressources</button>
+      <button class="navbtn" data-view="performance">📈 Performance</button>
+      <button class="navbtn" data-view="labo">🧪 Labo API</button>
       <button class="navbtn" data-view="settings">🎨 Charte & moteurs</button>
     </aside>
 
@@ -103,17 +107,113 @@
         <div class="plan-grid" id="planGrid"></div>
       </section>
 
-      <section class="view" id="view-resources">
-        <div class="hero"><div><h1>Ressources gratuites</h1><p>Pexels et Unsplash sont des outils de recherche pour NyXia. Ils ne remplacent pas la création : ils lui donnent des matériaux gratuits à intégrer dans tes publicités.</p></div></div>
+      <section class="view" id="view-chat">
+        <div class="hero"><div><h1>Parler à NyXia Créative</h1><p>Donne-lui une idée, colle un texte, demande-lui de challenger un angle ou de chercher une meilleure façon de le dire. La discussion nourrit la création sans modifier silencieusement ta Fiche Maîtresse.</p></div></div>
         <div class="card">
           <div class="grid3">
-            <div><label class="f">Source</label><select class="f" id="assetProvider"><option value="pexels">Pexels</option><option value="unsplash">Unsplash</option><option value="freesound">Freesound</option></select></div>
+            <div><label class="f">Contexte</label><select class="f" id="chatEvent"></select></div>
+            <div style="display:flex;align-items:end"><label><input type="checkbox" id="chatSpeak" checked> 🔊 NyXia me répond à voix haute</label></div>
+            <div class="actions" style="align-items:end;justify-content:flex-end"><button class="btn ghost" id="chatMicBtn">🎙️ Parler</button><button class="btn red" id="chatClearBtn">Effacer la conversation</button></div>
+          </div>
+        </div>
+        <div class="card chat-shell">
+          <div class="chat-log" id="chatLog"><div class="subtle">Choisis un contexte et parle-moi. 💜</div></div>
+          <div class="chat-compose">
+            <textarea class="f" id="chatInput" rows="4" placeholder="Ex. NyXia, j’ai une idée de publication mais je la trouve trop vendeuse…"></textarea>
+            <button class="btn" id="chatSendBtn">Envoyer à NyXia</button>
+          </div>
+        </div>
+        <div class="card locked-box">
+          <h2>Brief créatif de Diane</h2>
+          <p class="subtle">Ce brief guide les angles, le ton et la création. Il ne peut jamais écraser les faits de la Fiche Maîtresse.</p>
+          <textarea class="f" id="creativeBrief" rows="6" placeholder="Ex. Je veux une campagne plus humaine, drôle, très simple, avec beaucoup de vraies captures du portail…"></textarea>
+          <div class="actions" style="margin-top:10px"><button class="btn" id="saveBriefBtn">Enregistrer le brief</button><button class="btn ghost" id="appendLastChatBtn">Ajouter la dernière réponse de NyXia au brief</button></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-radar">
+        <div class="hero"><div><h1>Les yeux de NyXia</h1><p>Observer ce qui attire l’attention sans copier, et capturer tes vraies pages pour montrer ton véritable écosystème.</p></div></div>
+        <div class="card">
+          <h2>🔥 Radar YouTube</h2>
+          <div class="grid4">
+            <div style="grid-column:span 2"><label class="f">Sujet à observer</label><input class="f" id="ytQuery" placeholder="ex. intelligence artificielle travail à domicile"></div>
+            <div><label class="f">Période</label><select class="f" id="ytDays"><option value="7">7 jours</option><option value="30" selected>30 jours</option><option value="90">90 jours</option><option value="365">1 an</option></select></div>
+            <div><label class="f">Marché</label><select class="f" id="ytRegion"><option value="CA">Canada</option><option value="FR">France</option><option value="BE">Belgique</option><option value="CH">Suisse</option><option value="">Global francophone</option></select></div>
+          </div>
+          <div class="actions" style="margin-top:10px"><button class="btn" id="ytSearchBtn">Observer YouTube</button><button class="btn gold" id="ytAnalyzeBtn" disabled>✨ NyXia analyse les mécanismes</button></div>
+          <div class="radar-grid" id="ytResults"></div>
+          <div class="strong-note hidden" id="ytAnalysis" style="margin-top:14px;white-space:pre-wrap"></div>
+        </div>
+        <div class="card">
+          <h2>📸 Capturer une vraie page</h2>
+          <p class="subtle">Browser Run ouvre réellement la page et enregistre la capture dans R2. Parfait pour montrer Studio Prompt, un portail ou une page Systeme.io sans inventer une fausse interface.</p>
+          <div class="grid3">
+            <div style="grid-column:span 2"><label class="f">URL</label><input class="f" id="captureUrl" placeholder="https://..."></div>
+            <div><label class="f">Vue</label><select class="f" id="capturePreset"><option value="mobile">Mobile</option><option value="desktop">Ordinateur</option><option value="square">Carré</option></select></div>
+          </div>
+          <div class="actions" style="margin-top:10px"><label><input type="checkbox" id="captureFullPage"> page complète</label><button class="btn" id="captureBtn">Capturer et conserver dans R2</button></div>
+          <div id="captureResult" style="margin-top:14px"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-resources">
+        <div class="hero"><div><h1>Ressources gratuites</h1><p>NyXia cherche d’abord dans les ressources gratuites et tes médias avant de dépenser en génération : Pexels, Pixabay, Unsplash, Openverse et Freesound.</p></div></div>
+        <div class="card">
+          <div class="grid3">
+            <div><label class="f">Source</label><select class="f" id="assetProvider"><option value="pexels">Pexels</option><option value="pixabay">Pixabay</option><option value="unsplash">Unsplash</option><option value="openverse">Openverse</option><option value="freesound">Freesound</option></select></div>
             <div><label class="f">Type</label><select class="f" id="assetType"><option value="image">Image</option><option value="video">Vidéo</option><option value="audio">Audio</option></select></div>
             <div><label class="f">Recherche</label><input class="f" id="assetQuery" placeholder="ex. femme ordinateur maison"></div>
           </div>
           <div class="actions" style="margin-top:10px"><button class="btn" id="assetSearchBtn">Rechercher</button></div>
           <div class="search-results" id="assetResults"></div>
         </div>
+        <div class="card hidden" id="lastMediaTools"></div>
+      </section>
+
+      <section class="view" id="view-performance">
+        <div class="hero"><div><h1>Mémoire des performances</h1><p>NyXia apprend de TES résultats. Entre les chiffres importants après une publication ou une campagne; ils seront utilisés pour orienter les prochaines créations.</p></div></div>
+        <div class="card">
+          <h2>Ajouter un résultat</h2>
+          <div class="grid4">
+            <div><label class="f">Campagne</label><select class="f" id="perfEvent"></select></div>
+            <div><label class="f">Date</label><input class="f" type="date" id="perfDate"></div>
+            <div><label class="f">Plateforme</label><select class="f" id="perfPlatform"><option value="facebook">Facebook</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="autre">Autre</option></select></div>
+            <div><label class="f">Format</label><input class="f" id="perfFormat" placeholder="image, reel, vidéo…"></div>
+            <div style="grid-column:span 2"><label class="f">Angle</label><input class="f" id="perfAngle"></div>
+            <div style="grid-column:span 2"><label class="f">Hook / accroche</label><input class="f" id="perfHook"></div>
+            <div><label class="f">Dépenses $</label><input class="f" type="number" step="0.01" min="0" id="perfSpend" value="0"></div>
+            <div><label class="f">Impressions</label><input class="f" type="number" min="0" id="perfImpressions" value="0"></div>
+            <div><label class="f">Clics</label><input class="f" type="number" min="0" id="perfClicks" value="0"></div>
+            <div><label class="f">Leads</label><input class="f" type="number" min="0" id="perfLeads" value="0"></div>
+            <div><label class="f">Ventes</label><input class="f" type="number" min="0" id="perfSales" value="0"></div>
+            <div><label class="f">Revenus $</label><input class="f" type="number" step="0.01" min="0" id="perfRevenue" value="0"></div>
+            <div style="grid-column:span 2"><label class="f">Notes</label><input class="f" id="perfNotes" placeholder="Ce qui semble avoir aidé / nui"></div>
+          </div>
+          <div class="actions" style="margin-top:12px"><button class="btn" id="savePerfBtn">Ajouter à la mémoire</button></div>
+        </div>
+        <div class="card"><h2>Ce que NyXia voit</h2><div id="perfSummary" class="subtle">Pas encore de données.</div></div>
+        <div class="perf-list" id="perfList"></div>
+      </section>
+
+      <section class="view" id="view-labo">
+        <div class="hero"><div><h1>🧪 Labo NyXia · Outils API personnalisés</h1><p>Colle un cURL, NyXia le décortique, tu ajustes puis tu l’enregistres. Les vraies clés restent dans les Variables & Secrets Cloudflare — jamais dans le navigateur ni dans CASHFLOW_KV.</p></div><div class="actions"><button class="btn" id="newApiToolBtn">+ Nouvel outil API</button></div></div>
+        <div class="grid2 labo-grid">
+          <div class="card"><h2>Mes outils</h2><div class="subtle" style="margin-bottom:10px">Teste une API, garde sa configuration et réutilise-la sans recoder le Worker.</div><div id="apiToolList" class="api-tool-list"></div></div>
+          <div class="card" id="apiToolEditorCard">
+            <h2 id="apiToolEditorTitle">Créer depuis un cURL</h2>
+            <div class="field"><label class="f">1 · Colle le cURL</label><textarea class="f" id="apiCurlPaste" rows="7" placeholder="curl -X POST https://api.exemple.com/v1/... -H 'Authorization: Bearer ...' -H 'Content-Type: application/json' -d '{...}'"></textarea></div>
+            <div class="actions"><button class="btn ghost" id="parseCurlBtn">✨ Décortiquer le cURL</button><button class="btn ghost" id="resetApiToolBtn">Vider</button></div><hr class="sep">
+            <input type="hidden" id="apiToolId">
+            <div class="grid4"><div><label class="f">Icône</label><input class="f" id="apiToolIcon" value="🧩"></div><div style="grid-column:span 2"><label class="f">Nom</label><input class="f" id="apiToolName" placeholder="Ex. Analyse Vision"></div><div><label class="f">Catégorie</label><input class="f" id="apiToolCategory" value="utilitaires"></div><div><label class="f">Méthode</label><select class="f" id="apiToolMethod"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></div><div style="grid-column:span 2"><label class="f">Hôte HTTPS</label><input class="f" id="apiToolHost" placeholder="vision.googleapis.com"></div><div><label class="f">Activé</label><select class="f" id="apiToolEnabled"><option value="1">Oui</option><option value="0">Non</option></select></div><div style="grid-column:1/-1"><label class="f">Chemin / path · {{champ}} accepté</label><input class="f" id="apiToolPath" value="/"></div></div>
+            <div class="grid3" style="margin-top:12px"><div><label class="f">Auth</label><select class="f" id="apiAuthMode"><option value="none">Aucune</option><option value="header">Header</option><option value="query">Paramètre URL</option></select></div><div><label class="f">Nom auth</label><input class="f" id="apiAuthName" placeholder="Authorization ou key"></div><div><label class="f">Préfixe</label><input class="f" id="apiAuthPrefix" placeholder="Bearer "></div><div style="grid-column:1/-1"><label class="f">Nom du Secret Cloudflare · jamais la clé</label><input class="f" id="apiAuthSecret" placeholder="GOOGLE_API_KEY"></div></div>
+            <div class="grid2" style="margin-top:12px"><div><label class="f">Headers fixes JSON · sans secrets</label><textarea class="f" id="apiFixedHeaders" rows="5" placeholder='{"Accept":"application/json"}'></textarea></div><div><label class="f">Query fixe JSON · sans secrets</label><textarea class="f" id="apiFixedQuery" rows="5" placeholder='{"lang":"fr"}'></textarea></div></div>
+            <div class="grid2"><div><label class="f">Corps</label><select class="f" id="apiBodyType"><option value="none">Aucun</option><option value="json">JSON</option><option value="text">Texte</option></select></div><div class="subtle" style="display:flex;align-items:end">Tu peux utiliser <code>{{nomDuChamp}}</code> dans le path, les headers, la query ou le corps.</div></div>
+            <div class="field"><label class="f">Body template</label><textarea class="f" id="apiBodyTemplate" rows="7" placeholder='{"text":"{{texte}}"}'></textarea></div>
+            <div class="modal-head" style="margin-top:14px"><div><h3 style="margin:0">Champs du formulaire</h3><div class="subtle">NyXia créera les entrées lorsque tu ouvres l’outil.</div></div><button class="btn ghost small" id="addApiFieldBtn">+ Champ</button></div><div id="apiFieldEditor" class="api-field-editor"></div><div class="actions" style="margin-top:14px"><button class="btn" id="saveApiToolBtn">💾 Enregistrer l’outil</button></div>
+          </div>
+        </div>
+        <div class="card hidden" id="apiRunnerCard"><div class="modal-head"><div><h2 id="apiRunnerTitle" style="margin:0">Tester l’outil</h2><div class="subtle" id="apiRunnerSub"></div></div><button class="btn ghost" id="closeApiRunnerBtn">Fermer</button></div><div class="grid3" id="apiRunnerFields"></div><div class="actions" style="margin-top:12px"><button class="btn gold" id="runApiToolBtn">▶ Appeler l’API</button></div><div id="apiRunnerMeta" class="subtle" style="margin-top:12px"></div><pre class="debug" id="apiRunnerOutput" style="margin-top:10px;max-height:520px">Aucun appel.</pre></div>
+        <div class="card"><h2>Google : la bonne architecture</h2><div class="strong-note"><strong>Une seule connexion Google OAuth plus tard.</strong> Drive, Calendar, Gmail, Sheets, YouTube Analytics/Reporting et les données privées ne doivent pas avoir six systèmes de connexion différents. Le Labo sert déjà aux API par clé/cURL; la connexion Google privée sera centralisée.</div></div>
       </section>
 
       <section class="view" id="view-settings">
