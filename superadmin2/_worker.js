@@ -10,6 +10,10 @@ const EVENT_INDEX_KEY = 'super2:creator:events:index';
 const EVENT_PREFIX = 'super2:creator:event:';
 const PLAN_PREFIX = 'super2:creator:plan:';
 const SETTINGS_KEY = 'super2:creator:settings';
+const CHAT_PREFIX = 'super2:creator:chat:';
+const BRIEF_PREFIX = 'super2:creator:brief:';
+const PERFORMANCE_KEY = 'super2:creator:performance';
+const CUSTOM_TOOLS_KEY = 'super2:labo:customtools';
 
 const DEFAULT_SETTINGS = {
   schemaVersion: 1,
@@ -293,8 +297,15 @@ function bindingStatus(env) {
     mediaBucket: !!env.MEDIA_BUCKET,
     aimlapi: !!env.AIMLAPI_CREATOR_KEY,
     pexels: !!env.PEXELS_KEY,
+    pixabay: !!(env.PIXABAY_API_KEY || env.PIXABAY_KEY_IMAGES || env.PIXABAY_KEY_VIDEO),
+    pixabayImages: !!(env.PIXABAY_KEY_IMAGES || env.PIXABAY_API_KEY),
+    pixabayVideo: !!(env.PIXABAY_KEY_VIDEO || env.PIXABAY_API_KEY),
     unsplash: !!(env.UNSPLASH_ACCES_KEY || env.UNSPLASH_ACCESS_KEY || env.UNSPLASH_KEY),
-    freesound: !!env.FREESOUND_API_KEY
+    openverse: true,
+    freesound: !!env.FREESOUND_API_KEY,
+    youtube: !!env.YOUTUBE_API_KEY,
+    browser: !!env.BROWSER,
+    images: !!env.IMAGES
   };
 }
 
@@ -529,6 +540,51 @@ async function handleAssetSearch(request, env) {
     const results = (d.photos || []).map(p => ({ provider: 'pexels', type: 'image', id: String(p.id), preview: p.src && (p.src.medium || p.src.small) || '', url: p.src && (p.src.large2x || p.src.large || p.src.original) || '', author: p.photographer || '', sourcePage: p.url || '' })).filter(x => x.url);
     return json({ results });
   }
+  if (provider === 'pixabay') {
+    if (!['image','video'].includes(type)) return json({ error: 'Pixabay fournit ici des images et des vidéos.' }, 400);
+    const pixabayKey = type === 'video'
+      ? (env.PIXABAY_KEY_VIDEO || env.PIXABAY_API_KEY || env.PIXABAY_KEY_IMAGES)
+      : (env.PIXABAY_KEY_IMAGES || env.PIXABAY_API_KEY || env.PIXABAY_KEY_VIDEO);
+    if (!pixabayKey) return json({ error: type === 'video' ? 'PIXABAY_KEY_VIDEO ou PIXABAY_API_KEY absent.' : 'PIXABAY_KEY_IMAGES ou PIXABAY_API_KEY absent.' }, 503);
+    const cacheKey = `super2:assetcache:pixabay:${type}:${q.toLowerCase()}`;
+    if (env.CASHFLOW_KV) {
+      const cached = await readJsonKV(env, cacheKey, null);
+      if (cached && Array.isArray(cached.results)) return json({ ...cached, cached:true });
+    }
+    const base = type === 'video' ? 'https://pixabay.com/api/videos/' : 'https://pixabay.com/api/';
+    const params = new URLSearchParams({ key: pixabayKey, q, per_page: '12', safesearch: 'true', lang: 'fr' });
+    if (type === 'image') params.set('orientation', 'vertical');
+    const r = await fetch(base + '?' + params.toString());
+    if (!r.ok) return json({ error: 'Pixabay a refusé la recherche.', detail: (await r.text()).slice(0,800) }, 502);
+    const d = await r.json();
+    let results=[];
+    if (type === 'video') {
+      results = (d.hits || []).map(v => {
+        const f = v.videos || {};
+        const best = f.medium || f.large || f.small || f.tiny || {};
+        return { provider:'pixabay', type:'video', id:String(v.id||''), preview:best.thumbnail||'', url:best.url||'', author:v.user||'', sourcePage:v.pageURL||'', name:(v.tags||'Vidéo Pixabay'), license:'Pixabay Content License' };
+      }).filter(x=>x.url);
+    } else {
+      results = (d.hits || []).map(p => ({ provider:'pixabay', type:'image', id:String(p.id||''), preview:p.webformatURL||p.previewURL||'', url:p.largeImageURL||p.webformatURL||'', author:p.user||'', sourcePage:p.pageURL||'', name:p.tags||'Image Pixabay', license:'Pixabay Content License' })).filter(x=>x.url);
+    }
+    const payload={results};
+    if(env.CASHFLOW_KV) await env.CASHFLOW_KV.put(cacheKey,JSON.stringify(payload),{expirationTtl:86400});
+    return json(payload);
+  }
+  if (provider === 'openverse') {
+    if (!['image','audio'].includes(type)) return json({ error: 'Openverse fournit ici des images et de l’audio.' }, 400);
+    const endpoint = type === 'audio' ? 'https://api.openverse.org/v1/audio/' : 'https://api.openverse.org/v1/images/';
+    const r = await fetch(`${endpoint}?q=${encodeURIComponent(q)}&page_size=12`);
+    if (!r.ok) return json({ error: 'Openverse a refusé la recherche.', detail: (await r.text()).slice(0,800) }, 502);
+    const d = await r.json();
+    const results = (d.results || []).map(x => ({
+      provider:'openverse', type, id:String(x.id||''), name:safeText(x.title,300)||'Openverse',
+      preview:type==='audio' ? (x.url||'') : (x.thumbnail||x.url||''), url:x.url||'',
+      author:x.creator||'', sourcePage:x.foreign_landing_url||'', duration:type==='audio' ? Number(x.duration||0)/1000 : 0,
+      license:[x.license,x.license_version].filter(Boolean).join(' ').toUpperCase(), attribution:safeText(x.attribution,1000)
+    })).filter(x=>x.url);
+    return json({ results });
+  }
   if (provider === 'freesound') {
     if (!env.FREESOUND_API_KEY) return json({ error: 'FREESOUND_API_KEY absent.' }, 503);
     if (type !== 'audio') return json({ error: 'Freesound est utilisé ici pour les sons.' }, 400);
@@ -566,6 +622,104 @@ async function handleAssetSearch(request, env) {
     return json({ results });
   }
   return json({ error: 'Fournisseur inconnu.' }, 400);
+}
+
+
+async function readPerformance(env) {
+  const rows = await readJsonKV(env, PERFORMANCE_KEY, []);
+  return Array.isArray(rows) ? rows : [];
+}
+function metric(n, d) { return d > 0 ? n / d : 0; }
+function performanceSummary(rows, eventId = '') {
+  const all = (rows || []).map(r => ({
+    ...r,
+    ctr: metric(Number(r.clicks||0), Number(r.impressions||0)),
+    cpl: Number(r.leads||0) > 0 ? Number(r.spend||0) / Number(r.leads||0) : 0,
+    cpa: Number(r.sales||0) > 0 ? Number(r.spend||0) / Number(r.sales||0) : 0,
+    roas: Number(r.spend||0) > 0 ? Number(r.revenue||0) / Number(r.spend||0) : 0
+  }));
+  const relevant = eventId ? all.filter(r => r.eventId === eventId) : all;
+  const source = relevant.length ? relevant : all;
+  const totals = source.reduce((a,r) => {
+    ['spend','impressions','clicks','leads','sales','revenue'].forEach(k => a[k] += Number(r[k]||0)); return a;
+  }, {spend:0,impressions:0,clicks:0,leads:0,sales:0,revenue:0});
+  const top = source.slice().sort((a,b) => (b.roas*100 + b.sales*10 + b.ctr) - (a.roas*100 + a.sales*10 + a.ctr)).slice(0,8)
+    .map(r => ({ platform:r.platform, format:r.format, angle:r.angle, hook:r.hook, ctr:r.ctr, cpl:r.cpl, cpa:r.cpa, roas:r.roas, sales:r.sales, notes:r.notes }));
+  return {
+    records: source.length,
+    totals,
+    averages: { ctr: metric(totals.clicks, totals.impressions), cpl: totals.leads ? totals.spend/totals.leads : 0, cpa: totals.sales ? totals.spend/totals.sales : 0, roas: totals.spend ? totals.revenue/totals.spend : 0 },
+    top
+  };
+}
+async function handlePerformance(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  if (request.method === 'GET') {
+    const rows = await readPerformance(env);
+    return json({ rows, summary: performanceSummary(rows) });
+  }
+  const b = await request.json().catch(()=>({}));
+  const rows = await readPerformance(env);
+  const id = safeText(b.id,100) || uid('perf-');
+  const row = {
+    id,
+    eventId:safeText(b.eventId,100), postId:safeText(b.postId,100), date:safeText(b.date,30),
+    platform:safeText(b.platform,40), format:safeText(b.format,60), angle:safeText(b.angle,600), hook:safeText(b.hook,1500),
+    spend:clampNumber(b.spend,0,1e9,0), impressions:clampNumber(b.impressions,0,1e12,0), clicks:clampNumber(b.clicks,0,1e12,0),
+    leads:clampNumber(b.leads,0,1e12,0), sales:clampNumber(b.sales,0,1e12,0), revenue:clampNumber(b.revenue,0,1e12,0),
+    notes:safeText(b.notes,3000), updatedAt:nowIso()
+  };
+  const i=rows.findIndex(x=>x.id===id); if(i>=0) rows[i]=row; else rows.unshift(row);
+  await writeJsonKV(env, PERFORMANCE_KEY, rows.slice(0,1000));
+  return json({ success:true, row, rows, summary:performanceSummary(rows) });
+}
+async function handlePerformanceDelete(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  const b=await request.json().catch(()=>({}));
+  const rows=(await readPerformance(env)).filter(x=>x.id!==b.id);
+  await writeJsonKV(env, PERFORMANCE_KEY, rows);
+  return json({ success:true, rows, summary:performanceSummary(rows) });
+}
+function contextKey(v){ return safeText(v,100).replace(/[^a-zA-Z0-9_-]/g,'') || 'general'; }
+async function handleBrief(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  if(request.method==='GET'){
+    const eventId=contextKey(new URL(request.url).searchParams.get('eventId'));
+    return json({ brief: await readJsonKV(env, BRIEF_PREFIX+eventId, '') });
+  }
+  const b=await request.json().catch(()=>({})), eventId=contextKey(b.eventId);
+  const brief=safeText(b.brief,12000); await writeJsonKV(env,BRIEF_PREFIX+eventId,brief);
+  return json({success:true,brief});
+}
+async function handleChat(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  const url=new URL(request.url);
+  if(request.method==='GET'){
+    const eventId=contextKey(url.searchParams.get('eventId'));
+    const history=await readJsonKV(env,CHAT_PREFIX+eventId,[]);
+    const brief=await readJsonKV(env,BRIEF_PREFIX+eventId,'');
+    return json({history:Array.isArray(history)?history:[],brief});
+  }
+  const b=await request.json().catch(()=>({}));
+  const eventId=contextKey(b.eventId), message=safeText(b.message,7000);
+  if(!message)return json({error:'Écris un message à NyXia.'},400);
+  const settings=await getSettings(env);
+  const historyRaw=await readJsonKV(env,CHAT_PREFIX+eventId,[]);
+  const history=Array.isArray(historyRaw)?historyRaw:[];
+  const brief=await readJsonKV(env,BRIEF_PREFIX+eventId,'');
+  const perf=performanceSummary(await readPerformance(env), eventId==='general'?'':eventId);
+  const event=eventId==='general'?null:await readEvent(env,eventId);
+  const truth=event?campaignTruth(event,settings):null;
+  const system=`Tu es NyXia Créative, la partenaire créative de Diane dans son Super Admin privé. Tu peux discuter normalement, rebondir sur une idée, améliorer un texte, proposer des angles, poser une question utile et challenger une idée avec bienveillance. Tu n'es PAS un distributeur automatique de prompts.\n\nRÈGLE DE VÉRITÉ: une conversation créative ou un brief ne modifie jamais silencieusement les faits d'une campagne. Si une Fiche Maîtresse est fournie, elle est prioritaire sur toute idée. Le brief créatif peut guider le ton, les angles et les formes, jamais contredire les faits verrouillés. Si Diane brainstorme quelque chose qui change un fait, indique clairement que c'est une idée à valider dans la Fiche Maîtresse.\n\nSTYLE: français naturel du Québec, tutoiement, concret, créatif, pas vendeur de tapis. Tu peux être enthousiaste mais utile. Ne remplis pas avec du blabla.\n\nBRIEF CRÉATIF ACTUEL:\n${brief||'(aucun)'}\n\nMÉMOIRE DE PERFORMANCE:\n${JSON.stringify(perf)}\n\nFICHE MAÎTRESSE / CONTEXTE:\n${truth?JSON.stringify(truth):'(conversation générale)'}`;
+  const msgs=[{role:'system',content:system},...history.slice(-24).map(x=>({role:x.role,content:x.content})),{role:'user',content:message}];
+  const answer=await aimlChat(env,settings.brainModel,msgs,false);
+  const saved=[...history,{role:'user',content:message,at:nowIso()},{role:'assistant',content:answer,at:nowIso()}].slice(-60);
+  await writeJsonKV(env,CHAT_PREFIX+eventId,saved);
+  return json({success:true,answer,history:saved,brief});
+}
+async function handleChatClear(request, env){
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  const b=await request.json().catch(()=>({})); const eventId=contextKey(b.eventId); await writeJsonKV(env,CHAT_PREFIX+eventId,[]); return json({success:true});
 }
 
 function campaignTruth(event, settings) {
@@ -683,9 +837,11 @@ async function handleGeneratePlan(request, env) {
   if (!event.locked) return json({ error: 'Verrouille d’abord la campagne. NyXia ne crée pas tant que la vérité de l’événement peut encore bouger.' }, 409);
   const settings = await getSettings(env);
   const truth = campaignTruth(event, settings);
+  truth.creativeBrief = await readJsonKV(env, BRIEF_PREFIX + event.id, '');
+  truth.performanceMemory = performanceSummary(await readPerformance(env), event.id);
   const count = Math.round(clampNumber(body.count, 1, 60, 14));
   const instructions = `Tu es NyXia Créatrice. Tu ne redéfinis JAMAIS la campagne.\n
-RÈGLE ABSOLUE : les faits contenus dans CAMPAGNE_VERROUILLEE ci-dessous sont la seule vérité. Si une information n'y est pas, tu ne l'inventes pas. Tu es créative sur la forme, jamais sur les faits.\n
+RÈGLE ABSOLUE : dans CAMPAGNE_VERROUILLEE, event.* contient les faits. creativeBrief et performanceMemory sont seulement des guides de création et d'apprentissage; ils ne deviennent jamais des faits et ne peuvent jamais contredire event.*. Si une information factuelle n'est pas dans event.*, tu ne l'inventes pas. Tu es créative sur la forme, jamais sur les faits.\n
 Pour les vidéos : ${settings.paidVideoGenerationEnabled ? 'la génération vidéo IA premium est autorisée uniquement sur action manuelle de la propriétaire; tu peux prévoir des concepts qui pourraient bénéficier d’un clip premium, mais tu ne déclenches jamais toi-même une dépense' : 'aucune génération vidéo IA payante'}. Le fond vidéo officiel ciel étoilé + étoiles filantes reste la signature; tu composes par-dessus avec texte glow, images, médias cœur, Pexels/Unsplash, captures et animations.\n
 Pour les personnages : si tu proposes un visuel contenant un personnage officiel, renseigne characterReferences avec son identifiant exact (nyxia,diane,eric,lena,selena,kael,alex). Son visage ne doit jamais être recréé sans référence.\n
 Crée ${count} contenus distincts, sans répétition d'angle, adaptés aux plateformes activées. Respecte l'heure programmée. Les formats possibles sont facebook-image, short-video, text-only.\n
@@ -975,6 +1131,211 @@ async function handleGenerateVideoStatus(request, env) {
   });
 }
 
+
+function isPrivateHost(host){
+  const h=String(host||'').toLowerCase();
+  if(h==='localhost'||h.endsWith('.local')||h==='127.0.0.1'||h==='::1')return true;
+  if(/^10\./.test(h)||/^192\.168\./.test(h))return true;
+  const m=h.match(/^172\.(\d+)\./); if(m&&Number(m[1])>=16&&Number(m[1])<=31)return true;
+  return false;
+}
+async function handleCapturePage(request, env){
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
+  if(!env.BROWSER)return json({error:'Binding Cloudflare BROWSER absent.'},503);
+  if(!env.MEDIA_BUCKET)return json({error:'R2 MEDIA_BUCKET absent.'},503);
+  const b=await request.json().catch(()=>({})); let u;
+  try{u=new URL(safeText(b.url,3000))}catch(_){return json({error:'URL invalide.'},400)}
+  if(!['http:','https:'].includes(u.protocol)||isPrivateHost(u.hostname))return json({error:'Adresse non autorisée.'},400);
+  const presets={mobile:{width:430,height:932},desktop:{width:1440,height:900},square:{width:1080,height:1080}};
+  const viewport=presets[b.preset]||presets.mobile;
+  const result=await env.BROWSER.quickAction('screenshot',{url:u.toString(),viewport,screenshotOptions:{fullPage:!!b.fullPage}});
+  let bytes=null,ct='image/png';
+  if(result instanceof Response){if(!result.ok)return json({error:'Browser Run a refusé la capture.',detail:(await result.text()).slice(0,800)},502);ct=result.headers.get('content-type')||ct;bytes=await result.arrayBuffer()}
+  else if(result&&result.screenshot){bytes=b64ToBytes(result.screenshot).buffer}
+  else if(result instanceof ArrayBuffer){bytes=result}
+  if(!bytes)return json({error:'Capture Browser Run vide.'},502);
+  const eventId=contextKey(b.eventId||'screenshots'); const key=`super2/${eventId}/${Date.now()}-${uid('').slice(0,8)}-screenshot.png`;
+  await env.MEDIA_BUCKET.put(key,bytes,{httpMetadata:{contentType:ct},customMetadata:{sourceUrl:u.toString(),source:'browser-run'}});
+  return json({success:true,media:{key,url:`${API}/media/file/${encodeURIComponent(key)}`,type:'image',originalName:'capture-page.png'},sourceUrl:u.toString()});
+}
+async function handleImageTransform(request, env){
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
+  if(!env.MEDIA_BUCKET)return json({error:'R2 MEDIA_BUCKET absent.'},503);
+  if(!env.IMAGES)return json({error:'Binding Cloudflare IMAGES absent.'},503);
+  const u=new URL(request.url),key=safeText(u.searchParams.get('key'),1000),preset=safeText(u.searchParams.get('preset'),40)||'square';
+  if(!key.startsWith('super2/'))return json({error:'Clé média invalide.'},400);
+  const presets={square:{width:1080,height:1080},feed:{width:1080,height:1350},story:{width:1080,height:1920},landscape:{width:1200,height:628}};
+  const dim=presets[preset]; if(!dim)return json({error:'Format inconnu.'},400);
+  const obj=await env.MEDIA_BUCKET.get(key); if(!obj)return json({error:'Image introuvable.'},404);
+  const out=await env.IMAGES.input(obj.body).transform({...dim,fit:'cover',gravity:'center'}).output({format:'image/jpeg',quality:90});
+  const headers={'Cache-Control':'private, max-age=3600'};
+  if(u.searchParams.get('download')==='1')headers['Content-Disposition']=`attachment; filename="nyxia-${preset}.jpg"`;
+  return out.response({headers});
+}
+
+function customToolId(v) {
+  return safeText(v, 100).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
+}
+function sanitizeObjectMap(raw, maxEntries = 40) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  Object.entries(raw).slice(0,maxEntries).forEach(([k,v]) => {
+    const key=safeText(k,120);
+    if (!key) return;
+    out[key]=safeText(v,8000);
+  });
+  return out;
+}
+function sanitizeCustomTool(raw, existing = null) {
+  const methods=['GET','POST','PUT','PATCH','DELETE'];
+  const authModes=['none','header','query'];
+  const bodyTypes=['none','json','text'];
+  const id=customToolId(raw && raw.id) || (existing && existing.id) || ('tool-'+crypto.randomUUID().slice(0,8));
+  const fields=Array.isArray(raw && raw.fields) ? raw.fields.slice(0,30).map((f,i)=>({
+    id: customToolId(f.id || f.name) || `field-${i+1}`,
+    name: safeText(f.name,100).replace(/[^A-Za-z0-9_.-]/g,''),
+    label: safeText(f.label || f.name,160),
+    location: ['path','query','body','header'].includes(f.location) ? f.location : 'query',
+    defaultValue: safeText(f.defaultValue,5000),
+    required: !!f.required
+  })).filter(f=>f.name) : [];
+  return {
+    id,
+    name: safeText(raw && raw.name,160) || (existing && existing.name) || 'Nouvel outil API',
+    icon: safeText(raw && raw.icon,20) || '🧩',
+    category: safeText(raw && raw.category,80) || 'utilitaires',
+    method: methods.includes(String(raw && raw.method || '').toUpperCase()) ? String(raw.method).toUpperCase() : 'GET',
+    host: safeText(raw && raw.host,260).replace(/^https?:\/\//i,'').replace(/\/$/,''),
+    pathTemplate: safeText(raw && raw.pathTemplate,3000) || '/',
+    fixedHeaders: sanitizeObjectMap(raw && raw.fixedHeaders),
+    fixedQuery: sanitizeObjectMap(raw && raw.fixedQuery),
+    bodyType: bodyTypes.includes(raw && raw.bodyType) ? raw.bodyType : 'none',
+    bodyTemplate: safeText(raw && raw.bodyTemplate,50000),
+    authMode: authModes.includes(raw && raw.authMode) ? raw.authMode : 'none',
+    authName: safeText(raw && raw.authName,160),
+    authPrefix: safeText(raw && raw.authPrefix,120),
+    authSecretName: safeText(raw && raw.authSecretName,160).replace(/[^A-Za-z0-9_]/g,''),
+    fields,
+    enabled: raw && raw.enabled !== false,
+    createdAt: existing && existing.createdAt || nowIso(),
+    updatedAt: nowIso()
+  };
+}
+function safeCustomHost(host) {
+  const h=String(host||'').toLowerCase().split(':')[0].replace(/^\[|\]$/g,'');
+  if (!h || h==='localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h==='metadata.google.internal') return false;
+  if (h==='::1' || h==='0.0.0.0' || h==='169.254.169.254') return false;
+  const m=h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const a=m.slice(1).map(Number); if(a.some(x=>x<0||x>255))return false;
+    if(a[0]===10 || a[0]===127 || (a[0]===169&&a[1]===254) || (a[0]===192&&a[1]===168) || (a[0]===172&&a[1]>=16&&a[1]<=31)) return false;
+  }
+  return /^[a-z0-9.-]+$/i.test(h) && h.includes('.');
+}
+function applyToolTemplate(value, values, encode = false) {
+  return String(value||'').replace(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g,(_,name)=>{
+    const v=values && values[name] != null ? String(values[name]) : '';
+    return encode ? encodeURIComponent(v) : v;
+  });
+}
+function smartValue(v) {
+  const s=String(v==null?'':v).trim();
+  if (s==='true') return true; if (s==='false') return false; if (s==='null') return null;
+  if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+  if ((s.startsWith('{')&&s.endsWith('}'))||(s.startsWith('[')&&s.endsWith(']'))) { try{return JSON.parse(s)}catch(_){} }
+  return v == null ? '' : v;
+}
+async function readCustomTools(env) {
+  const rows=await readJsonKV(env,CUSTOM_TOOLS_KEY,[]);
+  return Array.isArray(rows)?rows:[];
+}
+async function handleCustomTools(request, env, id = '') {
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  const rows=await readCustomTools(env);
+  if (request.method==='GET') return json({ tools:rows });
+  if (request.method==='DELETE') {
+    const next=rows.filter(x=>x.id!==id); await writeJsonKV(env,CUSTOM_TOOLS_KEY,next); return json({success:true,tools:next});
+  }
+  const body=await request.json().catch(()=>({}));
+  if (request.method==='POST') {
+    const tool=sanitizeCustomTool(body); if(!tool.host)return json({error:'Hôte API requis.'},400); if(!safeCustomHost(tool.host))return json({error:'Hôte API refusé pour sécurité.'},400);
+    const next=[tool,...rows.filter(x=>x.id!==tool.id)].slice(0,200); await writeJsonKV(env,CUSTOM_TOOLS_KEY,next); return json({success:true,tool,tools:next});
+  }
+  if (request.method==='PUT') {
+    const old=rows.find(x=>x.id===id); if(!old)return json({error:'Outil introuvable.'},404);
+    const tool=sanitizeCustomTool({...body,id},old); if(!tool.host||!safeCustomHost(tool.host))return json({error:'Hôte API invalide ou refusé.'},400);
+    const next=rows.map(x=>x.id===id?tool:x); await writeJsonKV(env,CUSTOM_TOOLS_KEY,next); return json({success:true,tool,tools:next});
+  }
+  return json({error:'Méthode non supportée.'},405);
+}
+async function handleCustomToolCall(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  const b=await request.json().catch(()=>({}));
+  const tools=await readCustomTools(env),tool=tools.find(x=>x.id===safeText(b.id,100));
+  if(!tool||!tool.enabled)return json({error:'Outil introuvable ou désactivé.'},404);
+  if(!safeCustomHost(tool.host))return json({error:'Hôte API refusé pour sécurité.'},400);
+  const values=b.values&&typeof b.values==='object'?b.values:{};
+  for(const f of tool.fields||[]) if(f.required && !String(values[f.name]??f.defaultValue??'').trim()) return json({error:`Champ requis : ${f.label||f.name}`},400);
+  const resolved={}; (tool.fields||[]).forEach(f=>resolved[f.name]=values[f.name]!=null?values[f.name]:f.defaultValue||'');
+  let path=applyToolTemplate(tool.pathTemplate||'/',resolved,true); if(!path.startsWith('/'))path='/'+path;
+  const qs=new URLSearchParams(); Object.entries(tool.fixedQuery||{}).forEach(([k,v])=>qs.set(k,applyToolTemplate(v,resolved,false)));
+  (tool.fields||[]).filter(f=>f.location==='query').forEach(f=>qs.set(f.name,String(resolved[f.name]??'')));
+  const headers=new Headers(); Object.entries(tool.fixedHeaders||{}).forEach(([k,v])=>{
+    const lk=k.toLowerCase(); if(['host','cookie','authorization','cf-connecting-ip','x-univers-token','x-univers-refresh'].includes(lk)||lk.startsWith('cf-'))return;
+    headers.set(k,applyToolTemplate(v,resolved,false));
+  });
+  (tool.fields||[]).filter(f=>f.location==='header').forEach(f=>headers.set(f.name,String(resolved[f.name]??'')));
+  if(tool.authMode!=='none') {
+    if(!tool.authSecretName)return json({error:'Nom du secret Cloudflare manquant dans la configuration.'},400);
+    const secret=env[tool.authSecretName]; if(!secret)return json({error:`Secret Cloudflare absent : ${tool.authSecretName}`},503);
+    if(tool.authMode==='header') { if(!tool.authName)return json({error:'Nom du header d’authentification manquant.'},400); headers.set(tool.authName,(tool.authPrefix||'')+secret); }
+    else { if(!tool.authName)return json({error:'Nom du paramètre d’authentification manquant.'},400); qs.set(tool.authName,(tool.authPrefix||'')+secret); }
+  }
+  const options={method:tool.method,headers,redirect:'follow'};
+  if(!['GET','DELETE'].includes(tool.method) && tool.bodyType!=='none') {
+    if(tool.bodyTemplate) {
+      options.body=applyToolTemplate(tool.bodyTemplate,resolved,false);
+      if(tool.bodyType==='json'&&!headers.has('content-type'))headers.set('content-type','application/json');
+    } else if(tool.bodyType==='json') {
+      const obj={}; (tool.fields||[]).filter(f=>f.location==='body').forEach(f=>obj[f.name]=smartValue(resolved[f.name])); options.body=JSON.stringify(obj); if(!headers.has('content-type'))headers.set('content-type','application/json');
+    } else {
+      options.body=(tool.fields||[]).filter(f=>f.location==='body').map(f=>String(resolved[f.name]??'')).join('\n');
+    }
+  }
+  const target=`https://${tool.host}${path}${qs.toString()?'?'+qs.toString():''}`;
+  const started=Date.now(); let r;
+  try{r=await fetch(target,options)}catch(e){return json({error:'Appel API impossible.',detail:String(e&&e.message||e)},502)}
+  const text=(await r.text()).slice(0,300000); let data=text; try{data=JSON.parse(text)}catch(_){}
+  const responseHeaders={}; ['content-type','content-length','x-ratelimit-remaining','retry-after'].forEach(k=>{const v=r.headers.get(k);if(v)responseHeaders[k]=v});
+  return json({success:r.ok,status:r.status,statusText:r.statusText,durationMs:Date.now()-started,url:target.replace(/([?&](?:key|api_key|token|access_token|client_secret)=)[^&]+/ig,'$1***'),headers:responseHeaders,data},r.ok?200:502);
+}
+
+async function handleYouTubeRadar(request, env){
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
+  if(!env.YOUTUBE_API_KEY)return json({error:'YOUTUBE_API_KEY absent.'},503);
+  const u=new URL(request.url),q=safeText(u.searchParams.get('q'),200),region=safeText(u.searchParams.get('region'),4).toUpperCase(),days=Math.round(clampNumber(u.searchParams.get('days'),1,365,30));
+  if(!q)return json({error:'Recherche YouTube requise.'},400);
+  const after=new Date(Date.now()-days*86400000).toISOString();
+  const p=new URLSearchParams({part:'snippet',type:'video',maxResults:'12',q,order:'viewCount',publishedAfter:after,relevanceLanguage:'fr',key:env.YOUTUBE_API_KEY});
+  if(['CA','FR','BE','CH'].includes(region))p.set('regionCode',region);
+  const r=await fetch('https://www.googleapis.com/youtube/v3/search?'+p.toString());
+  if(!r.ok)return json({error:'YouTube a refusé la recherche.',detail:(await r.text()).slice(0,1000)},502);
+  const d=await r.json(),ids=(d.items||[]).map(x=>x.id&&x.id.videoId).filter(Boolean);
+  if(!ids.length)return json({results:[]});
+  const sr=await fetch('https://www.googleapis.com/youtube/v3/videos?'+new URLSearchParams({part:'statistics,contentDetails',id:ids.join(','),key:env.YOUTUBE_API_KEY}).toString());
+  const sd=sr.ok?await sr.json():{items:[]}; const sm=new Map((sd.items||[]).map(x=>[x.id,x]));
+  const results=(d.items||[]).map(x=>{const id=x.id.videoId,s=sm.get(id)||{},st=s.statistics||{};return{id,title:x.snippet.title,description:x.snippet.description,channel:x.snippet.channelTitle,publishedAt:x.snippet.publishedAt,thumbnail:(x.snippet.thumbnails&&((x.snippet.thumbnails.high||x.snippet.thumbnails.medium||x.snippet.thumbnails.default)||{}).url)||'',views:Number(st.viewCount||0),likes:Number(st.likeCount||0),comments:Number(st.commentCount||0),url:`https://www.youtube.com/watch?v=${id}`}});
+  return json({results,query:q,days,region});
+}
+async function handleYouTubeAnalyze(request,env){
+  if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
+  const b=await request.json().catch(()=>({})),items=Array.isArray(b.items)?b.items.slice(0,12):[]; if(!items.length)return json({error:'Aucun résultat à analyser.'},400);
+  const settings=await getSettings(env),perf=performanceSummary(await readPerformance(env));
+  const prompt=`Tu es NyXia Créative en mode Radar. Analyse ces résultats YouTube publics pour comprendre les MÉCANISMES d'attention: thèmes, angles, promesses, structures de titres, questions, tensions, formats. Ne copie jamais un titre ni le contenu d'un créateur. Cherche des opportunités originales adaptées à l'univers NyXia. Mets en évidence ce qui est observation vs hypothèse.\n\nRECHERCHE: ${safeText(b.query,300)}\nRÉSULTATS: ${JSON.stringify(items)}\nMÉMOIRE DE PERFORMANCE NYXIA: ${JSON.stringify(perf)}\n\nRéponds en français, avec: 1) ce qui ressort, 2) 5 angles originaux NyXia, 3) ce qu'il vaut mieux éviter, 4) une petite expérience à tester.`;
+  const answer=await aimlChat(env,settings.brainModel,[{role:'system',content:'Tu analyses les tendances sans plagier ni présenter des corrélations comme des certitudes.'},{role:'user',content:prompt}],false);
+  return json({success:true,answer});
+}
+
 async function handlePortalRegistry(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const portals = await readJsonKV(env, 'univers:portals', []);
@@ -1008,6 +1369,19 @@ export default {
         return await handleMediaFile(request, env, encodedKey);
       }
       if (path === API + '/assets/search' && request.method === 'GET') return await handleAssetSearch(request, env);
+      if (path === API + '/capture/page' && request.method === 'POST') return await handleCapturePage(request, env);
+      if (path === API + '/media/transform' && request.method === 'GET') return await handleImageTransform(request, env);
+      if (path === API + '/chat' && (request.method === 'GET' || request.method === 'POST')) return await handleChat(request, env);
+      if (path === API + '/chat/clear' && request.method === 'POST') return await handleChatClear(request, env);
+      if (path === API + '/chat/brief' && (request.method === 'GET' || request.method === 'POST')) return await handleBrief(request, env);
+      if (path === API + '/performance' && (request.method === 'GET' || request.method === 'POST')) return await handlePerformance(request, env);
+      if (path === API + '/performance/delete' && request.method === 'POST') return await handlePerformanceDelete(request, env);
+      if (path === API + '/radar/youtube' && request.method === 'GET') return await handleYouTubeRadar(request, env);
+      if (path === API + '/radar/youtube/analyze' && request.method === 'POST') return await handleYouTubeAnalyze(request, env);
+
+      if (path === API + '/labo/tools' && (request.method === 'GET' || request.method === 'POST')) return await handleCustomTools(request, env);
+      if (path.startsWith(API + '/labo/tools/') && (request.method === 'PUT' || request.method === 'DELETE')) return await handleCustomTools(request, env, decodeURIComponent(path.slice((API + '/labo/tools/').length)));
+      if (path === API + '/labo/call' && request.method === 'POST') return await handleCustomToolCall(request, env);
 
       if (path === API + '/creator/plan' && request.method === 'POST') return await handleGeneratePlan(request, env);
       if (path === API + '/creator/plan' && request.method === 'GET') return await handleGetPlan(request, env);
