@@ -46,6 +46,10 @@ textarea.f{resize:vertical;min-height:140px}
 .tag.on{background:rgba(123,92,255,.22);border-color:rgba(167,139,250,.6)}
 .tag.ex{background:rgba(255,122,138,.12);border-color:rgba(255,122,138,.4)}
 .journal-row{padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+.taglist{max-height:160px;overflow:auto}
+.mail-card{border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px;background:rgba(4,8,22,.45)}
+.mail-card header{margin-bottom:8px;color:var(--gold);font-size:12px}
+.mail-card textarea.f{min-height:120px}
 .login{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(6,10,24,.90),rgba(6,10,24,.98));padding:18px}
 .login-card{width:min(390px,100%);padding:24px;border:1px solid var(--line);border-radius:22px;background:rgba(15,23,51,.88)}
 .login-card img{width:74px;height:74px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 14px}
