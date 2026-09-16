@@ -18,6 +18,8 @@ database_id = "a21fd813-06fa-41f1-b744-07bf1c5c7951"
 
 [vars]
 SITE_URL = "https://univers.nyxia.top"
+# Super Admin 3 : secret Cloudflare SYSTEME_API_KEY (wrangler secret put SYSTEME_API_KEY)
+# Expéditeur figé : NyXia · Univers <info@universnyxia.top>
 # ── À AJOUTER dans le wrangler.toml du Super Admin (univers) pour la vectorisation ──
 # (garde tout ce que tu as déjà : CASHFLOW_KV, DB, assets…)
 
