@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NyXia · Super Admin 3</title>
+  <link rel="icon" href="/FavIcon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/superadmin3/css/superadmin3.css">
+</head>
+<body>
+<canvas id="stars"></canvas>
+
+<div class="login" id="login">
+  <div class="login-card">
+    <img src="/NyXia.png" alt="NyXia">
+    <h1>Super Admin 3</h1>
+    <p>Infolettres · Systeme.io · NyXia · Univers</p>
+    <div class="field"><label class="f">Mot de passe Super Admin</label><input class="f" type="password" id="loginPassword" autocomplete="current-password"></div>
+    <button class="btn" id="loginBtn">Entrer</button>
+    <div class="subtle" id="loginMsg" style="margin-top:10px;text-align:center"></div>
+  </div>
+</div>
+
+<div class="shell hidden" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <img src="/NyXia.png" alt="NyXia">
+      <div><strong>NyXia · Super Admin 3</strong><span>Communication courriel</span></div>
+    </div>
+    <div class="super-switch">
+      <a href="/">Super 1 · Gestion</a>
+      <a href="/superadmin2/">Super 2 · Création</a>
+      <a href="/superadmin3/" class="active">Super 3 · Infolettres</a>
+      <a href="https://labo.nyxia.top/login" target="_blank" rel="noopener">🧪 Labo NyXia</a>
+      <button class="logout" id="logoutBtn">Déconnexion</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <button class="navbtn active" data-view="generer">✉️ Générer</button>
+      <button class="navbtn" data-view="brouillons">📝 Brouillons</button>
+      <button class="navbtn" data-view="tags">🏷️ Tags</button>
+      <button class="navbtn" data-view="journal">📜 Journal</button>
+    </aside>
+
+    <main class="content">
+      <section class="view active" id="view-generer">
+        <div class="hero">
+          <div>
+            <h1>Infolettres NyXia · Univers</h1>
+            <p>L’IA prépare le texte. Le Worker crée un brouillon Systeme.io. L’envoi réel attend que l’adresse soit verte — et ton clic.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="strong-note" id="statusNote">Vérification du module…</div>
+          <div class="grid2">
+            <div class="field">
+              <label class="f">Expéditeur (figé)</label>
+              <input class="f locked" id="senderDisplay" readonly value="NyXia · Univers <info@universnyxia.top>">
+            </div>
+            <div class="field">
+              <label class="f">Sujet</label>
+              <input class="f" id="subject" placeholder="Sujet de l’infolettre">
+            </div>
+          </div>
+          <div class="field">
+            <label class="f">Thème / sujet à aborder</label>
+            <input class="f" id="theme" placeholder="Ex. équinoxe, A.M.I.E.™, ouverture du Cercle…">
+          </div>
+          <div class="field">
+            <label class="f">Preview (ligne d’aperçu)</label>
+            <input class="f" id="preview" placeholder="Optionnel">
+          </div>
+          <div class="field">
+            <label class="f">Contenu (texte ou HTML)</label>
+            <textarea class="f" id="content" placeholder="Colle ou écris le corps. Plus tard l’IA pourra le générer ici."></textarea>
+          </div>
+          <div class="field">
+            <label class="f">Tags inclusion</label>
+            <div class="taglist" id="includeTags"><span class="subtle">Charge les tags Systeme.io…</span></div>
+          </div>
+          <div class="field">
+            <label class="f">Tags exclusion</label>
+            <div class="taglist" id="excludeTags"></div>
+          </div>
+          <div class="actions">
+            <button class="btn" id="saveDraftBtn">Créer le brouillon Systeme.io</button>
+            <button class="btn ghost" id="reloadTagsBtn">Recharger les tags</button>
+          </div>
+          <pre class="debug hidden" id="draftOut" style="margin-top:14px"></pre>
+        </div>
+      </section>
+
+      <section class="view" id="view-brouillons">
+        <div class="hero"><div><h1>Brouillons Systeme.io</h1><p>Liste lue via l’API. Relire et envoyer reste dans Systeme.io pour l’instant.</p></div>
+          <div class="actions"><button class="btn ghost" id="reloadNewsBtn">Actualiser</button></div>
+        </div>
+        <div class="card" id="newsList"><span class="subtle">Aucun chargement encore.</span></div>
+      </section>
+
+      <section class="view" id="view-tags">
+        <div class="hero"><div><h1>Audience par tags</h1><p>Les newsletters Systeme.io partent seulement aux contacts déjà tagués.</p></div></div>
+        <div class="card" id="tagsFull"><span class="subtle">…</span></div>
+      </section>
+
+      <section class="view" id="view-journal">
+        <div class="hero"><div><h1>Journal</h1><p>Historique local (KV) des tentatives de brouillon.</p></div>
+          <div class="actions"><button class="btn ghost" id="reloadJournalBtn">Actualiser</button></div>
+        </div>
+        <div class="card" id="journalList"></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+<script src="/starry-bg.js"></script>
+<script src="/superadmin3/js/superadmin3.js"></script>
+</body>
+</html>
