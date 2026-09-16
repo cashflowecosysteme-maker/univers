@@ -1,4 +1,5 @@
 import superAdmin2 from './superadmin2/_worker.js';
+import superAdmin3 from './superadmin3/_worker.js';
 // NyXia Univers — SuperAdmin central (système complet jumelé Cercles + Répertoire)
 const SESSION_TTL = 60 * 60 * 12;
 const COOKIE_NAME = 'nyxia_univers';
@@ -1570,6 +1571,10 @@ export default {
     // Le Worker principal fait uniquement l'aiguillage de ses routes API.
     if (path === '/api/superadmin2' || path.startsWith('/api/superadmin2/')) {
       return superAdmin2.fetch(request, env);
+    }
+    // Super Admin 3 : infolettres. Le monstre n'aiguillage que.
+    if (path === '/api/superadmin3' || path.startsWith('/api/superadmin3/')) {
+      return superAdmin3.fetch(request, env);
     }
 
     try {
