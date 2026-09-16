@@ -51,8 +51,8 @@
       <section class="view active" id="view-generer">
         <div class="hero">
           <div>
-            <h1>Infolettres NyXia · Univers</h1>
-            <p>L’IA prépare le texte. Le Worker crée un brouillon Systeme.io. L’envoi réel attend que l’adresse soit verte — et ton clic.</p>
+            <h1>Brief d’événement → série d’infolettres</h1>
+            <p>Tu donnes le cadre. L’IA écrit chaque envoi selon le calendrier. Systeme.io ne reçoit que des brouillons — toi tu valides.</p>
           </div>
         </div>
         <div class="card">
@@ -63,21 +63,59 @@
               <input class="f locked" id="senderDisplay" readonly value="NyXia · Univers <info@universnyxia.top>">
             </div>
             <div class="field">
-              <label class="f">Sujet</label>
-              <input class="f" id="subject" placeholder="Sujet de l’infolettre">
+              <label class="f">Lien de l’événement</label>
+              <input class="f" id="eventLink" placeholder="https://…">
+            </div>
+            <div class="field">
+              <label class="f">Événement — début</label>
+              <input class="f" id="eventStart" type="date">
+            </div>
+            <div class="field">
+              <label class="f">Événement — fin</label>
+              <input class="f" id="eventEnd" type="date">
             </div>
           </div>
           <div class="field">
-            <label class="f">Thème / sujet à aborder</label>
-            <input class="f" id="theme" placeholder="Ex. équinoxe, A.M.I.E.™, ouverture du Cercle…">
+            <label class="f">Thème</label>
+            <input class="f" id="theme" placeholder="Le thème de l’événement">
           </div>
           <div class="field">
-            <label class="f">Preview (ligne d’aperçu)</label>
-            <input class="f" id="preview" placeholder="Optionnel">
+            <label class="f">Sujet à écrire</label>
+            <textarea class="f" id="topic" style="min-height:90px" placeholder="Ce que l’IA doit dire, l’angle, ce qui est non négociable."></textarea>
           </div>
           <div class="field">
-            <label class="f">Contenu (texte ou HTML)</label>
-            <textarea class="f" id="content" placeholder="Colle ou écris le corps. Plus tard l’IA pourra le générer ici."></textarea>
+            <label class="f">Matériel (photos, liens, vidéo, audio)</label>
+            <textarea class="f" id="materials" style="min-height:80px" placeholder="Colle les URLs + une ligne de contexte par item."></textarea>
+          </div>
+          <div class="field">
+            <label class="f">Signature</label>
+            <textarea class="f" id="signature" style="min-height:70px">NyXia · Univers
+info@universnyxia.top</textarea>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <label class="f">Début des envois</label>
+              <input class="f" id="sendStart" type="date">
+            </div>
+            <div class="field">
+              <label class="f">Fin des envois</label>
+              <input class="f" id="sendEnd" type="date">
+            </div>
+            <div class="field">
+              <label class="f">Fréquence</label>
+              <select class="f" id="frequency">
+                <option value="jour">Par jour</option>
+                <option value="semaine">Par semaine</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="f">Combien par jour / semaine</label>
+              <input class="f" id="quantity" type="number" min="1" max="7" value="1">
+            </div>
+          </div>
+          <div class="field">
+            <label class="f">Filtrer les tags</label>
+            <input class="f" id="tagFilter" placeholder="Tape 3 lettres…">
           </div>
           <div class="field">
             <label class="f">Tags inclusion</label>
@@ -88,9 +126,15 @@
             <div class="taglist" id="excludeTags"></div>
           </div>
           <div class="actions">
-            <button class="btn" id="saveDraftBtn">Créer le brouillon Systeme.io</button>
+            <button class="btn" id="planBtn">Faire écrire la série à l’IA</button>
+            <button class="btn ghost" id="pushSeriesBtn" disabled>Créer les brouillons Systeme.io</button>
             <button class="btn ghost" id="reloadTagsBtn">Recharger les tags</button>
           </div>
+        </div>
+        <div class="card" id="planCard">
+          <h2>Série générée</h2>
+          <div id="planMeta" class="subtle">Aucun brief encore.</div>
+          <div id="planList"></div>
           <pre class="debug hidden" id="draftOut" style="margin-top:14px"></pre>
         </div>
       </section>
