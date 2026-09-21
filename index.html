@@ -78,7 +78,7 @@ td strong{color:#fff}
       <a href="/" class="active" aria-current="page">Super Admin 1 · Gestion</a>
       <a href="/superadmin2/" class="to-super2">Super Admin 2 · Création</a>
       <a href="/superadmin3/" class="to-super2">Super Admin 3 · Infolettres</a>
-      <a href="https://labo.nyxia.top/login" target="_blank" rel="noopener" class="to-super2" title="Ouvrir le Labo NyXia">🧪 Labo NyXia</a>
+      <a href="#labo" class="to-super2" onclick="event.preventDefault();switchModule('labo')" title="Ouvrir le Labo dans Univers">🧪 Labo NyXia</a>
       <button class="btn-out" onclick="doLogout()">Déconnexion</button>
     </div>
   </div>
@@ -93,6 +93,7 @@ td strong{color:#fff}
     <button class="module-tab" data-module="clients" onclick="switchModule('clients')">Clients portails</button>
     <button class="module-tab" data-module="degustations" onclick="switchModule('degustations')">🍷 Dégustations & accès</button>
     <button class="module-tab" data-module="outils" onclick="switchModule('outils')">Outils</button>
+    <button class="module-tab" data-module="labo" onclick="switchModule('labo')">🧪 Labo NyXia</button>
     <button class="module-tab" data-module="formations" onclick="switchModule('formations')">Formations des personnages</button>
     <button class="module-tab" data-module="defunts" onclick="switchModule('defunts')">Défunts</button>
   </nav>
@@ -498,6 +499,15 @@ td strong{color:#fff}
         <p class="hint" style="margin-bottom:10px">Ordre = ordre d’entrée sur scène. Après son dernier non-dit, le défunt quitte et le suivant prend le micro.</p>
         <div id="df-list">—</div>
       </div>
+    </div>
+
+    <div class="module-panel" id="module-labo" style="height:100%;min-height:680px">
+      <div class="panel" style="padding:12px 16px;margin-bottom:10px">
+        <h3 style="margin:0">🧪 Labo NyXia · Atelier équipe</h3>
+      </div>
+      <iframe id="nyxia-labo-frame" title="Atelier NyXiaLabo dans le Super Admin Univers"
+        data-src="https://labo.nyxia.top/login.html" loading="lazy"
+        style="display:block;width:100%;height:calc(100vh - 255px);min-height:620px;border:1px solid rgba(123,92,255,.25);border-radius:16px;background:#060a18"></iframe>
     </div>
 
     <div class="module-panel" id="module-formations">
@@ -953,6 +963,10 @@ function switchModule(name){
   if(name==='degustations' && typeof degustationsLoad==='function'){ degustationsLoad(); }
   if(name==='formations'){ foLoadAgents(); }
   if(name==='defunts'){ dfLoad(); }
+  if(name==='labo') {
+    var frame=document.getElementById('nyxia-labo-frame');
+    if(frame && !frame.getAttribute('src')) frame.setAttribute('src',frame.getAttribute('data-src'));
+  }
 }
 function showMsg(id,text,ok){var el=document.getElementById(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text;el.style.display='block';}
 async function api(path,method,body){
@@ -976,6 +990,7 @@ async function doLogin(){
 async function doLogout(){
   try{await api('/api/logout','POST',{});}catch(e){}
   TOKEN=null;sessionStorage.removeItem(TOKEN_KEY);
+  var laboFrame=document.getElementById('nyxia-labo-frame');if(laboFrame)laboFrame.removeAttribute('src');
   document.getElementById('app').classList.remove('visible');document.getElementById('loginGate').classList.remove('hidden');
 }
 async function loadStats(){
