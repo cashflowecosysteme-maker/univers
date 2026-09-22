@@ -868,6 +868,7 @@ async function loadPortals(){
     var out=await api('/api/portals','GET');
     var list=out.data.portals||[];
     window._portals=list;
+    foRenderPortalOptions(list);
     var box=document.getElementById('portal-list');
     if(!box) return;
     if(!list.length){ box.textContent='Aucun portail.'; return; }
@@ -951,7 +952,7 @@ function switchModule(name){
   if(name==='portails'){ loadPortals(); }
   if(name==='clients'){ loadPortals(); loadPortalClients(); }
   if(name==='degustations' && typeof degustationsLoad==='function'){ degustationsLoad(); }
-  if(name==='formations'){ foLoadAgents(); }
+  if(name==='formations'){ loadPortals(); foLoadAgents(); }
   if(name==='defunts'){ dfLoad(); }
 }
 function showMsg(id,text,ok){var el=document.getElementById(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text;el.style.display='block';}
@@ -1215,6 +1216,32 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 /* ───────────── FORMATIONS ALEX (constructeur visuel) ───────────── */
 var FO_AGENT='alex';
 var FO_PORTAIL='lena';
+var FO_BASE_PORTALS=[
+  {id:'lena',name:'Léna'},
+  {id:'selena',name:'Séléna'},
+  {id:'kael',name:'Kael'},
+  {id:'alex',name:'Alex'},
+  {id:'diane',name:'Diane'},
+  {id:'nyxia',name:'NyXia'},
+  {id:'eric',name:'Éric / Cercles'},
+  {id:'studio',name:'Studio Prompt'}
+];
+function foRenderPortalOptions(portals){
+  var sel=document.getElementById('fo-portail');if(!sel)return;
+  var current=FO_PORTAIL||sel.value||'lena';
+  var merged={};
+  FO_BASE_PORTALS.forEach(function(p){merged[p.id]={id:p.id,name:p.name};});
+  (Array.isArray(portals)?portals:[]).filter(function(p){return p&&p.active!==false;}).forEach(function(p){
+    var id=String(p.id||'').trim();
+    if(id)merged[id]={id:id,name:String(p.name||id)};
+  });
+  var list=Object.keys(merged).map(function(id){return merged[id];});
+  sel.innerHTML=list.map(function(p){
+    return '<option value="'+esc(p.id)+'"'+(p.id===current?' selected':'')+'>'+esc(p.name)+'</option>';
+  }).join('');
+  if(merged[current]){sel.value=current;}
+  else if(list.length){FO_PORTAIL=list[0].id;sel.value=FO_PORTAIL;}
+}
 function foChangePortail(p){
   FO_PORTAIL=p||'lena';
   var ed=document.getElementById('fo-editor');if(ed)ed.style.display='none';
