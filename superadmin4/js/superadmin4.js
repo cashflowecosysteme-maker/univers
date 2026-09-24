@@ -121,7 +121,6 @@ function agentMeta(a){return{key:a.key,name:a.name,sub:a.sub||'Personnage NyXia'
 function navHtml(list){return list.map((a,i)=>`<div class="nav-item ${i===0?'active':''}" id="nav-${a.key}" onclick="openAgentTab('${a.key}')">${a.image?`<img class="nav-avatar" src="${attr(a.image)}" alt="${attr(a.name)}" onerror="this.style.display='none'">`:`<span class="nav-icon">${esc(a.icon)}</span>`}<span class="nav-text"><span class="nav-name">${esc(a.name)}</span><span class="nav-sub">${esc(a.sub)}</span></span><span class="nav-arrow">›</span></div>`).join('\n')}
 
 function addTool(){
- if(tools.length>=2)return alert('Maximum 2 outils spécialisés par portail.')
  tools.push({id:crypto.randomUUID().slice(0,8),icon:'🧰',name:'',path:'/outil-'+(tools.length+1)+'.html',file:null});renderTools();autoSaveDraft()
 }
 function renderTools(){
@@ -146,7 +145,7 @@ function restoreDraft(){
  if(!d)return
  for(const [id,key] of [['title','title'],['short','short'],['portalId','portalId'],['workerName','workerName'],['host','host'],['icon','icon'],['welcome','welcome'],['mission','mission']])if(d[key]!=null)$(id).value=d[key]
  for(const a of d.agents||[]){if($('ag-'+a.key))$('ag-'+a.key).checked=!!a.active;if($('img-'+a.key)&&a.image!=null)$('img-'+a.key).value=a.image}
- tools=(d.tools||[]).slice(0,2).map((t,i)=>({id:t.id||crypto.randomUUID().slice(0,8),icon:t.icon||'🧰',name:t.name||'',path:t.path||('/outil-'+(i+1)+'.html'),file:null}));renderTools();refreshTrainer();if(d.trainer&&[...$('trainer').options].some(o=>o.value===d.trainer))$('trainer').value=d.trainer
+ tools=(d.tools||[]).map((t,i)=>({id:t.id||crypto.randomUUID().slice(0,8),icon:t.icon||'🧰',name:t.name||'',path:t.path||('/outil-'+(i+1)+'.html'),file:null}));renderTools();refreshTrainer();if(d.trainer&&[...$('trainer').options].some(o=>o.value===d.trainer))$('trainer').value=d.trainer
 }
 function resetDraft(){
  if(!confirm('Effacer ce brouillon et recommencer un nouveau portail ?'))return
