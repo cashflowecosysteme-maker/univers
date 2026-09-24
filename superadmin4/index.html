@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow,noarchive">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://raw.githubusercontent.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <title>NyXia · Super Admin 4 · Portails</title>
   <link rel="icon" href="/FavIcon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=4">
+  <link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=5">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
   <script src="/starry-bg.js" defer></script>
-  <script src="/superadmin4/js/superadmin4.js?v=4" defer></script>
+  <script src="/superadmin4/js/superadmin4.js?v=5" defer></script>
 </head>
 <body>
 <canvas id="starry-canvas"></canvas>
@@ -36,7 +36,7 @@
   <header class="topbar">
     <div class="brand">
       <img src="/NyXia.png" alt="NyXia">
-      <div><strong>NyXia · Super Admin 4</strong><span>Création de Portail · coque commune de l’écosystème</span></div>
+      <div><strong>NyXia · Super Admin 4</strong><span>Création et sauvegarde des Portails NyXia</span></div>
     </div>
     <div class="super-switch">
       <a href="/">Super 1 · Gestion</a>
@@ -52,13 +52,33 @@
     <div class="hero">
       <div>
         <h1>🪞 Création de Portail</h1>
-        <p>Le portail existe déjà sous forme de coque. Ici tu choisis son identité, les personnages actifs et les outils spécialisés dont ton produit a réellement besoin. La compilation ne crée aucune nouvelle KV, D1 ou architecture parallèle.</p>
+        <p>Crée, sauvegarde, teste et reprends tes portails autant de fois que nécessaire. La sauvegarde du projet est indépendante du ZIP d’installation.</p>
       </div>
       <div class="pill">🔒 Session Univers · même CASHFLOW_KV</div>
     </div>
 
+    <section class="card project-card">
+      <h2><span class="section-number">1</span>Mes portails</h2>
+      <div class="note ok" style="margin-bottom:14px"><strong>Comme pour les jeux :</strong> chaque portail est conservé comme projet de travail. Tu peux le rouvrir, le modifier, le dupliquer ou le supprimer. Les fichiers HTML spécialisés sont sauvegardés avec le projet.</div>
+      <div class="projectbar">
+        <div class="field project-select-wrap">
+          <label>Projet sauvegardé</label>
+          <select id="projectSelect"><option value="">— Aucun projet ouvert —</option></select>
+        </div>
+        <button class="btn secondary" id="openProjectBtn" type="button">✏️ Ouvrir / Modifier</button>
+        <button class="btn primary" id="saveProjectBtn" type="button">💾 Sauvegarder le portail</button>
+        <button class="btn secondary" id="newProjectBtn" type="button">＋ Nouveau</button>
+        <button class="btn secondary" id="duplicateProjectBtn" type="button">⧉ Dupliquer</button>
+        <button class="btn danger" id="deleteProjectBtn" type="button">🗑 Supprimer</button>
+      </div>
+      <div class="project-state-row">
+        <span class="status" id="projectSaveState">Brouillon local prêt.</span>
+        <span class="status" id="projectInfo"></span>
+      </div>
+    </section>
+
     <section class="card">
-      <h2><span class="section-number">1</span>Identité du portail</h2>
+      <h2><span class="section-number">2</span>Identité du portail</h2>
       <div class="grid">
         <div class="field"><label>Nom complet</label><input id="title" placeholder="Portail Kael — Relations"></div>
         <div class="field"><label>Nom court</label><input id="short" placeholder="Portail Kael"></div>
@@ -73,47 +93,45 @@
     </section>
 
     <section class="card">
-      <h2><span class="section-number">2</span>Personnages</h2>
-      <div class="note ok" style="margin-bottom:12px"><strong>Relié au Super Admin 1.</strong> Tous les personnages sont libres et optionnels, y compris NyXia et Diane. Tu peux n’en activer aucun. Le catalogue central <code>nyxia:personnages</code> / <code>formations:agents</code> est rechargé à chaque ouverture.</div>
+      <h2><span class="section-number">3</span>Personnages</h2>
+      <div class="note ok" style="margin-bottom:12px"><strong>Relié au Super Admin 1.</strong> Tous les personnages sont libres et optionnels, y compris NyXia et Diane. Tu peux n’en activer aucun. Les nouveaux personnages créés dans Super Admin 1 apparaissent ici au prochain chargement.</div>
       <div class="status" id="catalogStatus" style="margin-bottom:12px">Chargement du catalogue…</div>
       <div class="agents" id="agents"></div>
     </section>
 
     <section class="card">
-      <h2><span class="section-number">3</span>Outils spécialisés</h2>
-      <div class="note" style="margin-bottom:12px">La coque conserve ses fonctions communes. Ici tu ajoutes librement les éléments propres au produit, sans limite arbitraire sur le nombre de fichiers HTML spécialisés.</div>
+      <h2><span class="section-number">4</span>Outils spécialisés</h2>
+      <div class="note" style="margin-bottom:12px">Ajoute autant d’outils HTML que ton portail en a besoin. Leur contenu est enregistré avec le projet : après réouverture, tu n’as pas à sélectionner les fichiers de nouveau.</div>
       <div class="tools-list" id="tools"></div>
       <button class="btn secondary" type="button" id="addToolBtn">+ Ajouter un outil</button>
     </section>
 
     <section class="card">
-      <h2><span class="section-number">4</span>Coque officielle</h2>
-      <div class="note warn">Le compilateur cherche d’abord une copie locale <code>/superadmin4/portail-shell-template.zip</code>. Tant qu’elle n’est pas copiée dans Univers, il utilise en lecture seule la coque déjà créée dans le dépôt NyXiaLabo. Tu peux aussi choisir manuellement un ZIP de coque.</div>
+      <h2><span class="section-number">5</span>Coque officielle</h2>
+      <div class="note warn">Le compilateur cherche d’abord <code>/superadmin4/portail-shell-template.zip</code>. Garde donc <code>portail-shell-template.zip</code> directement dans le dossier <code>superadmin4</code>. Une coque manuelle reste disponible comme secours.</div>
       <div class="template-row" style="margin-top:14px">
-        <div class="field"><label>Coque manuelle de secours (facultatif)</label><input type="file" id="templateFile" accept=".zip,application/zip"><span class="hint">Utile si GitHub Raw est indisponible. Le fichier reste uniquement dans ton navigateur.</span></div>
+        <div class="field"><label>Coque manuelle de secours (facultatif)</label><input type="file" id="templateFile" accept=".zip,application/zip"><span class="hint">Le fichier reste uniquement dans ton navigateur.</span></div>
         <button class="btn secondary" id="testTemplateBtn" type="button">Tester la coque</button>
       </div>
       <div class="status" id="templateStatus" style="margin-top:12px">Aucune coque chargée pour l’instant.</div>
       <div class="template-source" id="templateSource" style="margin-top:6px"></div>
       <div class="diag">
-        <div><b>CASHFLOW_KV</b><span>partagée avec Univers et les portails</span></div>
+        <div><b>CASHFLOW_KV</b><span>projets + données communes</span></div>
         <div><b>D1 · nyxia-cercles-db</b><span>base centrale commune</span></div>
         <div><b>Vectorize · univers-livres</b><span>index commun de connaissances</span></div>
       </div>
     </section>
 
     <section class="card">
-      <h2><span class="section-number">5</span>Compilation</h2>
-      <div class="note" style="margin-bottom:14px"><strong>Règle :</strong> Super Admin 4 configure et assemble. Il ne modifie ni Super Admin 1, ni les personnalités centrales, ni les bases existantes. Les fichiers spécialisés sont simplement ajoutés à la coque.</div>
+      <h2><span class="section-number">6</span>Compilation</h2>
+      <div class="note" style="margin-bottom:14px"><strong>La sauvegarde et l’installation sont deux choses différentes.</strong> « Sauvegarder le portail » conserve ton travail. « Créer le ZIP » produit seulement une version installable du portail à partir de ce travail.</div>
       <div class="actions">
-        <button class="btn primary" id="compileBtn">Créer le ZIP du nouveau portail</button>
-        <button class="btn secondary" id="saveDraftBtn" type="button">Sauvegarder ce brouillon</button>
-        <button class="btn secondary" id="resetBtn" type="button">Nouveau portail</button>
+        <button class="btn primary" id="compileBtn">Créer le ZIP du portail</button>
         <span class="status" id="compileStatus">Prêt.</span>
       </div>
     </section>
 
-    <div class="footer-note">Super Admin 4 · compilation locale dans le navigateur · GitHub lu en lecture seule · aucun commit, push, branche ou PR.</div>
+    <div class="footer-note">Super Admin 4 · projets sauvegardés dans CASHFLOW_KV · brouillon local de récupération · compilation locale dans le navigateur.</div>
   </main>
 </div>
 </body>
