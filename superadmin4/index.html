@@ -66,7 +66,7 @@
         <div class="field"><label>Nom du Worker Cloudflare</label><input id="workerName" placeholder="portail-kael"></div>
         <div class="field"><label>Sous-domaine</label><input id="host" placeholder="portailkael.nyxia.top"></div>
         <div class="field"><label>Icône</label><input id="icon" value="✦" maxlength="6"></div>
-        <div class="field"><label>Personnage principal / Formation Vivante</label><select id="trainer"></select></div>
+        <div class="field"><label>Personnage principal / Formation Vivante</label><select id="trainer"><option value="">Aucun formateur principal</option></select></div>
         <div class="field"><label>Texte court d’accueil</label><input id="welcome" placeholder="Bienvenue dans ton portail NyXia."></div>
         <div class="field full"><label>Mission du portail</label><textarea id="mission" placeholder="Ce portail sert à..."></textarea></div>
       </div>
@@ -74,7 +74,7 @@
 
     <section class="card">
       <h2><span class="section-number">2</span>Personnages</h2>
-      <div class="note ok" style="margin-bottom:12px"><strong>Relié au Super Admin 1.</strong> NyXia et Diane sont toujours actives. Les autres personnages viennent du catalogue central <code>nyxia:personnages</code> / <code>formations:agents</code> et sont rechargés à chaque ouverture.</div>
+      <div class="note ok" style="margin-bottom:12px"><strong>Relié au Super Admin 1.</strong> Tous les personnages sont libres et optionnels, y compris NyXia et Diane. Tu peux n’en activer aucun. Le catalogue central <code>nyxia:personnages</code> / <code>formations:agents</code> est rechargé à chaque ouverture.</div>
       <div class="status" id="catalogStatus" style="margin-bottom:12px">Chargement du catalogue…</div>
       <div class="agents" id="agents"></div>
     </section>

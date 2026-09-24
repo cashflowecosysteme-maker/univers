@@ -3,11 +3,11 @@
 
 const TEMPLATE_LOCAL='/superadmin4/portail-shell-template.zip'
 const TEMPLATE_READONLY='https://raw.githubusercontent.com/cashflowecosysteme-maker/NyXiaLabo/main/portail-shell-template.zip'
-const DRAFT_KEY='nyxia:superadmin4:draft:v1'
+const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 
 const BASE_META={
- nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦',image:'https://univers.nyxia.top/NyXia.png',locked:true},
- diane:{name:'Diane',sub:'Créatrice & accompagnement',icon:'👑',image:'https://univers.nyxia.top/Diane.png',locked:true},
+ nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦',image:'https://univers.nyxia.top/NyXia.png'},
+ diane:{name:'Diane',sub:'Créatrice & accompagnement',icon:'👑',image:'https://univers.nyxia.top/Diane.png'},
  eric:{name:'Éric',sub:'Communication & CashFlow',icon:'💼',image:'https://univers.nyxia.top/Eric.png'},
  lena:{name:'Léna',sub:'Spiritualité & intuition',icon:'🔮',image:'https://univers.nyxia.top/Lena.png'},
  alex:{name:'Alex',sub:'Écriture & storytelling',icon:'✍️',image:'https://univers.nyxia.top/Alex.png'},
@@ -78,7 +78,7 @@ function normalizeCatalog(rows){
    const key=slug(p.code||p.id||p.nom||p.name,40)
    if(!key)continue
    const base=BASE_META[key]||{}
-   map.set(key,{key,name:p.nom||p.name||base.name||key,portail:p.portail||p.portal||'',custom:!!p.custom||!BASE_META[key],sub:base.sub||(p.portail?'Personnage · '+p.portail:'Personnage NyXia'),icon:base.icon||(p.custom?'✨':'✦'),image:base.image||'',locked:key==='nyxia'||key==='diane'})
+   map.set(key,{key,name:p.nom||p.name||base.name||key,portail:p.portail||p.portal||'',custom:!!p.custom||!BASE_META[key],sub:base.sub||(p.portail?'Personnage · '+p.portail:'Personnage NyXia'),icon:base.icon||(p.custom?'✨':'✦'),image:base.image||''})
  }
  for(const required of ['nyxia','diane'])if(!map.has(required))map.set(required,{key:required,...BASE_META[required],custom:false})
  return [...map.values()].sort((a,b)=>{
@@ -103,19 +103,19 @@ async function loadCatalog(){
 function renderAgents(){
  const host=$('agents');host.innerHTML=''
  for(const a of catalog){
-   const box=document.createElement('div');box.className='agent'+(a.locked?' locked':'')
-   box.innerHTML=`<div class="agent-head">${a.image?`<img src="${attr(a.image)}" alt="${attr(a.name)}">`:`<div style="width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#0a1024;border:1px solid rgba(167,139,250,.25);font-size:20px">${esc(a.icon)}</div>`}<div class="agent-title"><strong>${esc(a.name)}${a.custom?'<span class="custom-badge">Super Admin 1</span>':''}</strong><small>${esc(a.sub||'Personnage NyXia')}</small></div></div><label class="agent-toggle"><input type="checkbox" id="ag-${attr(a.key)}" ${a.locked?'checked disabled':''}> ${a.locked?'Toujours actif':'Activer dans ce portail'}</label><div class="field"><label>Image du personnage dans ce portail</label><input id="img-${attr(a.key)}" value="${attr(a.image||'')}" placeholder="/Personnage.png ou https://..."></div>`
+   const box=document.createElement('div');box.className='agent'
+   box.innerHTML=`<div class="agent-head">${a.image?`<img src="${attr(a.image)}" alt="${attr(a.name)}">`:`<div style="width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#0a1024;border:1px solid rgba(167,139,250,.25);font-size:20px">${esc(a.icon)}</div>`}<div class="agent-title"><strong>${esc(a.name)}${a.custom?'<span class="custom-badge">Super Admin 1</span>':''}</strong><small>${esc(a.sub||'Personnage NyXia')}</small></div></div><label class="agent-toggle"><input type="checkbox" id="ag-${attr(a.key)}"> Activer dans ce portail</label><div class="field"><label>Image du personnage dans ce portail</label><input id="img-${attr(a.key)}" value="${attr(a.image||'')}" placeholder="/Personnage.png ou https://..."></div>`
    host.appendChild(box)
    const ck=$('ag-'+a.key);if(ck)ck.addEventListener('change',()=>{refreshTrainer();autoSaveDraft()})
    const im=$('img-'+a.key);if(im)im.addEventListener('input',autoSaveDraft)
  }
 }
-function activeAgents(){return catalog.filter(a=>a.locked||$('ag-'+a.key)?.checked)}
+function activeAgents(){return catalog.filter(a=>$('ag-'+a.key)?.checked)}
 function refreshTrainer(){
  const sel=$('trainer'),prev=sel.value
- sel.innerHTML=activeAgents().map(a=>`<option value="${attr(a.key)}">${esc(a.name)}</option>`).join('')
+ sel.innerHTML='<option value="">Aucun formateur principal</option>'+activeAgents().map(a=>`<option value="${attr(a.key)}">${esc(a.name)}</option>`).join('')
  if([...sel.options].some(o=>o.value===prev))sel.value=prev
- else if([...sel.options].some(o=>o.value==='diane'))sel.value='diane'
+ else sel.value=''
 }
 function agentMeta(a){return{key:a.key,name:a.name,sub:a.sub||'Personnage NyXia',icon:a.icon||'✦',image:($('img-'+a.key)?.value||a.image||'').trim(),custom:!!a.custom,portail:a.portail||'',greeting:'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.'}}
 function navHtml(list){return list.map((a,i)=>`<div class="nav-item ${i===0?'active':''}" id="nav-${a.key}" onclick="openAgentTab('${a.key}')">${a.image?`<img class="nav-avatar" src="${attr(a.image)}" alt="${attr(a.name)}" onerror="this.style.display='none'">`:`<span class="nav-icon">${esc(a.icon)}</span>`}<span class="nav-text"><span class="nav-name">${esc(a.name)}</span><span class="nav-sub">${esc(a.sub)}</span></span><span class="nav-arrow">›</span></div>`).join('\n')}
@@ -138,14 +138,14 @@ function renderTools(){
 function cleanPath(v){v=String(v||'').trim();if(!/^\/[a-zA-Z0-9_.-]+\.html$/.test(v))throw new Error('Le chemin d’un outil doit ressembler à /mon-outil.html');return v}
 
 function b64Utf8(s){const bytes=new TextEncoder().encode(s);let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));return btoa(bin)}
-function currentDraft(){return{title:$('title').value,short:$('short').value,portalId:$('portalId').value,workerName:$('workerName').value,host:$('host').value,icon:$('icon').value,welcome:$('welcome').value,mission:$('mission').value,trainer:$('trainer').value,agents:catalog.map(a=>({key:a.key,active:a.locked||!!$('ag-'+a.key)?.checked,image:$('img-'+a.key)?.value||''})),tools:tools.map(t=>({id:t.id,icon:t.icon,name:t.name,path:t.path}))}}
+function currentDraft(){return{title:$('title').value,short:$('short').value,portalId:$('portalId').value,workerName:$('workerName').value,host:$('host').value,icon:$('icon').value,welcome:$('welcome').value,mission:$('mission').value,trainer:$('trainer').value,agents:catalog.map(a=>({key:a.key,active:!!$('ag-'+a.key)?.checked,image:$('img-'+a.key)?.value||''})),tools:tools.map(t=>({id:t.id,icon:t.icon,name:t.name,path:t.path}))}}
 function saveDraft(show=true){try{localStorage.setItem(DRAFT_KEY,JSON.stringify(currentDraft()));if(show)setStatus('compileStatus','Brouillon sauvegardé dans ce navigateur.','ok')}catch(e){if(show)setStatus('compileStatus','Sauvegarde locale impossible : '+e.message,'error')}}
 function autoSaveDraft(){saveDraft(false)}
 function restoreDraft(){
  let d;try{d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null')}catch(_){return}
  if(!d)return
  for(const [id,key] of [['title','title'],['short','short'],['portalId','portalId'],['workerName','workerName'],['host','host'],['icon','icon'],['welcome','welcome'],['mission','mission']])if(d[key]!=null)$(id).value=d[key]
- for(const a of d.agents||[]){if(a.key==='nyxia'||a.key==='diane'){}else if($('ag-'+a.key))$('ag-'+a.key).checked=!!a.active;if($('img-'+a.key)&&a.image!=null)$('img-'+a.key).value=a.image}
+ for(const a of d.agents||[]){if($('ag-'+a.key))$('ag-'+a.key).checked=!!a.active;if($('img-'+a.key)&&a.image!=null)$('img-'+a.key).value=a.image}
  tools=(d.tools||[]).slice(0,2).map((t,i)=>({id:t.id||crypto.randomUUID().slice(0,8),icon:t.icon||'🧰',name:t.name||'',path:t.path||('/outil-'+(i+1)+'.html'),file:null}));renderTools();refreshTrainer();if(d.trainer&&[...$('trainer').options].some(o=>o.value===d.trainer))$('trainer').value=d.trainer
 }
 function resetDraft(){
@@ -194,8 +194,8 @@ function validatePortal(){
  const host=$('host').value.trim().toLowerCase();if(!/^[a-z0-9.-]+\.nyxia\.top$/.test(host))throw new Error('Entre un sous-domaine NyXia valide, ex. portailkael.nyxia.top')
  const icon=$('icon').value.trim()||'✦'
  const mission=$('mission').value.trim(),welcome=$('welcome').value.trim()||'Bienvenue dans ton portail NyXia.'
- const list=activeAgents().map(agentMeta);if(!list.some(x=>x.key==='nyxia')||!list.some(x=>x.key==='diane'))throw new Error('NyXia et Diane doivent rester actives.')
- const trainer=$('trainer').value||'diane';if(!list.some(x=>x.key===trainer))throw new Error('Le formateur principal doit être un personnage actif.')
+ const list=activeAgents().map(agentMeta)
+ const trainer=$('trainer').value||'';if(trainer&&!list.some(x=>x.key===trainer))throw new Error('Le formateur principal doit être un personnage actif.')
  return{title,short,id,worker,host,icon,mission,welcome,list,trainer}
 }
 
@@ -206,7 +206,7 @@ async function compilePortal(){
    const cfg={id:p.id,title:p.title,shortTitle:p.short,mission:p.mission,welcome:p.welcome,icon:p.icon,mode:p.id==='alex'?'alex-writing':'standard',formationAgent:p.trainer,activeAgents:p.list.map(x=>x.key),agents:p.list,sourceCatalog:'univers:/api/personnages'}
 
    let dash=await zip.file('dashbord.html').async('string')
-   dash=dash.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_SHORT_TITLE__',p.short).replaceAll('__PORTAL_ICON__',p.icon).replaceAll('__PORTAL_DEFAULT_AGENT__',p.list[0].key).replaceAll('__PORTAL_WELCOME__',p.welcome).replaceAll('__PORTAL_MISSION__',p.mission)
+   dash=dash.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_SHORT_TITLE__',p.short).replaceAll('__PORTAL_ICON__',p.icon).replaceAll('__PORTAL_DEFAULT_AGENT__',p.list[0]?.key||'').replaceAll('__PORTAL_WELCOME__',p.welcome).replaceAll('__PORTAL_MISSION__',p.mission)
    dash=dash.replace('__PORTAL_AGENT_NAV__',navHtml(p.list))
    const pages={};p.list.forEach(a=>pages[a.key]='/chat-'+a.key+'.html')
    let special=''
