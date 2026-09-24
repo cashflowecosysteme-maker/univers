@@ -1,9 +1,29 @@
 /**
  * starry-bg.js — Canvas ciel étoilé avec étoiles filantes
+ * + lien Super Admin 4 dans les barres Univers qui chargent ce script.
  * Aucune dépendance. Isolé.
  */
 ;(function () {
   'use strict'
+
+  // Intégration non destructive : ajoute le lien seulement s'il n'existe pas déjà.
+  function injectSuperAdmin4Link() {
+    var menus = document.querySelectorAll('.super-switch')
+    if (!menus.length) return
+    menus.forEach(function (menu) {
+      if (menu.querySelector('a[href="/superadmin4/"],a[href="/superadmin4"]')) return
+      var a = document.createElement('a')
+      a.href = '/superadmin4/'
+      a.textContent = 'Super 4 · Portails'
+      a.className = 'to-super2'
+      if (location.pathname.indexOf('/superadmin4') === 0) a.classList.add('active')
+      var logout = menu.querySelector('button')
+      if (logout) menu.insertBefore(a, logout)
+      else menu.appendChild(a)
+    })
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectSuperAdmin4Link)
+  else injectSuperAdmin4Link()
 
   var canvas = document.getElementById('starry-canvas')
   if (!canvas) return
