@@ -9,6 +9,9 @@ const MAX_INDEX_ITEMS = 500;
 // Ce n'est PAS une limite sur le nombre d'outils.
 const MAX_TOOL_BYTES = 20 * 1024 * 1024;
 const COOKIE_NAME = 'nyxia_univers';
+const OFFICIAL_PORTAL_TEMPLATE_URL = 'https://raw.githubusercontent.com/cashflowecosysteme-maker/NyXiaLabo/main/portail-shell-template.zip';
+const OFFICIAL_PORTAL_TEMPLATE_SIZE = 14716736;
+
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -247,17 +250,32 @@ export default {
     const url = new URL(request.url);
 
     try {
-      // Coque officielle protégée : le parent Univers achemine cette URL ici.
+      // Coque PORTAIL officielle NyXiaLabo. Le navigateur reste en même origine :
+      // ce Worker effectue le fetch GitHub côté serveur pour éviter tout blocage CORS.
       if (request.method === 'GET' && url.pathname === '/superadmin4/portail-shell-template.zip') {
-        if (!env.ASSETS) return json({ error: 'Assets Univers non configurés.' }, 503);
-        return env.ASSETS.fetch(request);
+        const upstream = await fetch(OFFICIAL_PORTAL_TEMPLATE_URL, {
+          headers: { 'Accept': 'application/octet-stream', 'User-Agent': 'NyXia-SuperAdmin4/16' },
+          cf: { cacheEverything: true, cacheTtl: 300 }
+        });
+        if (!upstream.ok) return json({ error: 'Coque Portail NyXiaLabo inaccessible (HTTP ' + upstream.status + ').' }, 502);
+        const advertised = Number(upstream.headers.get('content-length') || 0);
+        if (advertised && advertised !== OFFICIAL_PORTAL_TEMPLATE_SIZE) {
+          return json({ error: 'Coque Portail NyXiaLabo inattendue : ' + advertised + ' octets au lieu de ' + OFFICIAL_PORTAL_TEMPLATE_SIZE + '.' }, 502);
+        }
+        const headers = new Headers();
+        headers.set('Content-Type', 'application/zip');
+        headers.set('Content-Disposition', 'inline; filename="portail-shell-template.zip"');
+        headers.set('Cache-Control', 'private, no-store');
+        headers.set('X-NyXia-Template', 'portail-shell-template.zip');
+        headers.set('X-NyXia-Template-Size', String(OFFICIAL_PORTAL_TEMPLATE_SIZE));
+        return new Response(upstream.body, { status: 200, headers });
       }
       if (request.method === 'GET' && url.pathname === '/api/superadmin4/health') {
         return json({
           ok: !!env.CASHFLOW_KV,
           kv: !!env.CASHFLOW_KV,
           bindings: { kv: 'CASHFLOW_KV', d1: 'nyxia-cercles-db', vectorize: 'univers-livres' },
-          version: 'superadmin4-portails-15.0-source-exacte-nyxialabo-game-shell'
+          version: 'superadmin4-portails-16.0-portail-officiel-nyxialabo'
         });
       }
       if (url.pathname === '/api/superadmin4/projects' || url.pathname.startsWith('/api/superadmin4/projects/')) {
