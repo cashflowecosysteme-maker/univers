@@ -5,7 +5,7 @@ const TEMPLATE_LOCAL='/superadmin4/portail-shell-template.zip'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'
-const UI_VERSION='9.0-coque-propre'
+const UI_VERSION='12.0-validation-stricte'
 
 const BASE_META={
  nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦',image:'https://univers.nyxia.top/NyXia.png'},
@@ -335,6 +335,41 @@ function validatePortal(){
  return{title,short,id,worker,host,icon,mission,welcome,list,trainer}
 }
 function b64Utf8(s){const bytes=new TextEncoder().encode(s);let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));return btoa(bin)}
+
+function replaceTomlStringLine(toml,key,value){
+ const lines=String(toml||'').split(/\r?\n/)
+ const re=new RegExp('^\\s*'+key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*=\\s*.*$')
+ const line=key+' = '+JSON.stringify(String(value||''))
+ const idx=lines.findIndex(x=>re.test(x))
+ if(idx<0)throw new Error('Coque wrangler.toml invalide : ligne '+key+' introuvable.')
+ lines[idx]=line
+ return lines.join('\n')
+}
+function replaceTomlRoutePattern(toml,host){
+ const lines=String(toml||'').split(/\r?\n/)
+ let inRoutes=false,done=false
+ for(let i=0;i<lines.length;i++){
+   if(/^\s*\[\[routes\]\]\s*$/.test(lines[i])){inRoutes=true;continue}
+   if(inRoutes&&/^\s*\[/.test(lines[i])&&!/^\s*\[\[routes\]\]\s*$/.test(lines[i]))inRoutes=false
+   if(inRoutes&&/^\s*pattern\s*=/.test(lines[i])){lines[i]='pattern = '+JSON.stringify(String(host||''));done=true;break}
+ }
+ if(!done){
+   if(lines.length&&lines[lines.length-1].trim()!=='')lines.push('')
+   lines.push('[[routes]]','pattern = '+JSON.stringify(String(host||'')),'zone_name = "nyxia.top"','custom_domain = true')
+ }
+ return lines.join('\n')
+}
+async function assertNoTemplateMarkers(zip){
+ const bad=[]
+ const textExt=/\.(?:html?|js|mjs|css|toml|json|txt|md)$/i
+ for(const [name,file] of Object.entries(zip.files)){
+   if(file.dir||!textExt.test(name))continue
+   const txt=await file.async('string')
+   const hits=txt.match(/__[A-Z][A-Z0-9_]*__/g)
+   if(hits&&hits.length)bad.push(name+' : '+[...new Set(hits)].join(', '))
+ }
+ if(bad.length)throw new Error('Compilation interrompue : marqueur(s) de coque non remplacé(s) → '+bad.join(' | '))
+}
 function injectVoiceVars(toml,agents){
  const vars=agents.filter(a=>a.voiceId).map(a=>({name:a.voiceEnv||voiceEnvName(a.key),value:a.voiceId}))
  if(!vars.length)return toml
@@ -421,9 +456,22 @@ async function compilePortal(){
    worker=worker.replace('__PORTAL_CONFIG_B64__',b64Utf8(JSON.stringify(cfg)));zip.file('_worker.js',worker)
 
    let wr=await zip.file('wrangler.toml').async('string')
-   wr=wr.replaceAll('__WORKER_NAME__',p.worker).replaceAll('__HOST__',p.host).replaceAll('__PORTAL_ID__',p.id);wr=injectVoiceVars(wr,p.list);zip.file('wrangler.toml',wr)
+   // On n'utilise plus un placeholder pour le nom : on réécrit les lignes TOML complètes.
+   wr=replaceTomlStringLine(wr,'name',p.worker)
+   wr=replaceTomlRoutePattern(wr,p.host)
+   wr=replaceTomlStringLine(wr,'SITE_URL','https://'+p.host)
+   wr=replaceTomlStringLine(wr,'PORTAIL',p.id)
+   wr=replaceTomlStringLine(wr,'PORTAL_SLUG',p.id)
+   // Compatibilité avec d'anciennes coques : remplace aussi d'éventuels marqueurs restants.
+   wr=wr.replaceAll('__WORKER_NAME__',p.worker).replaceAll('__HOST__',p.host).replaceAll('__PORTAL_ID__',p.id)
+   wr=injectVoiceVars(wr,p.list)
+   zip.file('wrangler.toml',wr)
 
-   zip.file('portal-manifest.json',JSON.stringify({schemaVersion:5,projectRecordId:currentProjectId,createdBy:'NyXia Univers · Super Admin 4',...cfg,host:p.host,workerName:p.worker,compiledAt:new Date().toISOString(),sharedData:{kv:'CASHFLOW_KV',d1:'nyxia-cercles-db',vectorize:'univers-livres'},templateSource:loadedTemplateSource},null,2))
+   zip.file('portal-manifest.json',JSON.stringify({schemaVersion:6,projectRecordId:currentProjectId,createdBy:'NyXia Univers · Super Admin 4',...cfg,host:p.host,workerName:p.worker,compiledAt:new Date().toISOString(),sharedData:{kv:'CASHFLOW_KV',d1:'nyxia-cercles-db',vectorize:'univers-livres'},templateSource:loadedTemplateSource},null,2))
+
+   // Contrôle final AVANT téléchargement : aucun marqueur de coque ne peut sortir du compilateur.
+   await assertNoTemplateMarkers(zip)
+
    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:5}})
    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Portail-'+slug(p.short)+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)
    setStatus('compileStatus','ZIP propre prêt · projet sauvegardé · '+p.list.length+' personnage(s) actif(s) · '+Object.keys(voiceVariables).length+' voix ElevenLabs · '+tools.length+' outil(s).','ok')
