@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=6">
+  <link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=9">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
   <script src="/starry-bg.js" defer></script>
-  <script src="/superadmin4/js/superadmin4.js?v=6" defer></script>
+  <script src="/superadmin4/js/superadmin4.js?v=9" defer></script>
 </head>
 <body>
 <canvas id="starry-canvas"></canvas>
@@ -94,7 +94,7 @@
 
     <section class="card">
       <h2><span class="section-number">3</span>Personnages</h2>
-      <div class="note ok" style="margin-bottom:12px"><strong>Relié au Super Admin 1.</strong> Tous les personnages sont libres et optionnels, y compris NyXia et Diane. Tu peux n’en activer aucun. Les nouveaux personnages créés dans Super Admin 1 apparaissent ici au prochain chargement. Chaque personnage possède aussi son champ de voix ElevenLabs, sauvegardé avec le projet.</div>
+      <div class="note ok" style="margin-bottom:12px"><strong>Relié au Super Admin 1.</strong> Tous les personnages restent libres et optionnels. Dans le portail compilé, NyXia, Diane et Éric activés apparaissent dans l’équipe principale; tout autre personnage activé est rangé automatiquement dans <strong>🎭 Atelier</strong>. Les nouveaux personnages créés dans Super Admin 1 apparaissent ici au prochain chargement. Chaque personnage possède aussi son champ de voix ElevenLabs, sauvegardé avec le projet.</div>
       <div class="status" id="catalogStatus" style="margin-bottom:12px">Chargement du catalogue…</div>
       <div class="agents" id="agents"></div>
     </section>
@@ -107,10 +107,10 @@
     </section>
 
     <section class="card">
-      <h2><span class="section-number">5</span>Coque officielle</h2>
+      <h2><span class="section-number">5</span>Coque NyXia propre</h2>
       <div class="note warn">Le compilateur cherche d’abord <code>/superadmin4/portail-shell-template.zip</code>. Garde donc <code>portail-shell-template.zip</code> directement dans le dossier <code>superadmin4</code>. Une coque manuelle reste disponible comme secours.</div>
       <div class="template-row" style="margin-top:14px">
-        <div class="field"><label>Coque manuelle de secours (facultatif)</label><input type="file" id="templateFile" accept=".zip,application/zip"><span class="hint">Le fichier reste uniquement dans ton navigateur.</span></div>
+        <div class="field"><label>Coque manuelle de secours (facultatif)</label><input type="file" id="templateFile" accept=".zip,application/zip"><span class="hint">Le fichier reste uniquement dans ton navigateur. La coque propre refuse automatiquement les anciens résidus Alex.</span></div>
         <button class="btn secondary" id="testTemplateBtn" type="button">Tester la coque</button>
       </div>
       <div class="status" id="templateStatus" style="margin-top:12px">Aucune coque chargée pour l’instant.</div>

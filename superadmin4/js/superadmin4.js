@@ -5,7 +5,7 @@ const TEMPLATE_LOCAL='/superadmin4/portail-shell-template.zip'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'
-const UI_VERSION='6.0-voice-ids'
+const UI_VERSION='9.0-coque-propre'
 
 const BASE_META={
  nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦',image:'https://univers.nyxia.top/NyXia.png'},
@@ -128,7 +128,11 @@ function refreshTrainer(){
  else sel.value=''
 }
 function agentMeta(a){const voiceId=($('voice-'+a.key)?.value||'').trim();return{key:a.key,name:a.name,sub:a.sub||'Personnage NyXia',icon:a.icon||'✦',image:($('img-'+a.key)?.value||a.image||'').trim(),custom:!!a.custom,portail:a.portail||'',voiceEnv:voiceEnvName(a.key),voiceId,greeting:'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.'}}
-function navHtml(list){return list.map((a,i)=>`<div class="nav-item ${i===0?'active':''}" id="nav-${a.key}" onclick="openAgentTab('${a.key}')">${a.image?`<img class="nav-avatar" src="${attr(a.image)}" alt="${attr(a.name)}" onerror="this.style.display='none'">`:`<span class="nav-icon">${esc(a.icon)}</span>`}<span class="nav-text"><span class="nav-name">${esc(a.name)}</span><span class="nav-sub">${esc(a.sub)}</span></span><span class="nav-arrow">›</span></div>`).join('\n')}
+const CORE_AGENT_KEYS=['nyxia','diane','eric']
+function navItemHtml(a){return `<div class="nav-item" id="nav-${attr(a.key)}" data-page-key="${attr(a.key)}">${a.image?`<img class="nav-avatar" src="${attr(a.image)}" alt="${attr(a.name)}" onerror="this.style.display='none'">`:`<span class="nav-icon">${esc(a.icon)}</span>`}<span class="nav-text"><span class="nav-name">${esc(a.name)}</span><span class="nav-sub">${esc(a.sub)}</span></span><span class="nav-arrow">›</span></div>`}
+function coreNavHtml(list){const core=CORE_AGENT_KEYS.map(k=>list.find(a=>a.key===k)).filter(Boolean);return core.length?`<div class="nav-section"><div class="nav-section-title">Équipe principale</div>${core.map(navItemHtml).join('\n')}</div>`:''}
+function atelierNavHtml(list){const extra=list.filter(a=>!CORE_AGENT_KEYS.includes(a.key));if(!extra.length)return'';return `<div class="atelier-group" id="atelier-group"><button class="atelier-toggle" id="atelier-toggle" type="button"><span>🎭 Atelier</span><span class="atelier-caret">⌄</span></button><div class="atelier-panel">${extra.map(navItemHtml).join('\n')}</div></div>`}
+function toolsNavHtml(rows){if(!rows.length)return'';return `<div class="nav-section"><div class="nav-section-title">Outils</div>${rows.join('\n')}</div>`}
 
 function addTool(){
  tools.push({id:crypto.randomUUID().replace(/-/g,'').slice(0,16),icon:'🧰',name:'',path:'/outil-'+(tools.length+1)+'.html',fileName:'',content:''})
@@ -288,11 +292,14 @@ async function deleteProject(){
 async function zipFromArrayBuffer(buf,source){
  if(!window.JSZip)throw new Error('JSZip n’est pas encore chargé.')
  const zip=await JSZip.loadAsync(buf)
- const required=['dashbord.html','chat-base.html','_worker.js','wrangler.toml']
+ const required=['index.html','login.html','dashbord.html','chat-base.html','_worker.js','wrangler.toml','css/index.css','css/login.css','css/dashbord.css','css/chat.css','js/login.js','js/dashbord.js','js/chat.js']
  const missing=required.filter(f=>!zip.file(f))
  if(missing.length)throw new Error('Coque incomplète : '+missing.join(', ')+' absent(s).')
+ const auditFiles=['index.html','login.html','dashbord.html','chat-base.html','_worker.js']
+ const forbidden=/(Portail Alex|Devenir Écrivain|Aimée|Alibi|Constance|Fripouille|Mélusine|Abîme)/i
+ for(const f of auditFiles){const txt=await zip.file(f).async('string');if(forbidden.test(txt))throw new Error('Coque refusée : ancien contenu Alex détecté dans '+f+'. Utilise la coque NyXia propre.')}
  loadedTemplate=buf;loadedTemplateSource=source
- setStatus('templateStatus','Coque validée : '+required.length+' fichiers structurants présents.','ok')
+ setStatus('templateStatus','Coque NyXia propre validée · '+required.length+' fichiers structurants.','ok')
  $('templateSource').textContent='Source : '+source
  return zip
 }
@@ -343,33 +350,65 @@ function injectVoiceVars(toml,agents){
 }
 
 async function compilePortal(){
- const btn=$('compileBtn');btn.disabled=true;setStatus('compileStatus','Sauvegarde du projet puis chargement de la coque…')
+ const btn=$('compileBtn');btn.disabled=true;setStatus('compileStatus','Sauvegarde du projet puis chargement de la coque propre…')
  try{
-   // Comme NyXia Game : on confirme d'abord la sauvegarde du projet, puis on compile.
    if(!(await saveProjectNow(false)))throw new Error('Impossible de sauvegarder le projet avant la compilation.')
    const p=validatePortal();const zip=await loadTemplate()
    const voiceVariables=Object.fromEntries(p.list.filter(a=>a.voiceId).map(a=>[a.voiceEnv||voiceEnvName(a.key),a.voiceId]))
-   const cfg={id:p.id,title:p.title,shortTitle:p.short,mission:p.mission,welcome:p.welcome,icon:p.icon,mode:p.id==='alex'?'alex-writing':'standard',formationAgent:p.trainer,activeAgents:p.list.map(x=>x.key),agents:p.list,voiceVariables,sourceCatalog:'univers:/api/personnages'}
+   const cfg={id:p.id,title:p.title,shortTitle:p.short,mission:p.mission,welcome:p.welcome,icon:p.icon,mode:'standard',formationAgent:p.trainer,activeAgents:p.list.map(x=>x.key),agents:p.list,voiceVariables,sourceCatalog:'univers:/api/personnages'}
 
-   let dash=await zip.file('dashbord.html').async('string')
-   dash=dash.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_SHORT_TITLE__',p.short).replaceAll('__PORTAL_ICON__',p.icon).replaceAll('__PORTAL_DEFAULT_AGENT__',p.list[0]?.key||'').replaceAll('__PORTAL_WELCOME__',p.welcome).replaceAll('__PORTAL_MISSION__',p.mission)
-   dash=dash.replace('__PORTAL_AGENT_NAV__',navHtml(p.list))
+   // Sécurité : même si quelqu'un fournit une ancienne coque avec des chats résiduels,
+   // on retire tous les chat-*.html avant de générer uniquement les personnages actifs.
+   for(const name of Object.keys(zip.files)){if(/^chat-(?!base\.html$).+\.html$/i.test(name))zip.remove(name)}
+
    const pages={};p.list.forEach(a=>pages[a.key]='/chat-'+a.key+'.html')
-   let special=''
+   const toolRows=[]
    for(const [i,t] of tools.entries()){
      if(!t.name.trim())throw new Error('Outil '+(i+1)+' : ajoute un nom.')
-     if(typeof t.content!=='string'||!t.content.trim())throw new Error('Outil '+(i+1)+' : ajoute un fichier HTML. Si ce projet vient d’une ancienne V4, sélectionne ce fichier une seule fois puis sauvegarde.')
+     if(typeof t.content!=='string'||!t.content.trim())throw new Error('Outil '+(i+1)+' : aucun fichier HTML n’est associé. Ajoute son fichier ou retire cet outil.')
      const path=cleanPath(t.path||('/outil-'+(i+1)+'.html'));const html=t.content
      if(!/<html[\s>]/i.test(html)&&!/<body[\s>]/i.test(html))throw new Error('Outil '+(i+1)+' : le fichier ne ressemble pas à une page HTML.')
      zip.file(path.replace(/^\//,''),html)
      const key='tool-'+t.id;pages[key]=path
-     special+=`<div class="nav-item" id="nav-${key}" onclick="openAgentTab('${key}')"><span class="nav-icon">${esc(t.icon||'🧰')}</span><span class="nav-text"><span class="nav-name">${esc(t.name)}</span><span class="nav-sub">Outil spécialisé</span></span><span class="nav-arrow">›</span></div>\n`
+     toolRows.push(`<div class="nav-item" id="nav-${attr(key)}" data-page-key="${attr(key)}"><span class="nav-icon">${esc(t.icon||'🧰')}</span><span class="nav-text"><span class="nav-name">${esc(t.name)}</span><span class="nav-sub">Outil spécialisé</span></span><span class="nav-arrow">›</span></div>`)
    }
-   dash=dash.replace('__PORTAL_SPECIAL_TOOLS__',special).replace('__PORTAL_AGENT_PAGES__',JSON.stringify(pages))
+
+   const preferred=['nyxia','diane','eric'].find(k=>pages[k])
+   const defaultPage=preferred||p.list[0]?.key||Object.keys(pages)[0]||''
+   const meta=Object.fromEntries(p.list.map(a=>[a.key,a]))
+
+   function fillPortalText(html){
+     return html
+       .replaceAll('__PORTAL_TITLE__',p.title)
+       .replaceAll('__PORTAL_SHORT_TITLE__',p.short)
+       .replaceAll('__PORTAL_ICON__',p.icon)
+       .replaceAll('__PORTAL_WELCOME__',p.welcome)
+       .replaceAll('__PORTAL_MISSION__',p.mission)
+       .replaceAll('__PORTAL_TITLE_JSON__',JSON.stringify(p.title))
+       .replaceAll('__PORTAL_SHORT_TITLE_JSON__',JSON.stringify(p.short))
+       .replaceAll('__PORTAL_DEFAULT_AGENT_JSON__',JSON.stringify(defaultPage))
+   }
+
+   let index=fillPortalText(await zip.file('index.html').async('string'));zip.file('index.html',index)
+   let login=fillPortalText(await zip.file('login.html').async('string'));zip.file('login.html',login)
+
+   let dash=fillPortalText(await zip.file('dashbord.html').async('string'))
+   dash=dash
+     .replace('__PORTAL_CORE_NAV__',coreNavHtml(p.list))
+     .replace('__PORTAL_ATELIER_NAV__',atelierNavHtml(p.list))
+     .replace('__PORTAL_SPECIAL_TOOLS__',toolsNavHtml(toolRows))
+     .replace('__PORTAL_AGENT_PAGES__',JSON.stringify(pages))
+     .replace('__PORTAL_AGENT_META__',JSON.stringify(meta))
    zip.file('dashbord.html',dash)
 
    const chatBase=await zip.file('chat-base.html').async('string')
-   for(const a of p.list){let c=chatBase.replaceAll('__AGENT_NAME__',a.name).replaceAll('__AGENT_SUB__',a.sub).replaceAll('__PORTAL_TITLE__',p.title).replace('__AGENT_JSON__',JSON.stringify(a));zip.file('chat-'+a.key+'.html',c)}
+   for(const a of p.list){
+     let c=fillPortalText(chatBase)
+       .replaceAll('__AGENT_NAME__',a.name)
+       .replaceAll('__AGENT_SUB__',a.sub)
+       .replace('__AGENT_JSON__',JSON.stringify(a))
+     zip.file('chat-'+a.key+'.html',c)
+   }
    zip.remove('chat-base.html')
 
    let worker=await zip.file('_worker.js').async('string')
@@ -379,10 +418,10 @@ async function compilePortal(){
    let wr=await zip.file('wrangler.toml').async('string')
    wr=wr.replaceAll('__WORKER_NAME__',p.worker).replaceAll('__HOST__',p.host).replaceAll('__PORTAL_ID__',p.id);wr=injectVoiceVars(wr,p.list);zip.file('wrangler.toml',wr)
 
-   zip.file('portal-manifest.json',JSON.stringify({schemaVersion:4,projectRecordId:currentProjectId,createdBy:'NyXia Univers · Super Admin 4',...cfg,host:p.host,workerName:p.worker,compiledAt:new Date().toISOString(),sharedData:{kv:'CASHFLOW_KV',d1:'nyxia-cercles-db',vectorize:'univers-livres'},templateSource:loadedTemplateSource},null,2))
+   zip.file('portal-manifest.json',JSON.stringify({schemaVersion:5,projectRecordId:currentProjectId,createdBy:'NyXia Univers · Super Admin 4',...cfg,host:p.host,workerName:p.worker,compiledAt:new Date().toISOString(),sharedData:{kv:'CASHFLOW_KV',d1:'nyxia-cercles-db',vectorize:'univers-livres'},templateSource:loadedTemplateSource},null,2))
    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:5}})
    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Portail-'+slug(p.short)+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)
-   setStatus('compileStatus','ZIP prêt · projet sauvegardé · '+p.list.length+' personnage(s) actif(s) · '+Object.keys(voiceVariables).length+' voix ElevenLabs · '+tools.length+' outil(s).','ok')
+   setStatus('compileStatus','ZIP propre prêt · projet sauvegardé · '+p.list.length+' personnage(s) actif(s) · '+Object.keys(voiceVariables).length+' voix ElevenLabs · '+tools.length+' outil(s).','ok')
  }catch(e){setStatus('compileStatus','⚠ '+e.message,'error');alert(e.message)}finally{btn.disabled=false}
 }
 
