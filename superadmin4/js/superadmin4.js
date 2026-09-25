@@ -2,8 +2,8 @@
 'use strict'
 
 const PORTAL_TEMPLATE_ENDPOINT='/superadmin4/portail-shell-template.zip'
-const PORTAL_TEMPLATE_SIZE=20125902
-const PORTAL_TEMPLATE_GIT_BLOB='a5a6ac3a7586ce75b93526029e04e939b0b8aee2'
+const PORTAL_TEMPLATE_SIZE=20141983
+const PORTAL_TEMPLATE_GIT_BLOB='3c15e3ff0618d6405fc834870c183ea2c5145f3b'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'
@@ -133,7 +133,20 @@ function agentMeta(a){const voiceId=($('voice-'+a.key)?.value||'').trim();return
 const CORE_AGENT_KEYS=['nyxia','diane','eric']
 function navItemHtml(a){return `<div class="nav-item" id="nav-${attr(a.key)}" data-page-key="${attr(a.key)}" onclick="openAgentTab('${attr(a.key)}')">${a.image?`<img class="nav-avatar" src="${attr(a.image)}" alt="${attr(a.name)}" onerror="this.style.display='none'">`:`<span class="nav-icon">${esc(a.icon)}</span>`}<span class="nav-text"><span class="nav-name">${esc(a.name)}</span><span class="nav-sub">${esc(a.sub)}</span></span><span class="nav-arrow">›</span></div>`}
 function coreNavHtml(list){const core=CORE_AGENT_KEYS.map(k=>list.find(a=>a.key===k)).filter(Boolean);if(!core.length)return'';return `<div class="nav-section-title">Mes Conversations</div>${core.map(navItemHtml).join('\n')}`}
-function atelierNavHtml(list){const extra=list.filter(a=>!CORE_AGENT_KEYS.includes(a.key));if(!extra.length)return'';return `<div class="nav-section-title">Atelier</div><div class="atelier-group" id="atelier-group"><button type="button" class="atelier-toggle" id="atelier-toggle" aria-expanded="false"><span>🎭 Atelier</span><span class="atelier-caret" aria-hidden="true">⌄</span></button><div class="atelier-panel">${extra.map(navItemHtml).join('\n')}</div></div>`}
+function atelierAgents(list){return list.filter(a=>!CORE_AGENT_KEYS.includes(a.key))}
+function atelierNavHtml(list){
+ const extra=atelierAgents(list);if(!extra.length)return''
+ return `<div class="nav-dropdown" id="writing-workshop">
+          <button type="button" class="nav-dropdown-trigger" id="writing-workshop-trigger" onclick="toggleWritingWorkshop()" aria-expanded="false" aria-controls="writing-workshop-menu">
+            <span aria-hidden="true">🎭</span>
+            <span class="nav-dropdown-title">Atelier</span>
+            <span class="nav-dropdown-chevron" aria-hidden="true">⌄</span>
+          </button>
+          <div class="nav-dropdown-menu" id="writing-workshop-menu">
+            ${extra.map(navItemHtml).join('\n')}
+          </div>
+        </div>`
+}
 function toolsNavHtml(rows){if(!rows.length)return'';return `<div class="nav-section-title">Outils</div>${rows.join('\n')}`}
 
 function addTool(){
@@ -347,6 +360,7 @@ function buildPortalLogin(source,p){return replaceAllLiteral(source,{...portalTe
 function buildPortalDashboard(source,p,pages,meta,toolRows,defaultPage){
  let out=source.replace(/<div class="sidebar-section">\s*<div class="sidebar-label">Mes Conversations<\/div>\s*<div class="nav-item active" id="nav-diane"[\s\S]*?<div class="sidebar-section">\s*<div class="sidebar-label">Outils<\/div>/,
    '<div class="sidebar-section">\n        <div class="sidebar-label">Outils</div>')
+ out=out.replace('var WRITING_WORKSHOP_AGENTS = []','var WRITING_WORKSHOP_AGENTS = '+JSON.stringify(atelierAgents(p.list).map(a=>a.key)))
  return replaceAllLiteral(out,{...portalTextMap(p),'__PORTAL_AGENT_NAV__':coreNavHtml(p.list)+atelierNavHtml(p.list),'__PORTAL_SPECIAL_TOOLS__':toolsNavHtml(toolRows),'__PORTAL_TITLE_JSON__':JSON.stringify(p.title),'__PORTAL_SHORT_TITLE_JSON__':JSON.stringify(p.short),'__PORTAL_DEFAULT_AGENT_JSON__':JSON.stringify(defaultPage),'__PORTAL_DEFAULT_AGENT__':defaultPage,'__PORTAL_AGENT_PAGES__':JSON.stringify(pages),'__PORTAL_AGENT_META__':JSON.stringify(meta)})
 }
 function buildPortalChat(source,p,a){
