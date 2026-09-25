@@ -1,0 +1,13 @@
+/* Ajouts fonctionnels seulement — la couche visuelle principale reste celle de NyXia Game. */
+.msg-fallback{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(123,92,255,.15);border:1.5px solid rgba(123,92,255,.3);flex-shrink:0}
+.bubble-wrap{display:flex;flex-direction:column;gap:4px;min-width:0;max-width:100%}
+.message-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+.message-actions button{padding:2px 9px;border-radius:50px;border:1px solid rgba(123,92,255,.15);background:rgba(123,92,255,.04);color:var(--t4);font-family:Outfit,sans-serif;font-size:11px;cursor:pointer;transition:all .15s}
+.message-actions button:hover{border-color:rgba(123,92,255,.35);color:var(--t2);background:rgba(123,92,255,.10)}
+.media-card{margin-top:9px;max-width:560px;overflow:hidden;border-radius:12px}
+.media-card img,.media-card video{display:block;max-width:100%;border-radius:12px;border:1px solid rgba(123,92,255,.2)}
+.media-card audio{width:min(520px,100%)}
+.video-frame,.drive-doc,.drive-audio{display:block;width:min(560px,100%);border:0;border-radius:12px;background:#050914}
+.video-frame{aspect-ratio:16/9}.drive-doc{height:460px}.drive-audio{height:86px}
+.file-link{display:inline-flex;align-items:center;gap:7px;margin-top:6px;padding:9px 12px;border-radius:10px;border:1px solid rgba(123,92,255,.25);background:rgba(123,92,255,.08);color:#c4b5fd;text-decoration:none}
+.typing .msg-bubble{min-width:52px}

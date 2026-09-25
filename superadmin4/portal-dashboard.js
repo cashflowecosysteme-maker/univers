@@ -1,0 +1,13 @@
+(()=>{'use strict';
+const C=window.NYXIA_PORTAL_CONFIG||{};const pages=C.pages||{};const $=id=>document.getElementById(id);let token=sessionStorage.getItem('nyxia_token')||'';
+function closeMobileMenu(){const a=document.querySelector('aside'),b=$('mobile-menu-backdrop');if(a)a.classList.remove('mobile-open');if(b)b.classList.remove('mobile-open')}
+window.closeMobileMenu=closeMobileMenu;window.toggleMobileMenu=function(){const a=document.querySelector('aside'),b=$('mobile-menu-backdrop');if(!a)return;a.classList.toggle('mobile-open');if(b)b.classList.toggle('mobile-open',a.classList.contains('mobile-open'))}
+function setActive(key){document.querySelectorAll('.nav-item[data-page-key]').forEach(el=>el.classList.toggle('active',el.dataset.pageKey===key));const group=$('atelier-group');if(group)group.classList.toggle('has-active',!!group.querySelector('.nav-item.active'))}
+function openPage(key){const path=pages[key];if(!path)return;setActive(key);const frame=$('agent-iframe');if(frame)frame.src=path+(path.includes('?')?'&':'?')+'t='+encodeURIComponent(token);closeMobileMenu()}
+window.openPortalPage=openPage;
+function bindNav(){document.querySelectorAll('.nav-item[data-page-key]').forEach(el=>el.addEventListener('click',()=>openPage(el.dataset.pageKey)));const t=$('atelier-toggle'),g=$('atelier-group');if(t&&g)t.addEventListener('click',()=>{const open=g.classList.toggle('open');t.setAttribute('aria-expanded',open?'true':'false')});const back=$('mobile-menu-backdrop');if(back)back.addEventListener('click',closeMobileMenu)}
+async function logout(){try{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})})}catch(_){}sessionStorage.removeItem('nyxia_token');location.replace('/login')}
+window.logout=logout;
+async function init(){if(!token){location.replace('/login');return}try{const r=await fetch('/api/check-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});const d=await r.json();if(!d.valid){sessionStorage.removeItem('nyxia_token');location.replace('/login');return}const n=d.firstname||localStorage.getItem('nyxia_username')||'';if(n)localStorage.setItem('nyxia_username',n);const hu=$('header-username'),su=$('sidebar-username'),sa=$('sidebar-avatar');if(hu)hu.textContent=n;if(su)su.textContent=n||d.email||'Membre';if(sa)sa.textContent=(n||d.email||'N').charAt(0).toUpperCase()}catch(_){}bindNav();if(C.defaultPage&&pages[C.defaultPage])openPage(C.defaultPage);else{const first=Object.keys(pages)[0];if(first)openPage(first)}}
+document.addEventListener('DOMContentLoaded',init);
+})();

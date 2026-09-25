@@ -257,7 +257,7 @@ export default {
           ok: !!env.CASHFLOW_KV,
           kv: !!env.CASHFLOW_KV,
           bindings: { kv: 'CASHFLOW_KV', d1: 'nyxia-cercles-db', vectorize: 'univers-livres' },
-          version: 'superadmin4-portails-14.0-toml-voice-vars-corrige'
+          version: 'superadmin4-portails-15.0-source-exacte-nyxialabo-game-shell'
         });
       }
       if (url.pathname === '/api/superadmin4/projects' || url.pathname.startsWith('/api/superadmin4/projects/')) {

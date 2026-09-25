@@ -1,11 +1,17 @@
 ;(function(){
 'use strict'
 
-const TEMPLATE_LOCAL='/superadmin4/portail-shell-template.zip'
+const GAME_TEMPLATE_OFFICIAL='https://raw.githubusercontent.com/cashflowecosysteme-maker/NyXiaLabo/main/game-shell-template.zip'
+const GAME_TEMPLATE_SIZE=14816619
+const GAME_TEMPLATE_GIT_BLOB='d009812d9125eaf5a0c06624a579d24a7b9bcb5e'
+const PORTAL_WORKER_TEMPLATE='/superadmin4/portal-worker-template.js'
+const PORTAL_CHAT_RUNTIME='/superadmin4/portal-chat.js'
+const PORTAL_DASH_RUNTIME='/superadmin4/portal-dashboard.js'
+const PORTAL_CHAT_EXTRA_CSS='/superadmin4/portal-chat-extra.css'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'
-const UI_VERSION='13.0-config-b64-corrige'
+const UI_VERSION='15.0-source-exacte-nyxialabo-game-shell'
 
 const BASE_META={
  nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦',image:'https://univers.nyxia.top/NyXia.png'},
@@ -289,192 +295,158 @@ async function deleteProject(){
  }catch(e){alert('Suppression impossible : '+e.message)}
 }
 
+async function gitBlobSha1(buf){
+ const prefix=new TextEncoder().encode('blob '+buf.byteLength+'\0')
+ const body=new Uint8Array(buf),all=new Uint8Array(prefix.length+body.length);all.set(prefix,0);all.set(body,prefix.length)
+ const dig=await crypto.subtle.digest('SHA-1',all)
+ return [...new Uint8Array(dig)].map(b=>b.toString(16).padStart(2,'0')).join('')
+}
+async function helperText(url){const r=await fetch(url,{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error('Fichier interne Super Admin 4 introuvable : '+url+' (HTTP '+r.status+')');return r.text()}
+function htmlDoc(source){return new DOMParser().parseFromString(String(source||''),'text/html')}
+function htmlOut(doc){return '<!DOCTYPE html>\n'+doc.documentElement.outerHTML}
 async function zipFromArrayBuffer(buf,source){
  if(!window.JSZip)throw new Error('JSZip n’est pas encore chargé.')
+ if(buf.byteLength!==GAME_TEMPLATE_SIZE)throw new Error('Coque refusée : ce fichier ne correspond pas au game-shell-template.zip officiel de NyXiaLabo (taille '+buf.byteLength+' au lieu de '+GAME_TEMPLATE_SIZE+').')
+ const sha=await gitBlobSha1(buf)
+ if(sha!==GAME_TEMPLATE_GIT_BLOB)throw new Error('Coque refusée : empreinte différente du game-shell-template.zip officiel de NyXiaLabo. Reçu '+sha+'.')
  const zip=await JSZip.loadAsync(buf)
- const required=['index.html','login.html','dashbord.html','chat-base.html','_worker.js','wrangler.toml','.assetsignore','css/index.css','css/login.css','css/dashbord.css','css/chat.css','js/starry-bg.js','js/login.js','js/dashbord.js','js/chat.js']
- const missing=required.filter(f=>!zip.file(f))
- if(missing.length)throw new Error('Coque incomplète : '+missing.join(', ')+' absent(s).')
- const auditFiles=['index.html','login.html','dashbord.html','chat-base.html','_worker.js']
- const forbidden=/(Portail Alex|Devenir Écrivain|Aimée|Alibi|Constance|Fripouille|Mélusine|Abîme)/i
- for(const f of auditFiles){const txt=await zip.file(f).async('string');if(forbidden.test(txt))throw new Error('Coque refusée : ancien contenu Alex détecté dans '+f+'. Utilise la coque NyXia propre.')}
- loadedTemplate=buf;loadedTemplateSource=source
- setStatus('templateStatus','Coque NyXia propre validée · '+required.length+' fichiers structurants.','ok')
- $('templateSource').textContent='Source : '+source
+ const required=['index.html','login.html','dashbord.html','chat-diane.html','chat-nyxia.html','chat-eric.html','chat-pnj.html','_worker.js','wrangler.toml','.assetsignore','css/index.css','css/login.css','css/dashbord.css','css/chat-diane.css','js/starry-bg.js']
+ const missing=required.filter(f=>!zip.file(f));if(missing.length)throw new Error('Coque Game officielle incomplète : '+missing.join(', ')+' absent(s).')
+ const shellWorker=await zip.file('_worker.js').async('string'),shellNpc=await zip.file('chat-pnj.html').async('string'),shellDash=await zip.file('dashbord.html').async('string')
+ if(!shellWorker.includes('NYXIA_MJ_SCOPED_BRAIN_V1')||!shellWorker.includes('NYXIA_GAME_NPC_SCOPED_BRAIN_V1')||!shellNpc.includes('loadNpcIdentity')||!shellDash.includes('npcMeta'))throw new Error('Coque refusée : le ZIP a la bonne empreinte mais les marqueurs NyXia Game attendus sont absents.')
+ loadedTemplate=buf;loadedTemplateSource=source+' · blob '+sha
+ setStatus('templateStatus','Coque OFFICIELLE NyXiaLabo vérifiée · game-shell-template.zip · '+GAME_TEMPLATE_SIZE.toLocaleString('fr-CA')+' octets.','ok')
+ $('templateSource').textContent='Source : '+loadedTemplateSource
  return zip
 }
 async function loadTemplate(force=false){
- if(loadedTemplate&&!force)return zipFromArrayBuffer(loadedTemplate.slice(0),loadedTemplateSource)
+ if(loadedTemplate&&!force)return zipFromArrayBuffer(loadedTemplate.slice(0),loadedTemplateSource.split(' · blob ')[0])
  const manual=$('templateFile').files?.[0]
  if(manual){const buf=await manual.arrayBuffer();return zipFromArrayBuffer(buf,'fichier choisi : '+manual.name)}
- const candidates=[TEMPLATE_LOCAL]
- let last=''
- for(const url of candidates){
-   try{
-     setStatus('templateStatus','Chargement de la coque : '+url,'')
-     const res=await fetch(url,{cache:'no-store',credentials:url.startsWith('/')?'same-origin':'omit'})
-     if(!res.ok)throw new Error('HTTP '+res.status)
-     const buf=await res.arrayBuffer();if(buf.byteLength<1000)throw new Error('fichier trop petit')
-     return await zipFromArrayBuffer(buf,url)
-   }catch(e){last=e.message}
- }
- throw new Error('Coque officielle introuvable dans /superadmin4/portail-shell-template.zip. Ajoute ce fichier dans Super Admin 4 ou choisis-le manuellement. Dernière erreur : '+last)
+ try{
+   setStatus('templateStatus','Chargement DIRECT du game-shell-template.zip officiel de NyXiaLabo…','')
+   const res=await fetch(GAME_TEMPLATE_OFFICIAL,{cache:'no-store',credentials:'omit',mode:'cors'})
+   if(!res.ok)throw new Error('HTTP '+res.status)
+   return await zipFromArrayBuffer(await res.arrayBuffer(),GAME_TEMPLATE_OFFICIAL)
+ }catch(e){throw new Error('Impossible de charger la coque officielle NyXiaLabo directement : '+e.message+'. Tu peux sélectionner manuellement CE MÊME game-shell-template.zip comme secours.')}
 }
 async function testTemplate(){$('testTemplateBtn').disabled=true;try{await loadTemplate(true)}catch(e){loadedTemplate=null;setStatus('templateStatus',e.message,'error');$('templateSource').textContent=''}finally{$('testTemplateBtn').disabled=false}}
 
 function validatePortal(){
  const title=$('title').value.trim();if(!title)throw new Error('Nom du portail requis.')
- const short=$('short').value.trim()||title
- const id=slug($('portalId').value.trim()||short)
- const worker=slug($('workerName').value.trim()||short)
+ const short=$('short').value.trim()||title,id=slug($('portalId').value.trim()||short),worker=slug($('workerName').value.trim()||short)
  const host=$('host').value.trim().toLowerCase();if(!/^[a-z0-9.-]+\.nyxia\.top$/.test(host))throw new Error('Entre un sous-domaine NyXia valide, ex. portailkael.nyxia.top')
- const icon=$('icon').value.trim()||'✦'
- const mission=$('mission').value.trim(),welcome=$('welcome').value.trim()||'Bienvenue dans ton portail NyXia.'
- const list=activeAgents().map(agentMeta)
- const trainer=$('trainer').value||'';if(trainer&&!list.some(x=>x.key===trainer))throw new Error('Le formateur principal doit être un personnage actif.')
+ const icon=$('icon').value.trim()||'✦',mission=$('mission').value.trim(),welcome=$('welcome').value.trim()||'Bienvenue dans ton portail NyXia.'
+ const list=activeAgents().map(agentMeta),trainer=$('trainer').value||'';if(trainer&&!list.some(x=>x.key===trainer))throw new Error('Le formateur principal doit être un personnage actif.')
  return{title,short,id,worker,host,icon,mission,welcome,list,trainer}
 }
 function b64Utf8(s){const bytes=new TextEncoder().encode(s);let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));return btoa(bin)}
-
-function replaceTomlStringLine(toml,key,value){
- const lines=String(toml||'').split(/\r?\n/)
- const re=new RegExp('^\\s*'+key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*=\\s*.*$')
- const line=key+' = '+JSON.stringify(String(value||''))
- const idx=lines.findIndex(x=>re.test(x))
- if(idx<0)throw new Error('Coque wrangler.toml invalide : ligne '+key+' introuvable.')
- lines[idx]=line
- return lines.join('\n')
+function reEscape(v){return String(v||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
+function replaceTomlStringLine(toml,key,value,required=true){
+ const lines=String(toml||'').split(/\r?\n/),re=new RegExp('^\\s*'+reEscape(key)+'\\s*=\\s*.*$'),line=key+' = '+JSON.stringify(String(value||'')),idx=lines.findIndex(x=>re.test(x))
+ if(idx<0){if(required)throw new Error('Coque Game wrangler.toml invalide : ligne '+key+' introuvable.');return toml}lines[idx]=line;return lines.join('\n')
 }
 function replaceTomlRoutePattern(toml,host){
- const lines=String(toml||'').split(/\r?\n/)
- let inRoutes=false,done=false
- for(let i=0;i<lines.length;i++){
-   if(/^\s*\[\[routes\]\]\s*$/.test(lines[i])){inRoutes=true;continue}
-   if(inRoutes&&/^\s*\[/.test(lines[i])&&!/^\s*\[\[routes\]\]\s*$/.test(lines[i]))inRoutes=false
-   if(inRoutes&&/^\s*pattern\s*=/.test(lines[i])){lines[i]='pattern = '+JSON.stringify(String(host||''));done=true;break}
- }
- if(!done){
-   if(lines.length&&lines[lines.length-1].trim()!=='')lines.push('')
-   lines.push('[[routes]]','pattern = '+JSON.stringify(String(host||'')),'zone_name = "nyxia.top"','custom_domain = true')
- }
+ const lines=String(toml||'').split(/\r?\n/);let inRoutes=false,done=false
+ for(let i=0;i<lines.length;i++){if(/^\s*\[\[routes\]\]\s*$/.test(lines[i])){inRoutes=true;continue}if(inRoutes&&/^\s*\[/.test(lines[i])&&!/^\s*\[\[routes\]\]\s*$/.test(lines[i]))inRoutes=false;if(inRoutes&&/^\s*pattern\s*=/.test(lines[i])){lines[i]='pattern = '+JSON.stringify(String(host||''));done=true;break}}
+ if(!done)throw new Error('Coque Game wrangler.toml invalide : [[routes]] / pattern introuvable.')
  return lines.join('\n')
 }
-async function assertNoTemplateMarkers(zip){
- const bad=[]
- const textExt=/\.(?:html?|js|mjs|css|toml|json|txt|md)$/i
- for(const [name,file] of Object.entries(zip.files)){
-   if(file.dir||!textExt.test(name))continue
-   const txt=await file.async('string')
-   const hits=txt.match(/__[A-Z][A-Z0-9_]*__/g)
-   if(hits&&hits.length)bad.push(name+' : '+[...new Set(hits)].join(', '))
+function stripGameFiles(zip){
+ for(const name of Object.keys(zip.files)){
+   if(/^chat-.*\.html$/i.test(name))zip.remove(name)
+   else if(/^(?:jeu\.html|game-tools\.json|game-manifest\.json)$/i.test(name))zip.remove(name)
+   else if(/^(?:data|documents)\//i.test(name))zip.remove(name)
+   else if(/^js\/(?:nyxia-game|game-portal)\.js$/i.test(name))zip.remove(name)
+   else if(/^css\/(?:jeu|game-portal|chat-nyxia|chat-eric|chat-pnj)\.css$/i.test(name))zip.remove(name)
+   else if(/^images\/PNJ-avatar\.png$/i.test(name))zip.remove(name)
  }
- if(bad.length)throw new Error('Compilation interrompue : marqueur(s) de coque non remplacé(s) → '+bad.join(' | '))
 }
-function injectVoiceVars(toml,agents){
- const vars=agents.filter(a=>a.voiceId).map(a=>({name:a.voiceEnv||voiceEnvName(a.key),value:a.voiceId}))
- if(!vars.length)return toml
- const lines=String(toml||'').split(/\r?\n/)
- const varLine=v=>v.name+' = '+JSON.stringify(v.value)
- const idx=lines.findIndex(line=>/^\s*\[vars\]\s*(?:#.*)?$/.test(line))
- if(idx<0){if(lines.length&&lines[lines.length-1].trim()!=='')lines.push('');lines.push('[vars]',...vars.map(varLine));return lines.join('\n')}
- let end=idx+1;while(end<lines.length&&!/^\s*\[[^]]+\]\s*(?:#.*)?$/.test(lines[end]))end++
- const existing=new Set(lines.slice(idx+1,end).map(line=>{const m=line.match(/^\s*([A-Z0-9_]+)\s*=/);return m&&m[1]}).filter(Boolean))
- const add=vars.filter(v=>!existing.has(v.name)).map(varLine)
- lines.splice(end,0,...add)
- return lines.join('\n')
+function buildIndexFromGame(source,p){
+ const d=htmlDoc(source);d.title='NyXia — '+p.title
+ d.body.innerHTML=`<canvas id="starry-canvas"></canvas><div class="aura"></div><header class="site-header"><a class="brand" href="/"><img src="/images/NyXia.png" alt="NyXia"><span class="brand-name"><b>NyXia</b><span>${esc(p.short)}</span></span></a><div class="header-right"><a class="btn-primary" href="/login">Mon espace</a></div></header><section class="hero" id="top"><span class="hero-eyebrow">${esc(p.icon)} Portail NyXia</span><h1 class="display">${esc(p.title)}</h1>${p.mission?`<p class="hero-lead">${esc(p.mission)}</p>`:''}<div class="hero-cta"><a class="btn-primary" href="/login">Accéder à mon portail</a></div></section><script src="/js/starry-bg.js" defer></script>`
+ return htmlOut(d)
 }
-
+function buildLoginFromGame(source,p,brandImage){
+ const d=htmlDoc(source);d.title=p.title+' — Connexion'
+ const av=d.querySelector('.login-avatar');if(av){av.src=brandImage;av.alt=p.short}
+ const ti=d.querySelector('.login-title');if(ti){ti.id='portal-login-title';ti.textContent=p.short}
+ const sub=d.querySelector('.login-subtitle');if(sub)sub.textContent=p.welcome||'Connecte-toi pour retrouver ton portail.'
+ const foot=d.querySelector('.login-footer');if(foot)foot.innerHTML='<a href="/">Découvrir '+esc(p.short)+'</a><br><span style="opacity:0.5">© 2026 NyXia — '+esc(p.short)+'</span>'
+ d.querySelectorAll('script').forEach(sc=>{if((sc.textContent||'').includes('/api/game/public'))sc.remove()})
+ return htmlOut(d)
+}
+function dashboardAside(p,toolRows){
+ const core=coreNavHtml(p.list),atelier=atelierNavHtml(p.list),toolsHtml=toolRows.length?`<div class="sidebar-section"><div class="sidebar-label">Outils</div>${toolRows.join('')}</div>`:''
+ return `<div class="sidebar-section"><div class="sidebar-label">Mes Conversations</div>${core}${atelier}</div>${toolsHtml}<div class="sidebar-bottom"><div class="user-card"><div class="user-avatar" id="sidebar-avatar">N</div><div class="user-info"><div class="user-name" id="sidebar-username">Chargement...</div><div class="user-plan">✦ ${esc(p.short)}</div></div></div></div>`
+}
+function buildDashboardFromGame(source,p,pages,meta,toolRows,defaultPage){
+ const d=htmlDoc(source);d.title='NyXia — '+p.title
+ const welcome=d.querySelector('.welcome-text');if(welcome)welcome.innerHTML='Bienvenue dans '+esc(p.short)+' ✦ <strong id="header-username"></strong>'
+ const badge=d.querySelector('.btn-pro');if(badge)badge.textContent=p.icon+' '+p.short
+ const aside=d.querySelector('aside');if(!aside)throw new Error('Coque Game : sidebar introuvable dans dashbord.html.');aside.innerHTML=dashboardAside(p,toolRows)
+ const main=d.querySelector('.main-content');if(!main)throw new Error('Coque Game : .main-content introuvable.');main.innerHTML='<div class="panel active" id="panel-chat" style="flex-direction:column"><iframe id="agent-iframe" src="about:blank" style="width:100%;height:100%;border:none;display:block" title="Conversation"></iframe></div>'
+ d.querySelectorAll('script').forEach(x=>x.remove())
+ const s1=d.createElement('script');s1.src='/js/starry-bg.js';s1.defer=true;d.body.appendChild(s1)
+ const cfg=d.createElement('script');cfg.textContent='window.NYXIA_PORTAL_CONFIG='+JSON.stringify({pages,meta,defaultPage,title:p.title,shortTitle:p.short})+';';d.body.appendChild(cfg)
+ const s2=d.createElement('script');s2.src='/js/portal-dashboard.js';d.body.appendChild(s2)
+ return htmlOut(d)
+}
+function buildAgentChatFromGame(source,a){
+ const d=htmlDoc(source);d.title=a.name+' — NyXia'
+ const css=d.querySelector('link[href*="chat-"]');if(css)css.href='/css/chat-diane.css';const extra=d.createElement('link');extra.rel='stylesheet';extra.href='/css/portal-chat-extra.css';d.head.appendChild(extra)
+ const av=d.querySelector('#chat-header-avatar');if(av){av.id='agent-avatar';av.innerHTML=a.image?'<img src="'+attr(a.image)+'" alt="'+attr(a.name)+'">':'<span class="chat-header-badge">'+esc(a.icon||'✦')+'</span>'}
+ const nm=d.querySelector('#chat-header-name');if(nm)nm.textContent=a.name;const sub=d.querySelector('#chat-header-sub');if(sub)sub.textContent=a.sub||'Personnage NyXia'
+ const video=d.querySelector('#btn-welcome-video');if(video)video.remove();const newBtn=[...d.querySelectorAll('.btn-new-chat')].find(x=>(x.textContent||'').includes('Nouveau chat'));if(newBtn){newBtn.id='new-chat-btn';newBtn.removeAttribute('onclick')}
+ const msgs=d.querySelector('.chat-messages');if(msgs)msgs.id='messages'
+ const fw=d.querySelector('#formation-launch-wrap');if(fw){fw.style.removeProperty('display');fw.hidden=true;const fb=fw.querySelector('button');if(fb){fb.id='formation-btn';fb.removeAttribute('onclick');fb.textContent='🎓 Formation Vivante'}}
+ const sug=d.querySelector('#suggestions');if(sug)sug.innerHTML='<button type="button" class="sug-chip" data-suggestion="Aide-moi à avancer aujourd’hui">Aide-moi à avancer aujourd’hui</button><button type="button" class="sug-chip" data-suggestion="Explique-moi simplement la prochaine étape">Explique-moi simplement la prochaine étape</button><button type="button" class="sug-chip" data-suggestion="Que peux-tu faire dans ce portail ?">Que peux-tu faire dans ce portail ?</button>'
+ const oldAttach=d.querySelector('#attach-bar');if(oldAttach){oldAttach.id='attachment-state';oldAttach.hidden=true;oldAttach.style.display='';oldAttach.innerHTML=''}
+ const file=d.querySelector('#chat-file');if(file){file.id='file-input';file.accept='image/*'}
+ const mic=d.querySelector('#btn-mic');if(mic){mic.id='mic-btn';mic.removeAttribute('onclick')}
+ const inp=d.querySelector('#chat-input');if(inp){inp.id='message-input';inp.placeholder='Écris ou parle à '+a.name+'...'}
+ const send=d.querySelector('#btn-send');if(send){send.id='send-btn';send.removeAttribute('onclick')}
+ d.querySelectorAll('script').forEach(x=>x.remove())
+ const s1=d.createElement('script');s1.src='/js/starry-bg.js';s1.defer=true;d.body.appendChild(s1)
+ const cfg=d.createElement('script');cfg.textContent='window.NYXIA_AGENT='+JSON.stringify(a)+';';d.body.appendChild(cfg)
+ const s2=d.createElement('script');s2.src='/js/portal-chat.js';d.body.appendChild(s2)
+ return htmlOut(d)
+}
+async function assertFinalPortal(zip,p){
+ const required=['index.html','login.html','dashbord.html','_worker.js','wrangler.toml','.assetsignore','css/index.css','css/login.css','css/dashbord.css','css/chat-diane.css','css/portal-chat-extra.css','js/starry-bg.js','js/portal-chat.js','js/portal-dashboard.js']
+ const missing=required.filter(f=>!zip.file(f));if(missing.length)throw new Error('Compilation interrompue : fichier final manquant → '+missing.join(', '))
+ for(const a of p.list)if(!zip.file('chat-'+a.key+'.html'))throw new Error('Compilation interrompue : chat-'+a.key+'.html manquant.')
+ const ai=await zip.file('.assetsignore').async('string');if(!/^_worker\.js$/m.test(ai))throw new Error('Compilation interrompue : .assetsignore ne protège pas _worker.js.')
+ const wr=await zip.file('wrangler.toml').async('string');if(/ELEVENLABS_[A-Z0-9_]+_VOICE_ID\s*=/.test(wr))throw new Error('Compilation interrompue : les Voice IDs ne doivent plus être injectés dans wrangler.toml.')
+ if(!new RegExp('^name\\s*=\\s*"'+reEscape(p.worker)+'"','m').test(wr))throw new Error('Compilation interrompue : nom Worker non appliqué.')
+ if(!wr.includes('pattern = '+JSON.stringify(p.host)))throw new Error('Compilation interrompue : domaine non appliqué dans [[routes]].')
+}
 async function compilePortal(){
- const btn=$('compileBtn');btn.disabled=true;setStatus('compileStatus','Sauvegarde du projet puis chargement de la coque propre…')
+ const btn=$('compileBtn');btn.disabled=true;setStatus('compileStatus','Sauvegarde puis lecture DIRECTE du game-shell-template.zip officiel…')
  try{
    if(!(await saveProjectNow(false)))throw new Error('Impossible de sauvegarder le projet avant la compilation.')
-   const p=validatePortal();const zip=await loadTemplate()
-   const voiceVariables=Object.fromEntries(p.list.filter(a=>a.voiceId).map(a=>[a.voiceEnv||voiceEnvName(a.key),a.voiceId]))
+   const p=validatePortal(),zip=await loadTemplate(),voiceVariables=Object.fromEntries(p.list.filter(a=>a.voiceId).map(a=>[a.voiceEnv||voiceEnvName(a.key),a.voiceId]))
    const cfg={id:p.id,title:p.title,shortTitle:p.short,mission:p.mission,welcome:p.welcome,icon:p.icon,mode:'standard',formationAgent:p.trainer,activeAgents:p.list.map(x=>x.key),agents:p.list,voiceVariables,sourceCatalog:'univers:/api/personnages'}
-
-   // Sécurité : même si quelqu'un fournit une ancienne coque avec des chats résiduels,
-   // on retire tous les chat-*.html avant de générer uniquement les personnages actifs.
-   for(const name of Object.keys(zip.files)){if(/^chat-(?!base\.html$).+\.html$/i.test(name))zip.remove(name)}
-
-   const pages={};p.list.forEach(a=>pages[a.key]='/chat-'+a.key+'.html')
-   const toolRows=[]
+   const brandAgent=p.list.find(a=>a.key===p.trainer)||p.list.find(a=>a.key==='diane')||p.list.find(a=>a.key==='nyxia')||p.list.find(a=>a.key==='eric')||p.list[0]||null,brandImage=(brandAgent&&brandAgent.image)||'/images/NyXia.png'
+   const gameIndex=await zip.file('index.html').async('string'),gameLogin=await zip.file('login.html').async('string'),gameDash=await zip.file('dashbord.html').async('string'),gameChat=await zip.file('chat-diane.html').async('string')
+   stripGameFiles(zip)
+   const pages={},toolRows=[]
    for(const [i,t] of tools.entries()){
      if(!t.name.trim())throw new Error('Outil '+(i+1)+' : ajoute un nom.')
      if(typeof t.content!=='string'||!t.content.trim())throw new Error('Outil '+(i+1)+' : aucun fichier HTML n’est associé. Ajoute son fichier ou retire cet outil.')
-     const path=cleanPath(t.path||('/outil-'+(i+1)+'.html'));const html=t.content
-     if(!/<html[\s>]/i.test(html)&&!/<body[\s>]/i.test(html))throw new Error('Outil '+(i+1)+' : le fichier ne ressemble pas à une page HTML.')
-     zip.file(path.replace(/^\//,''),html)
-     const key='tool-'+t.id;pages[key]=path
-     toolRows.push(`<div class="nav-item" id="nav-${attr(key)}" data-page-key="${attr(key)}"><span class="nav-icon">${esc(t.icon||'🧰')}</span><span class="nav-text"><span class="nav-name">${esc(t.name)}</span><span class="nav-sub">Outil spécialisé</span></span><span class="nav-arrow">›</span></div>`)
+     const path=cleanPath(t.path||('/outil-'+(i+1)+'.html'));if(!/<html[\s>]/i.test(t.content)&&!/<body[\s>]/i.test(t.content))throw new Error('Outil '+(i+1)+' : le fichier ne ressemble pas à une page HTML.')
+     zip.file(path.replace(/^\//,''),t.content);const key='tool-'+t.id;pages[key]=path;toolRows.push(`<div class="nav-item" id="nav-${attr(key)}" data-page-key="${attr(key)}"><span class="nav-icon">${esc(t.icon||'🧰')}</span><span class="nav-text"><span class="nav-name">${esc(t.name)}</span><span class="nav-sub">Outil spécialisé</span></span><span class="nav-arrow">›</span></div>`)
    }
-
-   const preferred=['nyxia','diane','eric'].find(k=>pages[k])
-   const defaultPage=preferred||p.list[0]?.key||Object.keys(pages)[0]||''
-   const meta=Object.fromEntries(p.list.map(a=>[a.key,a]))
-   const brandAgent=p.list.find(a=>a.key===p.trainer)||p.list.find(a=>a.key==='diane')||p.list.find(a=>a.key==='nyxia')||p.list.find(a=>a.key==='eric')||p.list[0]||null
-   const portalBrandImage=(brandAgent&&brandAgent.image)||'https://univers.nyxia.top/NyXia.png'
-
-   function fillPortalText(html){
-     return html
-       .replaceAll('__PORTAL_TITLE__',p.title)
-       .replaceAll('__PORTAL_SHORT_TITLE__',p.short)
-       .replaceAll('__PORTAL_ICON__',p.icon)
-       .replaceAll('__PORTAL_WELCOME__',p.welcome)
-       .replaceAll('__PORTAL_MISSION__',p.mission)
-       .replaceAll('__PORTAL_TITLE_JSON__',JSON.stringify(p.title))
-       .replaceAll('__PORTAL_SHORT_TITLE_JSON__',JSON.stringify(p.short))
-       .replaceAll('__PORTAL_DEFAULT_AGENT_JSON__',JSON.stringify(defaultPage))
-       .replaceAll('__PORTAL_LOGIN_IMAGE__',portalBrandImage)
-       .replaceAll('__PORTAL_HEADER_IMAGE__',portalBrandImage)
-   }
-
-   let index=fillPortalText(await zip.file('index.html').async('string'));zip.file('index.html',index)
-   let login=fillPortalText(await zip.file('login.html').async('string'));zip.file('login.html',login)
-
-   let dash=fillPortalText(await zip.file('dashbord.html').async('string'))
-   dash=dash
-     .replace('__PORTAL_CORE_NAV__',coreNavHtml(p.list))
-     .replace('__PORTAL_ATELIER_NAV__',atelierNavHtml(p.list))
-     .replace('__PORTAL_SPECIAL_TOOLS__',toolsNavHtml(toolRows))
-     .replace('__PORTAL_AGENT_PAGES__',JSON.stringify(pages))
-     .replace('__PORTAL_AGENT_META__',JSON.stringify(meta))
-   zip.file('dashbord.html',dash)
-
-   const chatBase=await zip.file('chat-base.html').async('string')
-   for(const a of p.list){
-     let c=fillPortalText(chatBase)
-       .replaceAll('__AGENT_NAME__',a.name)
-       .replaceAll('__AGENT_SUB__',a.sub)
-       .replaceAll('__AGENT_ICON__',a.icon||'✦')
-       .replace('__AGENT_JSON__',JSON.stringify(a))
-     zip.file('chat-'+a.key+'.html',c)
-   }
-   zip.remove('chat-base.html')
-
-   let worker=await zip.file('_worker.js').async('string')
-   if(!worker.includes('__PORTAL_CONFIG_B64__'))throw new Error('Coque Worker invalide : marqueur __PORTAL_CONFIG_B64__ absent.')
-   worker=worker.replace('__PORTAL_CONFIG_B64__',b64Utf8(JSON.stringify(cfg)));zip.file('_worker.js',worker)
-
-   let wr=await zip.file('wrangler.toml').async('string')
-   // On n'utilise plus un placeholder pour le nom : on réécrit les lignes TOML complètes.
-   wr=replaceTomlStringLine(wr,'name',p.worker)
-   wr=replaceTomlRoutePattern(wr,p.host)
-   wr=replaceTomlStringLine(wr,'SITE_URL','https://'+p.host)
-   wr=replaceTomlStringLine(wr,'PORTAIL',p.id)
-   wr=replaceTomlStringLine(wr,'PORTAL_SLUG',p.id)
-   // Compatibilité avec d'anciennes coques : remplace aussi d'éventuels marqueurs restants.
-   wr=wr.replaceAll('__WORKER_NAME__',p.worker).replaceAll('__HOST__',p.host).replaceAll('__PORTAL_ID__',p.id)
-   wr=injectVoiceVars(wr,p.list)
-   zip.file('wrangler.toml',wr)
-
-   zip.file('portal-manifest.json',JSON.stringify({schemaVersion:6,projectRecordId:currentProjectId,createdBy:'NyXia Univers · Super Admin 4',...cfg,host:p.host,workerName:p.worker,compiledAt:new Date().toISOString(),sharedData:{kv:'CASHFLOW_KV',d1:'nyxia-cercles-db',vectorize:'univers-livres'},templateSource:loadedTemplateSource},null,2))
-
-   // Contrôle final AVANT téléchargement : aucun marqueur de coque ne peut sortir du compilateur.
-   await assertNoTemplateMarkers(zip)
-
-   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:5}})
-   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Portail-'+slug(p.short)+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)
-   setStatus('compileStatus','ZIP propre prêt · projet sauvegardé · '+p.list.length+' personnage(s) actif(s) · '+Object.keys(voiceVariables).length+' voix ElevenLabs · '+tools.length+' outil(s).','ok')
+   for(const a of p.list){pages[a.key]='/chat-'+a.key+'.html';zip.file('chat-'+a.key+'.html',buildAgentChatFromGame(gameChat,a))}
+   const preferred=['nyxia','diane','eric'].find(k=>pages[k]),defaultPage=preferred||p.list[0]?.key||Object.keys(pages)[0]||'',meta=Object.fromEntries(p.list.map(a=>[a.key,a]))
+   zip.file('index.html',buildIndexFromGame(gameIndex,p));zip.file('login.html',buildLoginFromGame(gameLogin,p,brandImage));zip.file('dashbord.html',buildDashboardFromGame(gameDash,p,pages,meta,toolRows,defaultPage))
+   zip.file('js/portal-chat.js',await helperText(PORTAL_CHAT_RUNTIME));zip.file('js/portal-dashboard.js',await helperText(PORTAL_DASH_RUNTIME));zip.file('css/portal-chat-extra.css',await helperText(PORTAL_CHAT_EXTRA_CSS))
+   let worker=await helperText(PORTAL_WORKER_TEMPLATE);if(!worker.includes('__PORTAL_CONFIG_B64__'))throw new Error('Worker portail interne invalide : marqueur de configuration absent.');worker=worker.replace('__PORTAL_CONFIG_B64__',b64Utf8(JSON.stringify(cfg)));zip.file('_worker.js',worker)
+   let wr=await zip.file('wrangler.toml').async('string');wr=replaceTomlStringLine(wr,'name',p.worker);wr=replaceTomlRoutePattern(wr,p.host);wr=replaceTomlStringLine(wr,'SITE_URL','https://'+p.host+'/',true);wr=replaceTomlStringLine(wr,'PORTAIL',p.id,true);wr=replaceTomlStringLine(wr,'GAME_ID','',false);zip.file('wrangler.toml',wr)
+   zip.file('portal-manifest.json',JSON.stringify({schemaVersion:7,projectRecordId:currentProjectId,createdBy:'NyXia Univers · Super Admin 4',...cfg,host:p.host,workerName:p.worker,compiledAt:new Date().toISOString(),sharedData:{kv:'CASHFLOW_KV',d1:'nyxia-cercles-db',vectorize:'univers-livres'},templateSource:loadedTemplateSource,templateGitBlob:GAME_TEMPLATE_GIT_BLOB},null,2))
+   await assertFinalPortal(zip,p)
+   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:5}}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Portail-'+slug(p.short)+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)
+   setStatus('compileStatus','ZIP prêt depuis la coque OFFICIELLE NyXiaLabo · '+p.list.length+' personnage(s) · '+Object.keys(voiceVariables).length+' voix intégrées à la configuration · '+tools.length+' outil(s).','ok')
  }catch(e){setStatus('compileStatus','⚠ '+e.message,'error');alert(e.message)}finally{btn.disabled=false}
 }
 
