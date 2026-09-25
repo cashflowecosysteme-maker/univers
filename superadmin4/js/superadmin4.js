@@ -2,8 +2,8 @@
 'use strict'
 
 const PORTAL_TEMPLATE_ENDPOINT='/superadmin4/portail-shell-template.zip'
-const PORTAL_TEMPLATE_SIZE=20142017
-const PORTAL_TEMPLATE_GIT_BLOB='48e24c076bd2acc6f70667bbc9f1426dbcb7c459'
+const PORTAL_TEMPLATE_SIZE=20183506
+const PORTAL_TEMPLATE_GIT_BLOB='62f7f37c11ab64f1bb3f158bf84aedd9d2601db2'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'
@@ -412,7 +412,11 @@ async function compilePortal(){
    const preferred=['nyxia','diane','eric'].find(k=>pages[k]),defaultPage=preferred||p.list[0]?.key||Object.keys(pages)[0]||'',meta=Object.fromEntries(p.list.map(a=>[a.key,a]))
    const indexSource=await zip.file('index.html').async('string'),loginSource=await zip.file('login.html').async('string'),dashSource=await zip.file('dashbord.html').async('string'),chatSource=await zip.file('chat-base.html').async('string')
    zip.file('index.html',buildPortalIndex(indexSource,p));zip.file('login.html',buildPortalLogin(loginSource,p));zip.file('dashbord.html',buildPortalDashboard(dashSource,p,pages,meta,toolRows,defaultPage))
-   for(const a of p.list)zip.file('chat-'+a.key+'.html',buildPortalChat(chatSource,p,a))
+   for(const a of p.list){
+     const existingChat=zip.file('chat-'+a.key+'.html')
+     const source=existingChat?await existingChat.async('string'):chatSource
+     zip.file('chat-'+a.key+'.html',buildPortalChat(source,p,a))
+   }
    zip.remove('chat-base.html')
    zip.file('_worker.js',compilePortalWorker(await zip.file('_worker.js').async('string'),cfg))
    zip.file('wrangler.toml',compileWrangler(await zip.file('wrangler.toml').async('string'),p))
