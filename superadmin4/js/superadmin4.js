@@ -5,7 +5,7 @@ const TEMPLATE_LOCAL='/superadmin4/portail-shell-template.zip'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'
-const UI_VERSION='12.0-validation-stricte'
+const UI_VERSION='13.0-config-b64-corrige'
 
 const BASE_META={
  nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦',image:'https://univers.nyxia.top/NyXia.png'},
