@@ -2,8 +2,8 @@
 'use strict'
 
 const PORTAL_TEMPLATE_ENDPOINT='/superadmin4/portail-shell-template.zip'
-const PORTAL_TEMPLATE_SIZE=14716736
-const PORTAL_TEMPLATE_GIT_BLOB='ecc5f218a12caabbf35f0ac8cdca6f9e880100d7'
+const PORTAL_TEMPLATE_SIZE=20125902
+const PORTAL_TEMPLATE_GIT_BLOB='a5a6ac3a7586ce75b93526029e04e939b0b8aee2'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'
@@ -305,7 +305,7 @@ async function zipFromArrayBuffer(buf,source){
  const sha=await gitBlobSha1(buf)
  if(sha!==PORTAL_TEMPLATE_GIT_BLOB)throw new Error('Coque Portail refusée : empreinte Git différente. Reçu '+sha+'.')
  const zip=await JSZip.loadAsync(buf)
- const required=['index.html','login.html','dashbord.html','chat-base.html','_worker.js','wrangler.toml','.assetsignore','starry-bg.js']
+ const required=['index.html','login.html','dashbord.html','chat-base.html','_worker.js','wrangler.toml','.assetsignore','css/index.css','css/login.css','css/dashbord.css','css/chat.css','js/starry-bg.js']
  const missing=required.filter(f=>!zip.file(f));if(missing.length)throw new Error('Coque Portail officielle incomplète : '+missing.join(', ')+' absent(s).')
  const dash=await zip.file('dashbord.html').async('string'),chat=await zip.file('chat-base.html').async('string'),worker=await zip.file('_worker.js').async('string'),wr=await zip.file('wrangler.toml').async('string')
  for(const mark of ['__PORTAL_AGENT_NAV__','__PORTAL_SPECIAL_TOOLS__','__PORTAL_AGENT_PAGES__','__PORTAL_DEFAULT_AGENT__'])if(!dash.includes(mark))throw new Error('Coque Portail invalide : '+mark+' absent de dashbord.html.')
@@ -343,7 +343,7 @@ function buildPortalLogin(source,p){return replaceAllLiteral(source,{...portalTe
  .replace(/<title>[^<]*<\/title>/,'<title>'+esc(p.title)+' — Connexion</title>')
  .replace(/<div class="login-title">[\s\S]*?<\/div>/,'<div class="login-title">'+esc(p.short)+'</div>')
  .replace(/<div class="login-subtitle">[\s\S]*?<\/div>/,'<div class="login-subtitle">Connecte-toi pour retrouver ton portail NyXia</div>')
- .replace(/<img src="\/Alex\.png" alt="Alex" class="login-avatar">/,'<img src="/NyXia.png" alt="NyXia" class="login-avatar">')}
+ .replace(/<img src="\/images\/Alex\.png" alt="Alex" class="login-avatar">/,'<img src="/images/NyXia.png" alt="NyXia" class="login-avatar">')}
 function buildPortalDashboard(source,p,pages,meta,toolRows,defaultPage){
  let out=source.replace(/<div class="sidebar-section">\s*<div class="sidebar-label">Mes Conversations<\/div>\s*<div class="nav-item active" id="nav-diane"[\s\S]*?<div class="sidebar-section">\s*<div class="sidebar-label">Outils<\/div>/,
    '<div class="sidebar-section">\n        <div class="sidebar-label">Outils</div>')
@@ -368,7 +368,7 @@ function compileWrangler(source,p){
  return wr
 }
 async function assertFinalPortal(zip,p){
- const required=['index.html','login.html','dashbord.html','_worker.js','wrangler.toml','.assetsignore','starry-bg.js']
+ const required=['index.html','login.html','dashbord.html','_worker.js','wrangler.toml','.assetsignore','css/index.css','css/login.css','css/dashbord.css','css/chat.css','js/starry-bg.js']
  const missing=required.filter(f=>!zip.file(f));if(missing.length)throw new Error('Compilation interrompue : fichier final manquant → '+missing.join(', '))
  for(const a of p.list)if(!zip.file('chat-'+a.key+'.html'))throw new Error('Compilation interrompue : chat-'+a.key+'.html manquant.')
  if(zip.file('chat-base.html'))throw new Error('Compilation interrompue : chat-base.html modèle encore présent.')
