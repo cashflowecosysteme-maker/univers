@@ -130,9 +130,9 @@ function refreshTrainer(){
 function agentMeta(a){const voiceId=($('voice-'+a.key)?.value||'').trim();return{key:a.key,name:a.name,sub:a.sub||'Personnage NyXia',icon:a.icon||'✦',image:($('img-'+a.key)?.value||a.image||'').trim(),custom:!!a.custom,portail:a.portail||'',voiceEnv:voiceEnvName(a.key),voiceId,greeting:'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.'}}
 const CORE_AGENT_KEYS=['nyxia','diane','eric']
 function navItemHtml(a){return `<div class="nav-item" id="nav-${attr(a.key)}" data-page-key="${attr(a.key)}">${a.image?`<img class="nav-avatar" src="${attr(a.image)}" alt="${attr(a.name)}" onerror="this.style.display='none'">`:`<span class="nav-icon">${esc(a.icon)}</span>`}<span class="nav-text"><span class="nav-name">${esc(a.name)}</span><span class="nav-sub">${esc(a.sub)}</span></span><span class="nav-arrow">›</span></div>`}
-function coreNavHtml(list){const core=CORE_AGENT_KEYS.map(k=>list.find(a=>a.key===k)).filter(Boolean);return core.length?`<div class="nav-section"><div class="nav-section-title">Équipe principale</div>${core.map(navItemHtml).join('\n')}</div>`:''}
-function atelierNavHtml(list){const extra=list.filter(a=>!CORE_AGENT_KEYS.includes(a.key));if(!extra.length)return'';return `<div class="atelier-group" id="atelier-group"><button class="atelier-toggle" id="atelier-toggle" type="button"><span>🎭 Atelier</span><span class="atelier-caret">⌄</span></button><div class="atelier-panel">${extra.map(navItemHtml).join('\n')}</div></div>`}
-function toolsNavHtml(rows){if(!rows.length)return'';return `<div class="nav-section"><div class="nav-section-title">Outils</div>${rows.join('\n')}</div>`}
+function coreNavHtml(list){const core=CORE_AGENT_KEYS.map(k=>list.find(a=>a.key===k)).filter(Boolean);return core.map(navItemHtml).join('\n')}
+function atelierNavHtml(list){const extra=list.filter(a=>!CORE_AGENT_KEYS.includes(a.key));if(!extra.length)return'';return `<div class="nav-dropdown" id="atelier-group"><button type="button" class="nav-dropdown-trigger" id="atelier-toggle" aria-expanded="false"><span aria-hidden="true">🎭</span><span class="nav-dropdown-title">Atelier</span><span class="nav-dropdown-chevron" aria-hidden="true">⌄</span></button><div class="nav-dropdown-menu">${extra.map(navItemHtml).join('\n')}</div></div>`}
+function toolsNavHtml(rows){if(!rows.length)return'';return `<div class="sidebar-divider"></div><div class="sidebar-section"><div class="sidebar-label">Outils</div>${rows.join('\n')}</div>`}
 
 function addTool(){
  tools.push({id:crypto.randomUUID().replace(/-/g,'').slice(0,16),icon:'🧰',name:'',path:'/outil-'+(tools.length+1)+'.html',fileName:'',content:''})
@@ -292,7 +292,7 @@ async function deleteProject(){
 async function zipFromArrayBuffer(buf,source){
  if(!window.JSZip)throw new Error('JSZip n’est pas encore chargé.')
  const zip=await JSZip.loadAsync(buf)
- const required=['index.html','login.html','dashbord.html','chat-base.html','_worker.js','wrangler.toml','css/index.css','css/login.css','css/dashbord.css','css/chat.css','js/login.js','js/dashbord.js','js/chat.js']
+ const required=['index.html','login.html','dashbord.html','chat-base.html','_worker.js','wrangler.toml','.assetsignore','css/index.css','css/login.css','css/dashbord.css','css/chat.css','js/starry-bg.js','js/login.js','js/dashbord.js','js/chat.js']
  const missing=required.filter(f=>!zip.file(f))
  if(missing.length)throw new Error('Coque incomplète : '+missing.join(', ')+' absent(s).')
  const auditFiles=['index.html','login.html','dashbord.html','chat-base.html','_worker.js']
@@ -376,6 +376,8 @@ async function compilePortal(){
    const preferred=['nyxia','diane','eric'].find(k=>pages[k])
    const defaultPage=preferred||p.list[0]?.key||Object.keys(pages)[0]||''
    const meta=Object.fromEntries(p.list.map(a=>[a.key,a]))
+   const brandAgent=p.list.find(a=>a.key===p.trainer)||p.list.find(a=>a.key==='diane')||p.list.find(a=>a.key==='nyxia')||p.list.find(a=>a.key==='eric')||p.list[0]||null
+   const portalBrandImage=(brandAgent&&brandAgent.image)||'https://univers.nyxia.top/NyXia.png'
 
    function fillPortalText(html){
      return html
@@ -387,6 +389,8 @@ async function compilePortal(){
        .replaceAll('__PORTAL_TITLE_JSON__',JSON.stringify(p.title))
        .replaceAll('__PORTAL_SHORT_TITLE_JSON__',JSON.stringify(p.short))
        .replaceAll('__PORTAL_DEFAULT_AGENT_JSON__',JSON.stringify(defaultPage))
+       .replaceAll('__PORTAL_LOGIN_IMAGE__',portalBrandImage)
+       .replaceAll('__PORTAL_HEADER_IMAGE__',portalBrandImage)
    }
 
    let index=fillPortalText(await zip.file('index.html').async('string'));zip.file('index.html',index)
@@ -406,6 +410,7 @@ async function compilePortal(){
      let c=fillPortalText(chatBase)
        .replaceAll('__AGENT_NAME__',a.name)
        .replaceAll('__AGENT_SUB__',a.sub)
+       .replaceAll('__AGENT_ICON__',a.icon||'✦')
        .replace('__AGENT_JSON__',JSON.stringify(a))
      zip.file('chat-'+a.key+'.html',c)
    }
