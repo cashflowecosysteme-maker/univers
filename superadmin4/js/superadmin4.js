@@ -131,7 +131,7 @@ function refreshTrainer(){
 }
 function agentMeta(a){const voiceId=($('voice-'+a.key)?.value||'').trim();return{key:a.key,name:a.name,sub:a.sub||'Personnage NyXia',icon:a.icon||'✦',image:($('img-'+a.key)?.value||a.image||'').trim(),custom:!!a.custom,portail:a.portail||'',voiceEnv:voiceEnvName(a.key),voiceId,greeting:'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.'}}
 const CORE_AGENT_KEYS=['nyxia','diane','eric']
-function navItemHtml(a){return `<div class="nav-item" id="nav-${attr(a.key)}" data-page-key="${attr(a.key)}">${a.image?`<img class="nav-avatar" src="${attr(a.image)}" alt="${attr(a.name)}" onerror="this.style.display='none'">`:`<span class="nav-icon">${esc(a.icon)}</span>`}<span class="nav-text"><span class="nav-name">${esc(a.name)}</span><span class="nav-sub">${esc(a.sub)}</span></span><span class="nav-arrow">›</span></div>`}
+function navItemHtml(a){return `<div class="nav-item" id="nav-${attr(a.key)}" data-page-key="${attr(a.key)}" onclick="openAgentTab('${attr(a.key)}')">${a.image?`<img class="nav-avatar" src="${attr(a.image)}" alt="${attr(a.name)}" onerror="this.style.display='none'">`:`<span class="nav-icon">${esc(a.icon)}</span>`}<span class="nav-text"><span class="nav-name">${esc(a.name)}</span><span class="nav-sub">${esc(a.sub)}</span></span><span class="nav-arrow">›</span></div>`}
 function coreNavHtml(list){const core=CORE_AGENT_KEYS.map(k=>list.find(a=>a.key===k)).filter(Boolean);if(!core.length)return'';return `<div class="nav-section-title">Mes Conversations</div>${core.map(navItemHtml).join('\n')}`}
 function atelierNavHtml(list){const extra=list.filter(a=>!CORE_AGENT_KEYS.includes(a.key));if(!extra.length)return'';return `<div class="nav-section-title">Atelier</div><div class="atelier-group" id="atelier-group"><button type="button" class="atelier-toggle" id="atelier-toggle" aria-expanded="false"><span>🎭 Atelier</span><span class="atelier-caret" aria-hidden="true">⌄</span></button><div class="atelier-panel">${extra.map(navItemHtml).join('\n')}</div></div>`}
 function toolsNavHtml(rows){if(!rows.length)return'';return `<div class="nav-section-title">Outils</div>${rows.join('\n')}`}
@@ -305,10 +305,10 @@ async function zipFromArrayBuffer(buf,source){
  const sha=await gitBlobSha1(buf)
  if(sha!==PORTAL_TEMPLATE_GIT_BLOB)throw new Error('Coque Portail refusée : empreinte Git différente. Reçu '+sha+'.')
  const zip=await JSZip.loadAsync(buf)
- const required=['index.html','login.html','dashbord.html','chat-base.html','_worker.js','wrangler.toml','.assetsignore','css/index.css','css/login.css','css/dashbord.css','css/chat.css','js/starry-bg.js','js/login.js','js/dashbord.js','js/chat.js']
+ const required=['index.html','login.html','dashbord.html','chat-base.html','_worker.js','wrangler.toml','.assetsignore','starry-bg.js']
  const missing=required.filter(f=>!zip.file(f));if(missing.length)throw new Error('Coque Portail officielle incomplète : '+missing.join(', ')+' absent(s).')
  const dash=await zip.file('dashbord.html').async('string'),chat=await zip.file('chat-base.html').async('string'),worker=await zip.file('_worker.js').async('string'),wr=await zip.file('wrangler.toml').async('string')
- for(const mark of ['__PORTAL_CORE_NAV__','__PORTAL_ATELIER_NAV__','__PORTAL_SPECIAL_TOOLS__','__PORTAL_AGENT_PAGES__','__PORTAL_AGENT_META__'])if(!dash.includes(mark))throw new Error('Coque Portail invalide : '+mark+' absent de dashbord.html.')
+ for(const mark of ['__PORTAL_AGENT_NAV__','__PORTAL_SPECIAL_TOOLS__','__PORTAL_AGENT_PAGES__','__PORTAL_DEFAULT_AGENT__'])if(!dash.includes(mark))throw new Error('Coque Portail invalide : '+mark+' absent de dashbord.html.')
  if(!chat.includes('__AGENT_JSON__'))throw new Error('Coque Portail invalide : __AGENT_JSON__ absent de chat-base.html.')
  if(!worker.includes('__PORTAL_CONFIG_B64__'))throw new Error('Coque Portail invalide : configuration Worker absente.')
  for(const mark of ['__WORKER_NAME__','__HOST__','__PORTAL_ID__'])if(!wr.includes(mark))throw new Error('Coque Portail invalide : '+mark+' absent de wrangler.toml.')
@@ -336,12 +336,18 @@ function validatePortal(){
 }
 function b64Utf8(s){const bytes=new TextEncoder().encode(s);let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));return btoa(bin)}
 function replaceAllLiteral(source,map){let out=String(source||'');for(const [k,v] of Object.entries(map))out=out.split(k).join(String(v));return out}
-function makeToolNav(t,key){return `<div class="nav-item" id="nav-${attr(key)}" data-page-key="${attr(key)}"><span class="nav-icon">${esc(t.icon||'🧰')}</span><span class="nav-text"><span class="nav-name">${esc(t.name)}</span><span class="nav-sub">Outil spécialisé</span></span><span class="nav-arrow">›</span></div>`}
+function makeToolNav(t,key){return `<div class="nav-item" id="nav-${attr(key)}" data-page-key="${attr(key)}" onclick="openAgentTab('${attr(key)}')"><span class="nav-icon">${esc(t.icon||'🧰')}</span><span class="nav-text"><span class="nav-name">${esc(t.name)}</span><span class="nav-sub">Outil spécialisé</span></span><span class="nav-arrow">›</span></div>`}
 function portalTextMap(p){return{'__PORTAL_TITLE__':esc(p.title),'__PORTAL_SHORT_TITLE__':esc(p.short),'__PORTAL_ICON__':esc(p.icon),'__PORTAL_MISSION__':esc(p.mission),'__PORTAL_WELCOME__':esc(p.welcome)}}
 function buildPortalIndex(source,p){return replaceAllLiteral(source,portalTextMap(p))}
-function buildPortalLogin(source,p){return replaceAllLiteral(source,{...portalTextMap(p),'__PORTAL_TITLE_JSON__':JSON.stringify(p.title)})}
+function buildPortalLogin(source,p){return replaceAllLiteral(source,{...portalTextMap(p),'__PORTAL_TITLE_JSON__':JSON.stringify(p.title)})
+ .replace(/<title>[^<]*<\/title>/,'<title>'+esc(p.title)+' — Connexion</title>')
+ .replace(/<div class="login-title">[\s\S]*?<\/div>/,'<div class="login-title">'+esc(p.short)+'</div>')
+ .replace(/<div class="login-subtitle">[\s\S]*?<\/div>/,'<div class="login-subtitle">Connecte-toi pour retrouver ton portail NyXia</div>')
+ .replace(/<img src="\/Alex\.png" alt="Alex" class="login-avatar">/,'<img src="/NyXia.png" alt="NyXia" class="login-avatar">')}
 function buildPortalDashboard(source,p,pages,meta,toolRows,defaultPage){
- return replaceAllLiteral(source,{...portalTextMap(p),'__PORTAL_CORE_NAV__':coreNavHtml(p.list),'__PORTAL_ATELIER_NAV__':atelierNavHtml(p.list),'__PORTAL_SPECIAL_TOOLS__':toolsNavHtml(toolRows),'__PORTAL_TITLE_JSON__':JSON.stringify(p.title),'__PORTAL_SHORT_TITLE_JSON__':JSON.stringify(p.short),'__PORTAL_DEFAULT_AGENT_JSON__':JSON.stringify(defaultPage),'__PORTAL_AGENT_PAGES__':JSON.stringify(pages),'__PORTAL_AGENT_META__':JSON.stringify(meta)})
+ let out=source.replace(/<div class="sidebar-section">\s*<div class="sidebar-label">Mes Conversations<\/div>\s*<div class="nav-item active" id="nav-diane"[\s\S]*?<div class="sidebar-section">\s*<div class="sidebar-label">Outils<\/div>/,
+   '<div class="sidebar-section">\n        <div class="sidebar-label">Outils</div>')
+ return replaceAllLiteral(out,{...portalTextMap(p),'__PORTAL_AGENT_NAV__':coreNavHtml(p.list)+atelierNavHtml(p.list),'__PORTAL_SPECIAL_TOOLS__':toolsNavHtml(toolRows),'__PORTAL_TITLE_JSON__':JSON.stringify(p.title),'__PORTAL_SHORT_TITLE_JSON__':JSON.stringify(p.short),'__PORTAL_DEFAULT_AGENT_JSON__':JSON.stringify(defaultPage),'__PORTAL_DEFAULT_AGENT__':defaultPage,'__PORTAL_AGENT_PAGES__':JSON.stringify(pages),'__PORTAL_AGENT_META__':JSON.stringify(meta)})
 }
 function buildPortalChat(source,p,a){
  return replaceAllLiteral(source,{'__PORTAL_TITLE__':esc(p.title),'__PORTAL_TITLE_JSON__':JSON.stringify(p.title),'__AGENT_NAME__':esc(a.name),'__AGENT_SUB__':esc(a.sub||'Personnage NyXia'),'__AGENT_JSON__':JSON.stringify(a)})
@@ -362,7 +368,7 @@ function compileWrangler(source,p){
  return wr
 }
 async function assertFinalPortal(zip,p){
- const required=['index.html','login.html','dashbord.html','_worker.js','wrangler.toml','.assetsignore','css/index.css','css/login.css','css/dashbord.css','css/chat.css','js/starry-bg.js','js/login.js','js/dashbord.js','js/chat.js']
+ const required=['index.html','login.html','dashbord.html','_worker.js','wrangler.toml','.assetsignore','starry-bg.js']
  const missing=required.filter(f=>!zip.file(f));if(missing.length)throw new Error('Compilation interrompue : fichier final manquant → '+missing.join(', '))
  for(const a of p.list)if(!zip.file('chat-'+a.key+'.html'))throw new Error('Compilation interrompue : chat-'+a.key+'.html manquant.')
  if(zip.file('chat-base.html'))throw new Error('Compilation interrompue : chat-base.html modèle encore présent.')

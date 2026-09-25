@@ -9,7 +9,6 @@ const MAX_INDEX_ITEMS = 500;
 // Ce n'est PAS une limite sur le nombre d'outils.
 const MAX_TOOL_BYTES = 20 * 1024 * 1024;
 const COOKIE_NAME = 'nyxia_univers';
-const OFFICIAL_PORTAL_TEMPLATE_URL = 'https://raw.githubusercontent.com/cashflowecosysteme-maker/NyXiaLabo/main/portail-shell-template.zip';
 const OFFICIAL_PORTAL_TEMPLATE_SIZE = 14716736;
 
 
@@ -250,17 +249,18 @@ export default {
     const url = new URL(request.url);
 
     try {
-      // Coque PORTAIL officielle NyXiaLabo. Le navigateur reste en même origine :
-      // ce Worker effectue le fetch GitHub côté serveur pour éviter tout blocage CORS.
+      // Coque PORTAIL officielle NyXiaLabo. Elle est servie depuis les assets
+      // déployés avec Univers, pour ne plus dépendre de GitHub pendant la compilation.
       if (request.method === 'GET' && url.pathname === '/superadmin4/portail-shell-template.zip') {
-        const upstream = await fetch(OFFICIAL_PORTAL_TEMPLATE_URL, {
-          headers: { 'Accept': 'application/octet-stream', 'User-Agent': 'NyXia-SuperAdmin4/16' },
-          cf: { cacheEverything: true, cacheTtl: 300 }
-        });
-        if (!upstream.ok) return json({ error: 'Coque Portail NyXiaLabo inaccessible (HTTP ' + upstream.status + ').' }, 502);
-        const advertised = Number(upstream.headers.get('content-length') || 0);
+        if (!env.ASSETS || typeof env.ASSETS.fetch !== 'function') {
+          return json({ error: 'Assets Cloudflare indisponibles : portail-shell-template.zip ne peut pas être servi localement.' }, 500);
+        }
+        const assetRequest = new Request(new URL('/superadmin4/portail-shell-template.zip', request.url), request);
+        const asset = await env.ASSETS.fetch(assetRequest);
+        if (!asset.ok) return json({ error: 'Coque Portail locale absente : /superadmin4/portail-shell-template.zip.' }, 502);
+        const advertised = Number(asset.headers.get('content-length') || 0);
         if (advertised && advertised !== OFFICIAL_PORTAL_TEMPLATE_SIZE) {
-          return json({ error: 'Coque Portail NyXiaLabo inattendue : ' + advertised + ' octets au lieu de ' + OFFICIAL_PORTAL_TEMPLATE_SIZE + '.' }, 502);
+          return json({ error: 'Coque Portail locale inattendue : ' + advertised + ' octets au lieu de ' + OFFICIAL_PORTAL_TEMPLATE_SIZE + '.' }, 502);
         }
         const headers = new Headers();
         headers.set('Content-Type', 'application/zip');
@@ -268,7 +268,7 @@ export default {
         headers.set('Cache-Control', 'private, no-store');
         headers.set('X-NyXia-Template', 'portail-shell-template.zip');
         headers.set('X-NyXia-Template-Size', String(OFFICIAL_PORTAL_TEMPLATE_SIZE));
-        return new Response(upstream.body, { status: 200, headers });
+        return new Response(asset.body, { status: 200, headers });
       }
       if (request.method === 'GET' && url.pathname === '/api/superadmin4/health') {
         return json({
