@@ -2,8 +2,8 @@
 'use strict'
 
 const PORTAL_TEMPLATE_ENDPOINT='/superadmin4/portail-shell-template.zip'
-const PORTAL_TEMPLATE_SIZE=20183506
-const PORTAL_TEMPLATE_GIT_BLOB='62f7f37c11ab64f1bb3f158bf84aedd9d2601db2'
+const PORTAL_TEMPLATE_SIZE=20190434
+const PORTAL_TEMPLATE_GIT_BLOB='eb0af08d010af8a5aedaafa436b0f79b2dbf47a2'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'
@@ -364,7 +364,22 @@ function buildPortalDashboard(source,p,pages,meta,toolRows,defaultPage){
  return replaceAllLiteral(out,{...portalTextMap(p),'__PORTAL_AGENT_NAV__':coreNavHtml(p.list)+atelierNavHtml(p.list),'__PORTAL_SPECIAL_TOOLS__':toolsNavHtml(toolRows),'__PORTAL_TITLE_JSON__':JSON.stringify(p.title),'__PORTAL_SHORT_TITLE_JSON__':JSON.stringify(p.short),'__PORTAL_DEFAULT_AGENT_JSON__':JSON.stringify(defaultPage),'__PORTAL_DEFAULT_AGENT__':defaultPage,'__PORTAL_AGENT_PAGES__':JSON.stringify(pages),'__PORTAL_AGENT_META__':JSON.stringify(meta)})
 }
 function buildPortalChat(source,p,a){
- return replaceAllLiteral(source,{'__PORTAL_TITLE__':esc(p.title),'__PORTAL_TITLE_JSON__':JSON.stringify(p.title),'__AGENT_NAME__':esc(a.name),'__AGENT_SUB__':esc(a.sub||'Personnage NyXia'),'__AGENT_JSON__':JSON.stringify(a)})
+ const image=a.image||''
+ const avatar=image?'<img src="'+attr(image)+'" alt="'+attr(a.name)+'">':'<span class="avatar-fallback">'+esc(a.icon||'✦')+'</span>'
+ return replaceAllLiteral(source,{
+  '__PORTAL_TITLE__':esc(p.title),
+  '__PORTAL_TITLE_JSON__':JSON.stringify(p.title),
+  '__AGENT_KEY__':a.key,
+  '__AGENT_NAME__':esc(a.name),
+  '__AGENT_SUB__':esc(a.sub||'Personnage NyXia'),
+  '__AGENT_JSON__':JSON.stringify(a),
+  '__AGENT_NAME_JSON__':JSON.stringify(a.name),
+  '__AGENT_SUB_JSON__':JSON.stringify(a.sub||'Personnage NyXia'),
+  '__AGENT_GREETING_JSON__':JSON.stringify(a.greeting||'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.'),
+  '__AGENT_IMAGE_JSON__':JSON.stringify(image),
+  '__AGENT_VIDEO_JSON__':JSON.stringify(a.welcomeVideo||''),
+  '__AGENT_AVATAR_HTML__':avatar
+ })
 }
 function compilePortalWorker(source,cfg){
  let worker=String(source||'')
