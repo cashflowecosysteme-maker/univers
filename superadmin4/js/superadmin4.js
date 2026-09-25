@@ -356,7 +356,7 @@ function compilePortalWorker(source,cfg){
  let worker=String(source||'')
  const constMarker="const PORTAL_CONFIG_B64 = '__PORTAL_CONFIG_B64__';"
  if(!worker.includes(constMarker))throw new Error('Coque Portail : marqueur Worker principal introuvable.')
- worker=worker.replace(/if\s*\(!raw\s*\|\|\s*raw\.includes\('__PORTAL_CONFIG_B64__'\)\)\s*return fallback;/,"if (!raw || raw.length < 8) return fallback;")
+ worker=worker.replace(/if\s*\(!raw\s*\|\|\s*(?:raw\.includes\('__PORTAL_CONFIG_B64__'\)|raw\.indexOf\('__PORTAL_CONFIG_B64__'\)\s*!==?\s*-1)\)\s*return fallback;/,"if (!raw || raw.length < 8) return fallback;")
  worker=worker.replace(constMarker,"const PORTAL_CONFIG_B64 = '"+b64Utf8(JSON.stringify(cfg))+"';")
  if(worker.includes('__PORTAL_CONFIG_B64__'))throw new Error('Coque Portail : marqueur Worker non remplacé.')
  return worker
