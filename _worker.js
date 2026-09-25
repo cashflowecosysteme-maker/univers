@@ -877,7 +877,7 @@ async function handleRemovePortal(request, env) {
   const id = String(body.id || '').trim();
   let portals = await getPortalsList(env);
   portals = portals.filter(p => p.id !== id);
-  await env.CASHFLOW_KV.put('univers:portals', JSON.stringify(portals);
+  await env.CASHFLOW_KV.put('univers:portals', JSON.stringify(portals));
   return json({ success: true, portals });
 }
 
@@ -910,7 +910,7 @@ async function handleCreatePortalClient(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const body = await request.json();
   const email = (body.email || '').toLowerCase().trim();
-  const password = body.password || ''';
+  const password = body.password || '';
   const firstName = (body.firstName || body.prenom || '').trim();
   const lastName = (body.lastName || '').trim();
   const products = Array.isArray(body.products) ? body.products : [];
