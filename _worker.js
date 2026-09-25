@@ -1,5 +1,6 @@
 import superAdmin2 from './superadmin2/_worker.js';
 import superAdmin3 from './superadmin3/_worker.js';
+import superAdmin4 from './superadmin4/_worker.js';
 // NyXia Univers — SuperAdmin central (système complet jumelé Cercles + Répertoire)
 const SESSION_TTL = 60 * 60 * 12;
 const COOKIE_NAME = 'nyxia_univers';
@@ -876,7 +877,7 @@ async function handleRemovePortal(request, env) {
   const id = String(body.id || '').trim();
   let portals = await getPortalsList(env);
   portals = portals.filter(p => p.id !== id);
-  await env.CASHFLOW_KV.put('univers:portals', JSON.stringify(portals));
+  await env.CASHFLOW_KV.put('univers:portals', JSON.stringify(portals);
   return json({ success: true, portals });
 }
 
@@ -909,7 +910,7 @@ async function handleCreatePortalClient(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const body = await request.json();
   const email = (body.email || '').toLowerCase().trim();
-  const password = body.password || '';
+  const password = body.password || ''';
   const firstName = (body.firstName || body.prenom || '').trim();
   const lastName = (body.lastName || '').trim();
   const products = Array.isArray(body.products) ? body.products : [];
@@ -1575,6 +1576,15 @@ export default {
     // Super Admin 3 : infolettres. Le monstre n'aiguillage que.
     if (path === '/api/superadmin3' || path.startsWith('/api/superadmin3/')) {
       return superAdmin3.fetch(request, env);
+    }
+
+    // Super Admin 4 : création, sauvegarde et reprise des projets de portails.
+    if (path === '/api/superadmin4' || path.startsWith('/api/superadmin4/')) {
+      return superAdmin4.fetch(request, env);
+    }
+    // Coque officielle de création de portail, servie derrière la session Super Admin.
+    if (path === '/superadmin4/portail-shell-template.zip') {
+      return superAdmin4.fetch(request, env);
     }
 
     try {
