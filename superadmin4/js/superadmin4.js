@@ -2,8 +2,8 @@
 'use strict'
 
 const PORTAL_TEMPLATE_ENDPOINT='/superadmin4/portail-shell-template.zip'
-const PORTAL_TEMPLATE_SIZE=20141983
-const PORTAL_TEMPLATE_GIT_BLOB='3c15e3ff0618d6405fc834870c183ea2c5145f3b'
+const PORTAL_TEMPLATE_SIZE=20142017
+const PORTAL_TEMPLATE_GIT_BLOB='48e24c076bd2acc6f70667bbc9f1426dbcb7c459'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'

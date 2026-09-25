@@ -9,7 +9,7 @@ const MAX_INDEX_ITEMS = 500;
 // Ce n'est PAS une limite sur le nombre d'outils.
 const MAX_TOOL_BYTES = 20 * 1024 * 1024;
 const COOKIE_NAME = 'nyxia_univers';
-const OFFICIAL_PORTAL_TEMPLATE_SIZE = 20141983;
+const OFFICIAL_PORTAL_TEMPLATE_SIZE = 20142017;
 
 
 function json(data, status = 200) {
