@@ -2,8 +2,8 @@
 'use strict'
 
 const PORTAL_TEMPLATE_ENDPOINT='/superadmin4/portail-shell-template.zip'
-const PORTAL_TEMPLATE_SIZE=20190434
-const PORTAL_TEMPLATE_GIT_BLOB='eb0af08d010af8a5aedaafa436b0f79b2dbf47a2'
+const PORTAL_TEMPLATE_SIZE=20190729
+const PORTAL_TEMPLATE_GIT_BLOB='def190413f34521357d4a10954e16c9c28e71484'
 // Même clé que V4 pour récupérer le travail déjà saisi au premier chargement.
 const DRAFT_KEY='nyxia:superadmin4:draft:v2'
 const API_PROJECTS='/api/superadmin4/projects'
@@ -132,7 +132,7 @@ function refreshTrainer(){
 function agentMeta(a){const voiceId=($('voice-'+a.key)?.value||'').trim();return{key:a.key,name:a.name,sub:a.sub||'Personnage NyXia',icon:a.icon||'✦',image:($('img-'+a.key)?.value||a.image||'').trim(),custom:!!a.custom,portail:a.portail||'',voiceEnv:voiceEnvName(a.key),voiceId,greeting:'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.'}}
 const CORE_AGENT_KEYS=['nyxia','diane','eric']
 function navItemHtml(a){return `<div class="nav-item" id="nav-${attr(a.key)}" data-page-key="${attr(a.key)}" onclick="openAgentTab('${attr(a.key)}')">${a.image?`<img class="nav-avatar" src="${attr(a.image)}" alt="${attr(a.name)}" onerror="this.style.display='none'">`:`<span class="nav-icon">${esc(a.icon)}</span>`}<span class="nav-text"><span class="nav-name">${esc(a.name)}</span><span class="nav-sub">${esc(a.sub)}</span></span><span class="nav-arrow">›</span></div>`}
-function coreNavHtml(list){const core=CORE_AGENT_KEYS.map(k=>list.find(a=>a.key===k)).filter(Boolean);if(!core.length)return'';return `<div class="nav-section-title">Mes Conversations</div>${core.map(navItemHtml).join('\n')}`}
+function coreNavHtml(list){const core=CORE_AGENT_KEYS.map(k=>list.find(a=>a.key===k)).filter(Boolean);if(!core.length)return'';return core.map(navItemHtml).join('\n')}
 function atelierAgents(list){return list.filter(a=>!CORE_AGENT_KEYS.includes(a.key))}
 function atelierNavHtml(list){
  const extra=atelierAgents(list);if(!extra.length)return''
@@ -147,7 +147,7 @@ function atelierNavHtml(list){
           </div>
         </div>`
 }
-function toolsNavHtml(rows){if(!rows.length)return'';return `<div class="nav-section-title">Outils</div>${rows.join('\n')}`}
+function toolsNavHtml(rows){if(!rows.length)return'';return rows.join('\n')}
 
 function addTool(){
  tools.push({id:crypto.randomUUID().replace(/-/g,'').slice(0,16),icon:'🧰',name:'',path:'/outil-'+(tools.length+1)+'.html',fileName:'',content:''})
