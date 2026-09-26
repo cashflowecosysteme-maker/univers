@@ -377,7 +377,10 @@ td strong{color:#fff}
             <h3 style="margin-bottom:4px">💬 Messagerie NyXia</h3>
             <p class="hint" style="margin-top:0">Messages reçus depuis les portails. Les réponses reviennent directement dans la messagerie du client.</p>
           </div>
-          <button class="btn btn-ghost" type="button" onclick="msgAdminLoad()">↻ Actualiser</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost" type="button" onclick="msgAdminCleanupOld()">🧹 Nettoyer &gt; 1 an</button>
+            <button class="btn btn-ghost" type="button" onclick="msgAdminLoad()">↻ Actualiser</button>
+          </div>
         </div>
         <div class="msg-admin-layout">
           <div class="msg-admin-inbox">
@@ -394,6 +397,7 @@ td strong{color:#fff}
               <div class="msg-reply-top">
                 <label for="msg-reply-as">Répondre comme</label>
                 <select class="f" id="msg-reply-as" style="width:auto;padding:7px 9px"><option value="Diane Boyer">Diane Boyer</option><option value="Équipe NyXia">Équipe NyXia</option></select>
+                <button class="btn btn-danger" id="msg-delete-btn" type="button" onclick="msgAdminDeleteConversation()" disabled style="margin-left:auto;padding:7px 10px">🗑️ Effacer la conversation</button>
               </div>
               <textarea id="msg-reply-text" placeholder="Écris ta réponse…" disabled></textarea>
               <div class="msg-reply-actions"><span class="msg-reply-status" id="msg-reply-status"></span><button class="btn" id="msg-send-btn" type="button" onclick="msgAdminReply()" disabled>Envoyer la réponse ➤</button></div>
@@ -1344,7 +1348,7 @@ async function msgAdminOpen(email,markRead){
       +(fromClient?'':'<div class="msg-who">'+esc(m.fromName||'Diane Boyer')+'</div>')+esc(text)
       +'<span class="msg-meta">'+msgAdminDate(m.createdAt||m.date||'')+(m.portal?' · '+esc(m.portal):'')+'</span></div></div>';
   }).join('')||'<div class="msg-empty">Aucun message.</div>';
-  body.scrollTop=body.scrollHeight;document.getElementById('msg-reply-text').disabled=false;document.getElementById('msg-send-btn').disabled=false;msgAdminRenderInbox();
+  body.scrollTop=body.scrollHeight;document.getElementById('msg-reply-text').disabled=false;document.getElementById('msg-send-btn').disabled=false;document.getElementById('msg-delete-btn').disabled=false;msgAdminRenderInbox();
   if(markRead!==false&&g.unread){
     var keys=g.messages.filter(function(m){return(m.to==='__admin__'||m.kind==='to_admin')&&!m.read&&m.key;}).map(function(m){return m.key;});
     if(keys.length){try{await api('/api/messagerie/read','POST',{keys:keys});await msgAdminLoad();}catch(e){}}
@@ -1358,6 +1362,39 @@ async function msgAdminReply(){
   try{var out=await api('/api/messagerie/reply','POST',{toEmail:MSG_ADMIN_CURRENT,body:text,fromName:document.getElementById('msg-reply-as').value,portal:currentPortal});
     if(!out.res.ok)throw new Error((out.data&&out.data.error)||'Erreur');document.getElementById('msg-reply-text').value='';status.textContent='✓ Réponse envoyée.';await msgAdminLoad();msgAdminOpen(MSG_ADMIN_CURRENT,false);
   }catch(e){status.textContent=e.message||'Erreur';}finally{btn.disabled=false;}
+}
+
+async function msgAdminDeleteConversation(){
+  if(!MSG_ADMIN_CURRENT)return;
+  var g=msgAdminGroups().find(function(x){return x.email===MSG_ADMIN_CURRENT;});
+  var label=g?(g.name+' ('+g.email+')'):MSG_ADMIN_CURRENT;
+  if(!confirm('Effacer définitivement toute la conversation Super Admin avec '+label+' ?\n\nCette action supprime les messages reçus et les réponses de cette conversation dans CASHFLOW_KV.'))return;
+  var btn=document.getElementById('msg-delete-btn');var status=document.getElementById('msg-reply-status');
+  btn.disabled=true;status.textContent='Suppression…';
+  try{
+    var out=await api('/api/messagerie/delete-conversation','POST',{email:MSG_ADMIN_CURRENT});
+    if(!out.res.ok)throw new Error((out.data&&out.data.error)||'Erreur');
+    var n=(out.data&&out.data.deleted)||0;
+    MSG_ADMIN_CURRENT='';
+    document.getElementById('msg-thread-head').innerHTML='<strong>Choisis une conversation</strong><span>Client · portail</span>';
+    document.getElementById('msg-thread-body').innerHTML='<div class="msg-empty">Conversation effacée.</div>';
+    document.getElementById('msg-reply-text').value='';document.getElementById('msg-reply-text').disabled=true;
+    document.getElementById('msg-send-btn').disabled=true;btn.disabled=true;
+    status.textContent='✓ '+n+' message(s) supprimé(s).';
+    await msgAdminLoad();
+  }catch(e){status.textContent=e.message||'Erreur';btn.disabled=false;}
+}
+
+async function msgAdminCleanupOld(){
+  if(!confirm('Nettoyer les messages de la Messagerie Super Admin datant de plus de 365 jours ?\n\nCette action est définitive. Les autres messageries et les données clients ne seront pas touchées.'))return;
+  try{
+    var out=await api('/api/messagerie/cleanup','POST',{days:365});
+    if(!out.res.ok)throw new Error((out.data&&out.data.error)||'Erreur');
+    var n=(out.data&&out.data.deleted)||0;
+    alert('Nettoyage terminé : '+n+' message(s) de plus d’un an supprimé(s).');
+    MSG_ADMIN_CURRENT='';
+    await msgAdminLoad();
+  }catch(e){alert(e.message||'Erreur de nettoyage.');}
 }
 
 /* ───────────── FORMATIONS ALEX (constructeur visuel) ───────────── */

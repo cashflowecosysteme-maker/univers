@@ -1728,6 +1728,63 @@ async function handleMessagerieReply(request, env) {
   return json({ success: true, message });
 }
 
+
+async function handleMessagerieDeleteConversation(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.CASHFLOW_KV) return json({ error: 'CASHFLOW_KV absent.' }, 500);
+  const body = await request.json().catch(() => ({}));
+  const email = String(body.email || '').toLowerCase().trim();
+  if (!email || !email.includes('@')) return json({ error: 'Client invalide.' }, 400);
+
+  const keys = await nyxMsgListAll(env, 'message:');
+  let deleted = 0;
+  for (const key of keys) {
+    const raw = await env.CASHFLOW_KV.get(key.name);
+    if (!raw) continue;
+    try {
+      const m = JSON.parse(raw);
+      const from = String(m.from || '').toLowerCase().trim();
+      const to = String(m.to || '').toLowerCase().trim();
+      const isToAdmin = to === '__admin__' || m.kind === 'to_admin';
+      const isFromAdmin = from === 'admin' || m.kind === 'admin' || m.kind === 'broadcast';
+      const belongs = (isToAdmin && from === email) || (isFromAdmin && to === email);
+      if (!belongs) continue;
+      await env.CASHFLOW_KV.delete(key.name);
+      deleted++;
+    } catch (_) {}
+  }
+  return json({ success: true, deleted });
+}
+
+async function handleMessagerieCleanup(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.CASHFLOW_KV) return json({ error: 'CASHFLOW_KV absent.' }, 500);
+  const body = await request.json().catch(() => ({}));
+  const days = Math.max(365, Math.min(3650, Number(body.days || 365)));
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const keys = await nyxMsgListAll(env, 'message:');
+  let deleted = 0;
+  let kept = 0;
+
+  for (const key of keys) {
+    const raw = await env.CASHFLOW_KV.get(key.name);
+    if (!raw) continue;
+    try {
+      const m = JSON.parse(raw);
+      const from = String(m.from || '').toLowerCase().trim();
+      const to = String(m.to || '').toLowerCase().trim();
+      const isToAdmin = to === '__admin__' || m.kind === 'to_admin';
+      const isFromAdmin = from === 'admin' || m.kind === 'admin' || m.kind === 'broadcast';
+      if (!isToAdmin && !isFromAdmin) continue; // ne touche jamais aux autres messageries
+      const stamp = Date.parse(m.createdAt || m.date || '');
+      if (!Number.isFinite(stamp) || stamp >= cutoff) { kept++; continue; }
+      await env.CASHFLOW_KV.delete(key.name);
+      deleted++;
+    } catch (_) {}
+  }
+  return json({ success: true, deleted, kept, days });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -1787,6 +1844,8 @@ export default {
       if (path === '/api/messagerie/inbox' && request.method === 'GET') return await handleMessagerieInbox(request, env);
       if (path === '/api/messagerie/read' && request.method === 'POST') return await handleMessagerieRead(request, env);
       if (path === '/api/messagerie/reply' && request.method === 'POST') return await handleMessagerieReply(request, env);
+      if (path === '/api/messagerie/delete-conversation' && request.method === 'POST') return await handleMessagerieDeleteConversation(request, env);
+      if (path === '/api/messagerie/cleanup' && request.method === 'POST') return await handleMessagerieCleanup(request, env);
       if (path === '/api/degustations/meta' && request.method === 'GET') return await handleDgMeta(request, env);
       if (path === '/api/degustations' && (request.method === 'GET' || request.method === 'POST')) return await handleDgCampaigns(request, env);
       if (path === '/api/degustations/delete' && request.method === 'POST') return await handleDgDeleteCampaign(request, env);
