@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Messagerie NyXia</title><link rel="stylesheet" href="./css/messagerie-admin.css"></head>
+<body>
+<div class="msg-admin-shell">
+  <div class="msg-admin-top">
+    <div><div class="eyebrow">SUPER ADMIN 1</div><h1>💬 Messagerie NyXia</h1><p>Tous les messages des portails, au même endroit.</p></div>
+    <button id="refreshInbox" class="btn secondary">↻ Actualiser</button>
+  </div>
+  <div class="filters">
+    <input id="searchInbox" placeholder="🔎 Rechercher un client…">
+    <select id="portalFilter"><option value="">Tous les portails</option></select>
+    <select id="statusFilter"><option value="">Tous</option><option value="unread">Non lus</option><option value="read">Lus</option></select>
+  </div>
+  <div class="messenger-layout">
+    <aside class="inbox"><div id="inboxList" class="inbox-list"><div class="empty">Chargement…</div></div></aside>
+    <section class="thread">
+      <div id="threadHead" class="thread-head"><strong>Choisis une conversation</strong><span>Client · portail</span></div>
+      <div id="threadMessages" class="thread-messages"><div class="empty large">Aucune conversation ouverte.</div></div>
+      <div class="reply-box">
+        <div class="reply-top"><label>Répondre comme</label><select id="replyAs"><option value="Diane Boyer">Diane Boyer</option><option value="Équipe NyXia">Équipe NyXia</option></select></div>
+        <textarea id="replyText" placeholder="Écris ta réponse…" disabled></textarea>
+        <div class="reply-bottom"><span id="replyStatus"></span><button id="sendReply" class="btn" disabled>Envoyer la réponse ➤</button></div>
+      </div>
+    </section>
+  </div>
+</div>
+<script src="./js/messagerie-admin.js"></script>
+</body></html>

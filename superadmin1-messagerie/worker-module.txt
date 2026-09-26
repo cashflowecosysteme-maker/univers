@@ -1,0 +1,16 @@
+/* ===== NYXIA MESSAGERIE CENTRALE — IAPubWeb compatible ===== */
+async function nyxMsgAdminList(request,env){
+  if(!(await requireAdmin(request,env)))return json({error:'Non autorisé.'},401);
+  const list=await env.CASHFLOW_KV.list({prefix:'msg:'}),messages=[];
+  for(const k of list.keys||[]){try{const raw=await env.CASHFLOW_KV.get(k.name);if(raw){const m=JSON.parse(raw);if(m&&m.id)messages.push(m)}}catch(_){}}
+  messages.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));return json({success:true,messages})
+}
+async function nyxMsgAdminReply(request,env){
+  if(!(await requireAdmin(request,env)))return json({error:'Non autorisé.'},401);
+  const b=await request.json().catch(()=>({})),email=String(b.clientEmail||'').toLowerCase().trim(),id=String(b.msgId||'').trim(),reply=String(b.reply||'').trim();
+  if(!email||!id||!reply)return json({error:'Client, message et réponse requis.'},400);
+  const key='msg:'+email+':'+id,raw=await env.CASHFLOW_KV.get(key);if(!raw)return json({error:'Message introuvable.'},404);
+  const m=JSON.parse(raw);m.reply=reply;m.replyFrom=String(b.replyFrom||'Diane Boyer').trim()||'Diane Boyer';m.replyDate=new Date().toISOString();m.read=true;if(b.portal&&!m.portal)m.portal=String(b.portal);
+  await env.CASHFLOW_KV.put(key,JSON.stringify(m));return json({success:true})
+}
+/* ===== FIN NYXIA MESSAGERIE CENTRALE ===== */
