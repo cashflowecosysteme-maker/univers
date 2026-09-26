@@ -57,6 +57,37 @@ td strong{color:#fff}
 .boutique-portal-settings{padding:12px;border:1px solid rgba(123,92,255,.16);border-radius:12px;background:rgba(15,28,63,.35)}
 .boutique-portal-settings h4{color:#fff;margin-bottom:10px}
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* ───────────── MESSAGERIE NYXIA ───────────── */
+.msg-admin-layout{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:14px;min-height:560px}
+.msg-admin-inbox,.msg-admin-thread{background:rgba(15,28,63,.48);border:1px solid rgba(123,92,255,.18);border-radius:16px;overflow:hidden}
+.msg-admin-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px;border-bottom:1px solid rgba(123,92,255,.14)}
+.msg-admin-toolbar input,.msg-admin-toolbar select{padding:9px 10px;border-radius:9px;border:1px solid rgba(123,92,255,.25);background:rgba(6,10,24,.5);color:#fff;font:inherit;font-size:12px}
+.msg-admin-toolbar input{flex:1;min-width:150px}
+.msg-conv-list{max-height:620px;overflow:auto;padding:8px}
+.msg-conv{position:relative;padding:11px 12px;border-radius:12px;border:1px solid transparent;cursor:pointer;margin-bottom:6px;transition:.15s}
+.msg-conv:hover,.msg-conv.active{background:rgba(123,92,255,.11);border-color:rgba(123,92,255,.25)}
+.msg-conv-name{font-size:13px;font-weight:700;color:#fff;padding-right:52px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg-conv-email,.msg-conv-preview{font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+.msg-conv-portal{display:inline-block;margin-top:5px;font-size:9px;font-weight:700;color:#c4b5fd;background:rgba(123,92,255,.1);border:1px solid rgba(123,92,255,.18);border-radius:999px;padding:3px 7px}
+.msg-unread{position:absolute;right:9px;top:9px;min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:#7B5CFF;color:#fff;font-size:10px;font-weight:800;box-shadow:0 0 16px rgba(123,92,255,.35)}
+#msg-nav-badge{display:none;margin-left:4px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;align-items:center;justify-content:center;background:#7B5CFF;color:#fff;font-size:9px;font-weight:800;vertical-align:middle}
+.msg-thread-head{padding:14px 16px;border-bottom:1px solid rgba(123,92,255,.14);background:rgba(26,37,84,.42)}
+.msg-thread-head strong{display:block;color:#fff;font-size:14px}.msg-thread-head span{display:block;color:var(--t3);font-size:11px;margin-top:3px}
+.msg-thread-body{height:420px;overflow:auto;padding:16px;background:rgba(6,10,24,.2)}
+.msg-line{display:flex;margin:8px 0}.msg-line.client{justify-content:flex-start}.msg-line.admin{justify-content:flex-end}
+.msg-bubble{max-width:78%;padding:10px 12px;border-radius:14px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.msg-line.client .msg-bubble{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.08);border-bottom-left-radius:5px}
+.msg-line.admin .msg-bubble{background:linear-gradient(135deg,rgba(123,92,255,.28),rgba(79,163,255,.14));border:1px solid rgba(123,92,255,.26);border-bottom-right-radius:5px}
+.msg-meta{display:block;margin-top:5px;font-size:9px;color:var(--t3)}
+.msg-who{font-size:10px;font-weight:800;color:#c4b5fd;margin-bottom:3px}
+.msg-reply{padding:12px;border-top:1px solid rgba(123,92,255,.14);background:rgba(15,28,63,.38)}
+.msg-reply-top{display:flex;gap:8px;align-items:center;margin-bottom:8px}.msg-reply-top label{font-size:10px;color:var(--t3)}
+.msg-reply textarea{width:100%;min-height:86px;resize:vertical;padding:11px 12px;border-radius:10px;border:1px solid rgba(123,92,255,.25);background:rgba(6,10,24,.55);color:#fff;font:inherit}
+.msg-reply-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px}.msg-reply-status{font-size:11px;color:var(--t3)}
+.msg-empty{padding:30px 14px;text-align:center;color:var(--t3);font-size:12px}
+@media(max-width:860px){.msg-admin-layout{grid-template-columns:1fr}.msg-conv-list{max-height:280px}.msg-thread-body{height:360px}}
+
 </style>
 </head>
 <body>
@@ -91,6 +122,7 @@ td strong{color:#fff}
     <button class="module-tab" data-module="apayer" onclick="switchModule('apayer')">À payer (mes produits)</button>
     <button class="module-tab" data-module="portails" onclick="switchModule('portails')">Portails</button>
     <button class="module-tab" data-module="clients" onclick="switchModule('clients')">Clients portails</button>
+    <button class="module-tab" data-module="messagerie" onclick="switchModule('messagerie')">💬 Messagerie <span id="msg-nav-badge">0</span></button>
     <button class="module-tab" data-module="degustations" onclick="switchModule('degustations')">🍷 Dégustations & accès</button>
     <button class="module-tab" data-module="outils" onclick="switchModule('outils')">Outils</button>
     <button class="module-tab" data-module="formations" onclick="switchModule('formations')">Formations des personnages</button>
@@ -334,6 +366,40 @@ td strong{color:#fff}
       <div class="panel">
         <h3>Clients inscrits</h3>
         <div id="cl-list">—</div>
+      </div>
+    </div>
+
+
+    <div class="module-panel" id="module-messagerie">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+          <div>
+            <h3 style="margin-bottom:4px">💬 Messagerie NyXia</h3>
+            <p class="hint" style="margin-top:0">Messages reçus depuis les portails. Les réponses reviennent directement dans la messagerie du client.</p>
+          </div>
+          <button class="btn btn-ghost" type="button" onclick="msgAdminLoad()">↻ Actualiser</button>
+        </div>
+        <div class="msg-admin-layout">
+          <div class="msg-admin-inbox">
+            <div class="msg-admin-toolbar">
+              <input id="msg-search" placeholder="Rechercher un client…" oninput="msgAdminRenderInbox()">
+              <select id="msg-filter" onchange="msgAdminRenderInbox()"><option value="all">Tous</option><option value="unread">Non lus</option></select>
+            </div>
+            <div class="msg-conv-list" id="msg-conv-list"><div class="msg-empty">Chargement…</div></div>
+          </div>
+          <div class="msg-admin-thread">
+            <div class="msg-thread-head" id="msg-thread-head"><strong>Choisis une conversation</strong><span>Client · portail</span></div>
+            <div class="msg-thread-body" id="msg-thread-body"><div class="msg-empty">Aucune conversation ouverte.</div></div>
+            <div class="msg-reply">
+              <div class="msg-reply-top">
+                <label for="msg-reply-as">Répondre comme</label>
+                <select class="f" id="msg-reply-as" style="width:auto;padding:7px 9px"><option value="Diane Boyer">Diane Boyer</option><option value="Équipe NyXia">Équipe NyXia</option></select>
+              </div>
+              <textarea id="msg-reply-text" placeholder="Écris ta réponse…" disabled></textarea>
+              <div class="msg-reply-actions"><span class="msg-reply-status" id="msg-reply-status"></span><button class="btn" id="msg-send-btn" type="button" onclick="msgAdminReply()" disabled>Envoyer la réponse ➤</button></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -951,6 +1017,7 @@ function switchModule(name){
   if(name==='apayer') loadAPayer();
   if(name==='portails'){ loadPortals(); }
   if(name==='clients'){ loadPortals(); loadPortalClients(); }
+  if(name==='messagerie'){ msgAdminLoad(); }
   if(name==='degustations' && typeof degustationsLoad==='function'){ degustationsLoad(); }
   if(name==='formations'){ loadPortals(); foLoadAgents(); }
   if(name==='defunts'){ dfLoad(); }
@@ -1212,6 +1279,86 @@ async function setProductStatus(id,status){try{await api('/api/products/update',
 async function setJoinType(id,type){try{await api('/api/products/update','POST',{id:id,join_type:type});loadProducts();}catch(e){alert(e.message||e);}}
 async function delProduct(id){if(!confirm('Supprimer ce produit ?'))return;await api('/api/products/delete','POST',{id:id});loadProducts();}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+
+
+/* ───────────── MESSAGERIE NYXIA — SUPER ADMIN 1 ───────────── */
+var MSG_ADMIN_ROWS=[];
+var MSG_ADMIN_CURRENT='';
+function msgAdminDate(v){try{return new Date(v).toLocaleString('fr-CA',{dateStyle:'medium',timeStyle:'short'});}catch(e){return v||'';}}
+function msgAdminGroups(){
+  var map={};
+  MSG_ADMIN_ROWS.forEach(function(m){
+    var email='';
+    if(m.to==='__admin__'||m.kind==='to_admin') email=String(m.from||'').toLowerCase();
+    else if(m.from==='admin'||m.kind==='admin'||m.kind==='broadcast') email=String(m.to||'').toLowerCase();
+    if(!email)return;
+    if(!map[email])map[email]={email:email,name:'',portal:'',messages:[],unread:0,lastAt:''};
+    var g=map[email];
+    if(m.fromName&&m.from!=='admin')g.name=m.fromName;
+    if(m.portal)g.portal=m.portal;
+    g.messages.push(m);
+    if((m.to==='__admin__'||m.kind==='to_admin')&&!m.read)g.unread++;
+    var at=m.createdAt||m.date||'';if(at>g.lastAt)g.lastAt=at;
+  });
+  return Object.keys(map).map(function(k){
+    var g=map[k];g.messages.sort(function(a,b){return String(a.createdAt||a.date||'').localeCompare(String(b.createdAt||b.date||''));});
+    if(!g.name)g.name=g.email;
+    if(!g.portal)g.portal='Portail non identifié';
+    return g;
+  }).sort(function(a,b){return String(b.lastAt).localeCompare(String(a.lastAt));});
+}
+function msgAdminRenderInbox(){
+  var box=document.getElementById('msg-conv-list');if(!box)return;
+  var q=(document.getElementById('msg-search').value||'').toLowerCase();
+  var filter=document.getElementById('msg-filter').value;
+  var list=msgAdminGroups().filter(function(g){return(!q||(g.name+' '+g.email+' '+g.portal).toLowerCase().indexOf(q)>=0)&&(filter!=='unread'||g.unread>0);});
+  if(!list.length){box.innerHTML='<div class="msg-empty">Aucun message.</div>';return;}
+  box.innerHTML=list.map(function(g){
+    var last=g.messages[g.messages.length-1]||{};var preview=last.body||last.message||'';
+    return '<div class="msg-conv '+(g.email===MSG_ADMIN_CURRENT?'active':'')+'" data-msg-email="'+esc(g.email)+'">'
+      +'<div class="msg-conv-name">'+esc(g.name)+'</div>'+(g.unread?'<span class="msg-unread">'+g.unread+'</span>':'')
+      +'<div class="msg-conv-email">'+esc(g.email)+'</div><span class="msg-conv-portal">'+esc(g.portal)+'</span>'
+      +'<div class="msg-conv-preview">'+esc(preview)+'</div></div>';
+  }).join('');
+  box.querySelectorAll('[data-msg-email]').forEach(function(el){el.addEventListener('click',function(){msgAdminOpen(el.getAttribute('data-msg-email'));});});
+}
+function msgAdminUpdateBadge(){
+  var n=msgAdminGroups().reduce(function(sum,g){return sum+g.unread;},0);var b=document.getElementById('msg-nav-badge');if(!b)return;
+  b.textContent=n;b.style.display=n?'inline-flex':'none';
+}
+async function msgAdminLoad(){
+  var box=document.getElementById('msg-conv-list');if(box)box.innerHTML='<div class="msg-empty">Chargement…</div>';
+  try{
+    var out=await api('/api/messagerie/inbox','GET');
+    MSG_ADMIN_ROWS=(out.data&&out.data.messages)||[];msgAdminUpdateBadge();msgAdminRenderInbox();
+    if(MSG_ADMIN_CURRENT&&msgAdminGroups().some(function(g){return g.email===MSG_ADMIN_CURRENT;}))msgAdminOpen(MSG_ADMIN_CURRENT,false);
+  }catch(e){if(box)box.innerHTML='<div class="msg-empty">'+esc(e.message||'Erreur')+'</div>';}
+}
+async function msgAdminOpen(email,markRead){
+  MSG_ADMIN_CURRENT=email;var g=msgAdminGroups().find(function(x){return x.email===email;});if(!g)return;
+  var h=document.getElementById('msg-thread-head');h.innerHTML='<strong>'+esc(g.name)+'</strong><span>'+esc(g.email)+' · '+esc(g.portal)+'</span>';
+  var body=document.getElementById('msg-thread-body');
+  body.innerHTML=g.messages.map(function(m){
+    var fromClient=(m.to==='__admin__'||m.kind==='to_admin');var text=m.body||m.message||'';
+    return '<div class="msg-line '+(fromClient?'client':'admin')+'"><div class="msg-bubble">'
+      +(fromClient?'':'<div class="msg-who">'+esc(m.fromName||'Diane Boyer')+'</div>')+esc(text)
+      +'<span class="msg-meta">'+msgAdminDate(m.createdAt||m.date||'')+(m.portal?' · '+esc(m.portal):'')+'</span></div></div>';
+  }).join('')||'<div class="msg-empty">Aucun message.</div>';
+  body.scrollTop=body.scrollHeight;document.getElementById('msg-reply-text').disabled=false;document.getElementById('msg-send-btn').disabled=false;msgAdminRenderInbox();
+  if(markRead!==false&&g.unread){
+    var keys=g.messages.filter(function(m){return(m.to==='__admin__'||m.kind==='to_admin')&&!m.read&&m.key;}).map(function(m){return m.key;});
+    if(keys.length){try{await api('/api/messagerie/read','POST',{keys:keys});await msgAdminLoad();}catch(e){}}
+  }
+}
+async function msgAdminReply(){
+  if(!MSG_ADMIN_CURRENT)return;var text=document.getElementById('msg-reply-text').value.trim();if(!text)return;
+  var btn=document.getElementById('msg-send-btn'),status=document.getElementById('msg-reply-status');btn.disabled=true;status.textContent='Envoi…';
+  var currentGroup=msgAdminGroups().find(function(g){return g.email===MSG_ADMIN_CURRENT;});
+  var currentPortal=(currentGroup&&currentGroup.portal)||'Portail non identifié';
+  try{var out=await api('/api/messagerie/reply','POST',{toEmail:MSG_ADMIN_CURRENT,body:text,fromName:document.getElementById('msg-reply-as').value,portal:currentPortal});
+    if(!out.res.ok)throw new Error((out.data&&out.data.error)||'Erreur');document.getElementById('msg-reply-text').value='';status.textContent='✓ Réponse envoyée.';await msgAdminLoad();msgAdminOpen(MSG_ADMIN_CURRENT,false);
+  }catch(e){status.textContent=e.message||'Erreur';}finally{btn.disabled=false;}
+}
 
 /* ───────────── FORMATIONS ALEX (constructeur visuel) ───────────── */
 var FO_AGENT='alex';
