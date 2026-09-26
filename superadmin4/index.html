@@ -7,4 +7,15 @@
 <section class="card"><h2>Personnages</h2><div class="note ok"><strong>Aucun personnage n’est obligatoire.</strong> NyXia, Diane, Éric et les formateurs de base sont activables selon le portail. Les personnages existants du Super Admin 1 apparaissent automatiquement ici et peuvent être sélectionnés, modifiés puis attribués à un portail / Formation Vivante.</div><div class="agents" id="agents"></div><hr><h3>Créer / modifier un personnage</h3><div class="grid"><div class="field full"><label>1. Choisir un personnage existant</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="charExisting" style="flex:1;min-width:260px"><option value="">— Choisir dans la liste —</option></select><button class="btn secondary" type="button" id="newCharBtn">＋ Nouveau personnage</button></div><span class="hint">La liste se remplit automatiquement avec les personnages du Super Admin 1. Choisis un nom : sa fiche se charge toute seule.</span></div><div class="field"><label>Nom</label><input id="charName"></div><div class="field"><label>Code</label><input id="charCode"></div><div class="field"><label>Rôle / sous-titre</label><input id="charSub"></div><div class="field"><label>Portail / Formation Vivante</label><input id="charPortal" placeholder="lena, kael, etc."></div><div class="field full"><label>Prompt / mission</label><textarea id="charPrompt"></textarea></div><div class="field full"><label>Personnalité</label><textarea id="charPersonality"></textarea></div><div class="field"><label>Image URL</label><input id="charImage"></div><div class="field"><label>Vidéo accueil URL</label><input id="charVideo"></div><div class="field"><label>Voice ID ElevenLabs</label><input id="charVoice"></div></div><button class="btn primary" id="saveCharBtn">Enregistrer le personnage</button><span class="status" id="charStatus"></span></section>
 <section class="card"><h2>Index</h2><div class="note">Le CSS d’origine est conservé. Ici tu modifies uniquement le contenu et les médias.</div><div id="indexFields"></div></section>
 <section class="card"><h2>Outils spécialisés</h2><div id="tools"></div><button class="btn secondary" id="addToolBtn">+ Ajouter un outil HTML</button></section>
+<section class="card"><h2>🎬 Banques médias communes</h2>
+<div class="note">Ces clés sont enregistrées une seule fois dans la KV partagée et servent à tous les portails.</div>
+<div class="grid">
+  <div class="field"><label>Clé Pixabay</label><input id="mediaKeyPixabay" type="password" placeholder="Coller la clé Pixabay"></div>
+  <div class="field"><label>Clé Pexels</label><input id="mediaKeyPexels" type="password" placeholder="Coller la clé Pexels"></div>
+  <div class="field"><label>Clé Freesound</label><input id="mediaKeyFreesound" type="password" placeholder="Coller le token Freesound"></div>
+</div>
+<button class="btn primary" id="saveMediaKeysBtn" type="button">Enregistrer les clés</button>
+<span class="status" id="mediaKeysStatus"></span>
+</section>
+
 </main></div></body></html>
