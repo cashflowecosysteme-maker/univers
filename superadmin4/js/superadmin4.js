@@ -1,7 +1,39 @@
 (()=>{'use strict';const $=id=>document.getElementById(id),API='/api/superadmin4/projects';let catalog=[],profiles={},tools=[],current='';const CORE={nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦'},diane:{name:'Diane',sub:'Créatrice & accompagnement',icon:'👑'},eric:{name:'Éric',sub:'Communication & CashFlow',icon:'💼'},lena:{name:'Léna',sub:'Spiritualité & intuition',icon:'🔮'},selena:{name:'Séléna',sub:'A.M.I.E.',icon:'🪞'},alex:{name:'Alex',sub:'Écriture',icon:'✍️'},kael:{name:'Kael',sub:'Relations',icon:'💜'},sophia:{name:'Sophia',sub:'Numérologie · La Tisseuse des Nombres',icon:'🔢'},aletheia:{name:'Aletheia',sub:'Runes · La Scribe des Murmures Runiques',icon:'ᚱ'},cassandre:{name:'Cassandre',sub:'Tarot · La Voix du Reflet',icon:'🃏'},celeste:{name:'Céleste',sub:'Mancies & rituels · La Cartographe des Présages',icon:'🌙'}};const sections=[['headerSocials','Header · Réseaux sociaux (HTML boutons)'],['headerCtaLabel','Header · Bouton texte'],['headerCtaUrl','Header · Bouton URL'],['heroEyebrow','Hero · Eyebrow'],['heroTitle','Hero · Titre'],['heroSubtitle','Hero · Sous-titre'],['heroText','Hero · Texte'],['heroNote','Hero · Note'],['heroCtaLabel','Hero · CTA texte'],['heroCtaUrl','Hero · CTA URL'],['heroMedia','Hero · Image/vidéo URL'],['s2','2. Problème · texte'],['s2Media','2. Média URL'],['s3Media','3. Image 02 · média URL'],['s45','4-5. Parcours · texte'],['s45Media','4-5. Média URL'],['s67','6-7. Texte'],['s67Media','6-7. Média URL'],['s89','8-9. Formation Vivante · texte'],['s89Media','8-9. Média URL'],['s1011','10-11. Évolution · texte'],['s1011Media','10-11. Média URL'],['s1213','12-13. Atelier · texte'],['s1213Media','12-13. Média URL'],['s1415','14-15. Résultats · texte'],['s1415Media','14-15. Média URL'],['marquee','Bandeau défilant · HTML/texte'],['socialProof','Preuve sociale · texte'],['socialProofMedia','Preuve sociale · image/vidéo URL'],['toolsText','Boîte à outils · texte'],['toolsMedia','Boîte à outils · média URL'],['transformText','Projection / transformation · texte'],['transformMedia','Projection · média URL'],['faq','FAQ · JSON [{q,a}]'],['ctaTitle','Rendez-vous · titre'],['ctaText','Rendez-vous · texte'],['ctaLabel','Rendez-vous · bouton'],['ctaUrl','Rendez-vous · URL'],['footerSocials','Footer · réseaux (HTML boutons)'],['footerSign','Footer · signature']];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const slug=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},...o});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'HTTP '+r.status);return d}
 function indexUI(){const h=$('indexFields');h.innerHTML='';for(const [k,l] of sections){const d=document.createElement('div');d.className='field';d.innerHTML='<label>'+esc(l)+'</label>'+(k==='faq'||/Text|s\d|Proof|marquee|footerSocials/.test(k)?'<textarea id="idx-'+k+'"></textarea>':'<input id="idx-'+k+'">');h.appendChild(d)}}
-async function load(){const p=await api('/api/personnages'),pr=await api('/api/superadmin4/personnages/profile');profiles=Object.fromEntries((pr.profiles||[]).map(x=>[x.code,x]));const map=new Map(Object.entries(CORE).map(([k,v])=>[k,{key:k,...v}]));for(const x of p.personnages||[]){const k=slug(x.code||x.nom);map.set(k,{key:k,name:x.nom||k,sub:profiles[k]?.sub||CORE[k]?.sub||'Personnage NyXia',image:profiles[k]?.image||'',portail:x.portail||'',...profiles[k]})}catalog=[...map.values()];renderAgents();await loadProjects()}
+async function load(){
+  const map=new Map(Object.entries(CORE).map(([k,v])=>[k,{key:k,...v,portail:'',custom:false}]));
+  profiles={};
+  catalog=[...map.values()];
+  renderAgents();
+  try{
+    const p=await api('/api/personnages');
+    for(const x of (p.personnages||p.agents||[])){
+      const k=slug(x.code||x.id||x.nom||x.name);
+      if(!k)continue;
+      const base=map.get(k)||{};
+      map.set(k,{...base,key:k,name:x.nom||x.name||base.name||k,sub:base.sub||'Personnage NyXia',portail:x.portail||x.portal||'',custom:!!x.custom||!CORE[k]});
+    }
+  }catch(e){
+    console.warn('Catalogue Super Admin 1 indisponible:',e);
+  }
+  try{
+    const pr=await api('/api/superadmin4/personnages/profile');
+    profiles=Object.fromEntries((pr.profiles||[]).map(x=>[x.code,x]));
+    for(const [k,pf] of Object.entries(profiles)){
+      const base=map.get(k)||{key:k,name:pf.name||k,sub:'Personnage NyXia',portail:'',custom:true};
+      map.set(k,{...base,...pf,key:k,name:pf.name||base.name||k,sub:pf.sub||base.sub||'Personnage NyXia',portail:pf.portail||base.portail||'',custom:base.custom!==false});
+    }
+  }catch(e){
+    console.warn('Profils Super Admin 4 indisponibles:',e);
+  }
+  catalog=[...map.values()].sort((a,b)=>{
+    const rank=k=>k==='nyxia'?0:k==='diane'?1:k==='eric'?2:CORE[k]?3:4;
+    return rank(a.key)-rank(b.key)||String(a.name||'').localeCompare(String(b.name||''),'fr');
+  });
+  renderAgents();
+  try{await loadProjects()}catch(e){console.warn('Projets indisponibles:',e)}
+}
 function renderCharacterSelect(){const s=$('charExisting');if(!s)return;const prev=s.value;s.innerHTML='<option value="">— Choisir dans la liste —</option>';for(const a of catalog){const o=document.createElement('option');o.value=a.key;o.textContent=a.name+(a.portail?' · '+a.portail:'');s.appendChild(o)}if([...s.options].some(o=>o.value===prev))s.value=prev}
 function clearCharacterForm(){for(const id of ['charName','charCode','charSub','charPortal','charPrompt','charPersonality','charImage','charVideo','charVoice'])if($(id))$(id).value='';if($('charExisting'))$('charExisting').value='';$('charStatus').textContent=''}
 function loadCharacterForm(code){if(!code)return clearCharacterForm();const a=catalog.find(x=>x.key===code)||profiles[code]||{};const p=profiles[code]||a;$('charName').value=p.name||a.name||'';$('charCode').value=code;$('charSub').value=p.sub||a.sub||'';$('charPortal').value=p.portail||a.portail||'';$('charPrompt').value=p.prompt||'';$('charPersonality').value=p.personality||'';$('charImage').value=p.image||a.image||'';$('charVideo').value=p.welcomeVideo||'';$('charVoice').value=p.voiceId||'';$('charStatus').textContent='Fiche chargée'}
