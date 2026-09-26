@@ -512,6 +512,31 @@ td strong{color:#fff}
 
     <div class="module-panel" id="module-defunts">
       <div class="panel">
+        <h3>🧠 Modèle IA — Léna-Ovilus</h3>
+        <p class="hint" style="margin-bottom:14px">Choisis ici le modèle OpenRouter utilisé par l’Ovilus de Léna. Ce réglage est enregistré uniquement dans <code>SPIRITUEL_KV</code> sous <code>config:ovilus_model</code>.</p>
+        <div class="grid2">
+          <div>
+            <label class="f">Modèle</label>
+            <select class="f" id="ov-model-select" onchange="ovModelChanged()">
+              <option value="aion-labs/aion-3.5-mini">Aion 3.5 Mini — recommandé</option>
+              <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+              <option value="mistralai/mistral-small-3.2-24b-instruct">Mistral Small 3.2</option>
+              <option value="__custom__">Autre modèle OpenRouter…</option>
+            </select>
+          </div>
+          <div id="ov-model-custom-wrap" style="display:none">
+            <label class="f">Slug OpenRouter personnalisé</label>
+            <input class="f" id="ov-model-custom" placeholder="ex. fournisseur/modele">
+          </div>
+        </div>
+        <div class="hint" style="margin-top:10px">Modèle actuellement enregistré : <strong id="ov-model-current">—</strong></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn" type="button" onclick="ovModelSave()">Enregistrer le modèle</button>
+          <button class="btn btn-ghost" type="button" onclick="ovModelLoad()">Recharger</button>
+        </div>
+        <div class="msg" id="ov-model-msg"></div>
+      </div>
+      <div class="panel">
         <h3>🔮 Léna-Ovilus — Création d’identité</h3>
         <p class="hint" style="margin-bottom:14px">Crée ici une identité complète et cohérente pour l’Ovilus de Léna. Les fiches restent structurées dans la D1 centrale puis sont synchronisées exclusivement vers <code>SPIRITUEL_KV</code>.</p>
         <input type="hidden" id="df-id">
@@ -1009,7 +1034,7 @@ function switchModule(name){
   if(name==='messagerie'){ msgAdminLoad(); }
   if(name==='degustations' && typeof degustationsLoad==='function'){ degustationsLoad(); }
   if(name==='formations'){ loadPortals(); foLoadAgents(); }
-  if(name==='defunts'){ dfLoad(); }
+  if(name==='defunts'){ ovModelLoad(); dfLoad(); }
 }
 function showMsg(id,text,ok){var el=document.getElementById(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text;el.style.display='block';}
 async function api(path,method,body){
@@ -1736,6 +1761,45 @@ async function foSave(){
       showMsg('fo-msg',(r.data&&r.data.error)||'Enregistrement impossible.',false);
     }
   }catch(e){showMsg('fo-msg',e.message||'Erreur.',false);}
+}
+
+var OVILUS_MODEL_PRESETS={
+  'aion-labs/aion-3.5-mini':'Aion 3.5 Mini',
+  'deepseek/deepseek-v3.2':'DeepSeek V3.2',
+  'mistralai/mistral-small-3.2-24b-instruct':'Mistral Small 3.2'
+};
+function ovModelChanged(){
+  var sel=document.getElementById('ov-model-select');
+  var wrap=document.getElementById('ov-model-custom-wrap');
+  if(wrap) wrap.style.display=(sel&&sel.value==='__custom__')?'block':'none';
+}
+async function ovModelLoad(){
+  try{
+    var r=await api('/api/ovilus/model','GET');
+    if(!r.res.ok) throw new Error((r.data&&r.data.error)||'Impossible de lire le modèle Ovilus.');
+    var model=(r.data&&r.data.model)||'aion-labs/aion-3.5-mini';
+    var sel=document.getElementById('ov-model-select'),custom=document.getElementById('ov-model-custom'),cur=document.getElementById('ov-model-current');
+    if(sel){
+      if(OVILUS_MODEL_PRESETS[model]) sel.value=model;
+      else { sel.value='__custom__'; if(custom) custom.value=model; }
+    }
+    if(cur) cur.textContent=model;
+    ovModelChanged();
+  }catch(e){ showMsg('ov-model-msg',e.message||'Erreur de lecture du modèle.',false); }
+}
+async function ovModelSave(){
+  var sel=document.getElementById('ov-model-select');
+  var custom=document.getElementById('ov-model-custom');
+  var model=sel?sel.value:'';
+  if(model==='__custom__') model=(custom&&custom.value||'').trim();
+  if(!model || model.indexOf('/')<1){ showMsg('ov-model-msg','Entre un slug OpenRouter valide, par exemple aion-labs/aion-3.5-mini.',false); return; }
+  try{
+    var r=await api('/api/ovilus/model','POST',{model:model});
+    if(r.res.ok&&r.data&&r.data.success){
+      var cur=document.getElementById('ov-model-current'); if(cur) cur.textContent=r.data.model||model;
+      showMsg('ov-model-msg','Modèle Léna-Ovilus enregistré dans SPIRITUEL_KV.',true);
+    }else showMsg('ov-model-msg',(r.data&&r.data.error)||'Enregistrement impossible.',false);
+  }catch(e){ showMsg('ov-model-msg',e.message||'Erreur.',false); }
 }
 
 var DF_LIST=[];

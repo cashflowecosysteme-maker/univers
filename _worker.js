@@ -1403,6 +1403,24 @@ function yearFromDate(d) {
   const m = String(d || '').match(/^(\d{4})/);
   return m ? Number(m[1]) : null;
 }
+const OVILUS_MODEL_KEY = 'config:ovilus_model';
+const OVILUS_MODEL_DEFAULT = 'aion-labs/aion-3.5-mini';
+async function handleOvilusModelGet(request, env){
+  if(!(await requireAdmin(request,env))) return json({error:'Non autorisé.'},401);
+  if(!env.SPIRITUEL_KV) return json({error:'SPIRITUEL_KV absent.'},500);
+  const model=(await env.SPIRITUEL_KV.get(OVILUS_MODEL_KEY)) || OVILUS_MODEL_DEFAULT;
+  return json({model,storage:'SPIRITUEL_KV'});
+}
+async function handleOvilusModelSet(request, env){
+  if(!(await requireAdmin(request,env))) return json({error:'Non autorisé.'},401);
+  if(!env.SPIRITUEL_KV) return json({error:'SPIRITUEL_KV absent.'},500);
+  const body=await request.json().catch(()=>({}));
+  const model=String(body.model||'').trim();
+  if(!model || model.length>180 || !/^[a-zA-Z0-9._:-]+\/[a-zA-Z0-9._:-]+$/.test(model)) return json({error:'Slug OpenRouter invalide.'},400);
+  await env.SPIRITUEL_KV.put(OVILUS_MODEL_KEY,model);
+  return json({success:true,model,storage:'SPIRITUEL_KV'});
+}
+
 const OVILUS_SPIRITUAL_LIST_KEY = 'ovilus:defunts';
 const OVILUS_SPIRITUAL_INDEX_KEY = 'ovilus:characters:index';
 const OVILUS_SPIRITUAL_CHARACTER_PREFIX = 'ovilus:character:';
@@ -1762,6 +1780,8 @@ export default {
       if ((path === '/api/personnages' || path === '/api/formations/agents') && (request.method === 'GET' || request.method === 'POST')) return await handlePersonnagesList(request, env);
       if ((path === '/api/personnages/save' || path === '/api/formations/agents/save') && request.method === 'POST') return await handlePersonnagesSave(request, env);
       if ((path === '/api/personnages/delete' || path === '/api/formations/agents/delete') && request.method === 'POST') return await handlePersonnagesDelete(request, env);
+      if (path === '/api/ovilus/model' && request.method === 'GET') return await handleOvilusModelGet(request, env);
+      if (path === '/api/ovilus/model' && request.method === 'POST') return await handleOvilusModelSet(request, env);
       if (path === '/api/defunts' && request.method === 'GET') return await handleListDefunts(request, env);
       if (path === '/api/defunts/save' && request.method === 'POST') return await handleSaveDefunt(request, env);
       if (path === '/api/defunts/delete' && request.method === 'POST') return await handleDeleteDefunt(request, env);
