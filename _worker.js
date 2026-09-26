@@ -1563,6 +1563,171 @@ async function handleOvilusCast(request, env) {
   return corsCast(json({ defunts }));
 }
 
+
+// ───────────── MESSAGERIE NYXIA — SUPER ADMIN 1 ─────────────
+// Compatible avec la messagerie Studio Prompt : mêmes clés CASHFLOW_KV "message:".
+async function nyxMsgListAll(env, prefix) {
+  const keys = [];
+  let cursor;
+  do {
+    const page = await env.CASHFLOW_KV.list({ prefix, cursor });
+    keys.push(...(page.keys || []));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return keys;
+}
+
+const NYX_MSG_PORTAL_ALIASES = {
+  systemeprompt: 'Studio Prompt',
+  studio: 'Studio Prompt',
+  studioprompt: 'Studio Prompt',
+  lena: 'Portail Léna',
+  portaillena: 'Portail Léna',
+  selena: 'Portail Séléna',
+  portailselena: 'Portail Séléna',
+  alex: 'Portail Alex',
+  portailalex: 'Portail Alex',
+  portail_alex: 'Portail Alex',
+  cashflow: 'Portail Éric CashFlow',
+  portail_cashflow: 'Portail Éric CashFlow',
+  eric: 'Portail Éric CashFlow',
+  cercles: 'Les Cercles',
+  'les-cercles': 'Les Cercles',
+  promoteurs: 'Les Promoteurs',
+  'eric-promoteurs': 'Éric Promoteurs',
+  eric_promoteurs: 'Éric Promoteurs',
+  repertoire: 'Le Répertoire',
+  affiliation: 'Affiliation',
+  marketplace: 'Marketplace'
+};
+
+function nyxMsgNormalizePortalId(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+}
+
+async function nyxMsgPortalCatalog(env) {
+  const map = { ...NYX_MSG_PORTAL_ALIASES };
+  try {
+    const portals = await getPortalsList(env);
+    for (const p of Array.isArray(portals) ? portals : []) {
+      const id = nyxMsgNormalizePortalId(p && p.id);
+      if (id && p && p.name) map[id] = String(p.name).trim();
+    }
+  } catch (_) {}
+  return map;
+}
+
+async function nyxMsgInferClientPortal(env, email, catalog, cache) {
+  const normalizedEmail = String(email || '').toLowerCase().trim();
+  if (!normalizedEmail) return 'Portail non identifié';
+  if (cache.has(normalizedEmail)) return cache.get(normalizedEmail);
+
+  let label = 'Portail non identifié';
+  try {
+    const raw = await env.CASHFLOW_KV.get('client:' + normalizedEmail);
+    if (raw) {
+      const client = JSON.parse(raw);
+      const products = Array.isArray(client.products) ? client.products : [];
+      const labels = [];
+      for (const product of products) {
+        const id = nyxMsgNormalizePortalId(product);
+        const portalLabel = catalog[id] || NYX_MSG_PORTAL_ALIASES[id];
+        if (portalLabel && !labels.includes(portalLabel)) labels.push(portalLabel);
+      }
+      if (labels.length === 1) label = labels[0];
+      else if (labels.length > 1) label = 'Plusieurs portails — origine non identifiée';
+    }
+  } catch (_) {}
+
+  cache.set(normalizedEmail, label);
+  return label;
+}
+
+async function handleMessagerieInbox(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  if (!env.CASHFLOW_KV) return json({ error: 'CASHFLOW_KV absent.' }, 500);
+  const keys = await nyxMsgListAll(env, 'message:');
+  const messages = [];
+  const portalCatalog = await nyxMsgPortalCatalog(env);
+  const portalCache = new Map();
+
+  for (const key of keys) {
+    const raw = await env.CASHFLOW_KV.get(key.name);
+    if (!raw) continue;
+    try {
+      const m = JSON.parse(raw);
+      if (!m || typeof m !== 'object') continue;
+      const isToAdmin = m.to === '__admin__' || m.kind === 'to_admin';
+      const isFromAdmin = m.from === 'admin' || m.kind === 'admin' || m.kind === 'broadcast';
+      if (!isToAdmin && !isFromAdmin) continue;
+      m.key = key.name;
+
+      // Les portails historiques n'enregistraient pas toujours leur nom dans le message.
+      // On n'invente surtout plus "Studio Prompt" :
+      // - 1 seul portail au dossier client => on peut l'identifier de façon fiable ;
+      // - plusieurs portails => on l'indique honnêtement ;
+      // - aucun renseignement => "Portail non identifié".
+      if (!m.portal && isToAdmin) {
+        m.portal = await nyxMsgInferClientPortal(env, m.from, portalCatalog, portalCache);
+      }
+      if (!m.portal && isFromAdmin) {
+        m.portal = await nyxMsgInferClientPortal(env, m.to, portalCatalog, portalCache);
+      }
+
+      messages.push(m);
+    } catch (_) {}
+  }
+  messages.sort((a, b) => String(b.createdAt || b.date || '').localeCompare(String(a.createdAt || a.date || '')));
+  return json({ success: true, messages });
+}
+
+async function handleMessagerieRead(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const keys = Array.isArray(body.keys) ? body.keys.slice(0, 100) : [];
+  let updated = 0;
+  for (const key of keys) {
+    const k = String(key || '');
+    if (!k.startsWith('message:__admin__:')) continue;
+    const raw = await env.CASHFLOW_KV.get(k);
+    if (!raw) continue;
+    try {
+      const m = JSON.parse(raw);
+      m.read = true;
+      await env.CASHFLOW_KV.put(k, JSON.stringify(m));
+      updated++;
+    } catch (_) {}
+  }
+  return json({ success: true, updated });
+}
+
+async function handleMessagerieReply(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const to = String(body.toEmail || '').toLowerCase().trim();
+  const text = String(body.body || '').trim();
+  const fromName = String(body.fromName || 'Diane Boyer').trim() || 'Diane Boyer';
+  if (!to || !text) return json({ error: 'Destinataire et message requis.' }, 400);
+  const recipientRaw = await env.CASHFLOW_KV.get('client:' + to);
+  if (!recipientRaw) return json({ error: 'Client introuvable.' }, 404);
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const message = {
+    id,
+    from: 'admin',
+    fromName,
+    to,
+    subject: String(body.subject || 'Message NyXia'),
+    body: text,
+    createdAt,
+    read: false,
+    kind: 'admin',
+    portal: String(body.portal || 'NyXia')
+  };
+  await env.CASHFLOW_KV.put(`message:${to}:${createdAt}_${id}`, JSON.stringify(message));
+  return json({ success: true, message });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -1619,6 +1784,9 @@ export default {
       if (path === '/api/portal-clients' && request.method === 'GET') return await handleListPortalClients(request, env);
       if (path === '/api/portal-clients' && request.method === 'POST') return await handleCreatePortalClient(request, env);
       if (path === '/api/portal-clients/delete' && request.method === 'POST') return await handleDeletePortalClient(request, env);
+      if (path === '/api/messagerie/inbox' && request.method === 'GET') return await handleMessagerieInbox(request, env);
+      if (path === '/api/messagerie/read' && request.method === 'POST') return await handleMessagerieRead(request, env);
+      if (path === '/api/messagerie/reply' && request.method === 'POST') return await handleMessagerieReply(request, env);
       if (path === '/api/degustations/meta' && request.method === 'GET') return await handleDgMeta(request, env);
       if (path === '/api/degustations' && (request.method === 'GET' || request.method === 'POST')) return await handleDgCampaigns(request, env);
       if (path === '/api/degustations/delete' && request.method === 'POST') return await handleDgDeleteCampaign(request, env);
