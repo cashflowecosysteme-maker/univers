@@ -40,8 +40,91 @@ function loadCharacterForm(code){if(!code)return clearCharacterForm();const a=ca
 function renderAgents(){renderCharacterSelect();const h=$('agents');h.innerHTML='';for(const a of catalog){const row=document.createElement('div');row.className='agent';row.innerHTML='<label class="agent-toggle"><input type="checkbox" id="ag-'+a.key+'"> <strong>'+esc(a.name)+'</strong> <small>'+esc(a.sub||'')+'</small></label><div class="field"><label>Image URL</label><input id="img-'+a.key+'" value="'+esc(a.image||'')+'"></div><div class="field"><label>Vidéo accueil URL</label><input id="vid-'+a.key+'" value="'+esc(a.welcomeVideo||'')+'"></div><div class="field"><label>Voice ID</label><input id="voi-'+a.key+'" value="'+esc(a.voiceId||'')+'"></div>';h.appendChild(row)}}
 function active(){return catalog.filter(a=>$('ag-'+a.key)?.checked).map(a=>({...a,image:$('img-'+a.key)?.value||a.image||'',welcomeVideo:$('vid-'+a.key)?.value||'',voiceId:$('voi-'+a.key)?.value||''}))}
 function draft(){const idx={};for(const [k] of sections)idx[k]=$('idx-'+k)?.value||'';return{title:$('title').value,short:$('short').value,portalId:$('portalId').value,workerName:$('workerName').value,host:$('host').value,mission:$('mission').value,loginImage:$('loginImage').value,agents:active(),index:idx,tools}}
+
+// Compatibilité ascendante : relit les projets créés par les anciennes versions du Super Admin 4.
+// Rien n'est supprimé dans la KV à l'ouverture. La conversion n'est enregistrée que si Diane clique Sauvegarder.
+function legacyFirst(){for(const v of arguments){if(v!==undefined&&v!==null&&v!=='')return v}return''}
+function legacyObj(v){return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}
+function legacyArray(v){return Array.isArray(v)?v:[]}
+function legacyKey(v){if(v&&typeof v==='object')v=v.key||v.code||v.id||v.slug||v.nom||v.name;return slug(v||'')}
+function legacyMapValue(map,key,envName){map=legacyObj(map);return legacyFirst(map[key],map[key.replace(/-/g,'_')],envName&&map[envName],envName&&map[envName.toLowerCase()])}
+function legacyVoiceEnv(key){return 'ELEVENLABS_'+String(key||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'')+'_VOICE_ID'}
+function normalizeLegacyProject(raw={},project={}){
+  const root=legacyObj(raw),cfg={...legacyObj(root.config),...legacyObj(root.portal),...legacyObj(root.settings),...root};
+  const out={};
+  out.title=legacyFirst(cfg.title,cfg.portalTitle,cfg.nom,cfg.name,project.title);
+  out.short=legacyFirst(cfg.short,cfg.shortTitle,cfg.portalShortTitle,cfg.nomCourt,cfg.short_name,out.title);
+  out.portalId=legacyFirst(cfg.portalId,cfg.portal_id,cfg.slug,cfg.id,cfg.identifier,cfg.identifiant);
+  out.workerName=legacyFirst(cfg.workerName,cfg.worker,cfg.worker_name,cfg.cloudflareWorker,cfg.workerCloudflare);
+  out.host=legacyFirst(cfg.host,cfg.hostname,cfg.domain,cfg.domaine,cfg.subdomain,cfg.sousDomaine,cfg.urlHost);
+  out.mission=legacyFirst(cfg.mission,cfg.description,cfg.portalMission,cfg.purpose);
+  out.loginImage=legacyFirst(cfg.loginImage,cfg.login_image,cfg.loginAvatar,cfg.loginMedia,cfg.imageLogin,cfg.coverImage);
+  out.index={...legacyObj(cfg.index),...legacyObj(cfg.indexConfig),...legacyObj(cfg.indexData),...legacyObj(cfg.landingPage)};
+  out.tools=legacyArray(legacyFirst(cfg.tools,cfg.specialTools,cfg.outils,cfg.portalTools));
+
+  // Anciennes versions : agents / list / activeAgents / selectedAgents / personnages.
+  let source=[];
+  for(const v of [cfg.agents,cfg.list,cfg.characters,cfg.personnages,cfg.selectedAgents,cfg.selectedCharacters]){
+    if(Array.isArray(v)&&v.length){source=v;break}
+  }
+  let selected=[];
+  for(const v of [cfg.activeAgents,cfg.active_agents,cfg.agentKeys,cfg.charactersActive,cfg.personnagesActifs]){
+    if(Array.isArray(v)&&v.length){selected=v;break}
+  }
+  const sourceByKey=new Map();
+  for(const item of source){const k=legacyKey(item);if(k)sourceByKey.set(k,item)}
+  const wanted=new Set();
+  for(const item of source){const k=legacyKey(item);if(k)wanted.add(k)}
+  for(const item of selected){const k=legacyKey(item);if(k)wanted.add(k)}
+  const trainer=legacyKey(legacyFirst(cfg.formationAgent,cfg.trainer,cfg.formateur,cfg.mainAgent));
+  if(trainer)wanted.add(trainer);
+
+  const imageMaps=[cfg.agentImages,cfg.images,cfg.characterImages,cfg.personnageImages,cfg.avatarUrls,cfg.avatars].map(legacyObj);
+  const videoMaps=[cfg.agentVideos,cfg.welcomeVideos,cfg.videos,cfg.characterVideos,cfg.personnageVideos].map(legacyObj);
+  const voiceMaps=[cfg.voiceIds,cfg.voices,cfg.agentVoices,cfg.characterVoices,cfg.voiceVariables,cfg.voice_variables].map(legacyObj);
+
+  out.agents=[];
+  for(const k of wanted){
+    const saved=legacyObj(sourceByKey.get(k));
+    const base=catalog.find(a=>a.key===k)||profiles[k]||{};
+    const envName=legacyFirst(saved.voiceEnv,base.voiceEnv,legacyVoiceEnv(k));
+    let image=legacyFirst(saved.image,saved.imageUrl,saved.avatar,saved.avatarUrl,saved.photo,saved.photoUrl);
+    if(!image)for(const m of imageMaps){image=legacyMapValue(m,k,envName);if(image)break}
+    let video=legacyFirst(saved.welcomeVideo,saved.video,saved.videoUrl,saved.welcome_video,saved.videoAccueil);
+    if(!video)for(const m of videoMaps){video=legacyMapValue(m,k,envName);if(video)break}
+    let voice=legacyFirst(saved.voiceId,saved.voice_id,saved.elevenlabsVoiceId,saved.elevenVoiceId);
+    if(!voice)for(const m of voiceMaps){voice=legacyMapValue(m,k,envName);if(voice)break}
+    out.agents.push({
+      ...base,...saved,key:k,
+      name:legacyFirst(saved.name,saved.nom,base.name,k),
+      sub:legacyFirst(saved.sub,saved.role,saved.subtitle,saved.description,base.sub,'Personnage NyXia'),
+      icon:legacyFirst(saved.icon,base.icon,'✦'),
+      image:legacyFirst(image,base.image,''),
+      welcomeVideo:legacyFirst(video,base.welcomeVideo,''),
+      voiceId:legacyFirst(voice,base.voiceId,''),
+      voiceEnv:envName,
+      greeting:legacyFirst(saved.greeting,saved.welcome,saved.accueil,base.greeting,'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.'),
+      portail:legacyFirst(saved.portail,saved.portal,base.portail,'')
+    });
+  }
+
+  // Si une ancienne sauvegarde n'avait que des maps image/voix/vidéo, récupère les personnages concernés.
+  if(!out.agents.length){
+    const keys=new Set();
+    for(const m of [...imageMaps,...videoMaps,...voiceMaps])for(const mk of Object.keys(m)){
+      let k=slug(mk.replace(/^ELEVENLABS_/i,'').replace(/_VOICE_ID$/i,'').replace(/_/g,'-'));
+      if(catalog.some(a=>a.key===k))keys.add(k);
+    }
+    for(const k of keys){const b=catalog.find(a=>a.key===k)||{};out.agents.push({...b,key:k,name:b.name||k,image:legacyMapValue(imageMaps[0],k)||b.image||'',welcomeVideo:legacyMapValue(videoMaps[0],k)||b.welcomeVideo||'',voiceId:legacyMapValue(voiceMaps[0],k,legacyVoiceEnv(k))||b.voiceId||''})}
+  }
+
+  // Anciennes données Index parfois sauvegardées à plat : on les récupère aussi.
+  for(const [k] of sections)if(!out.index[k])out.index[k]=legacyFirst(cfg[k],cfg['index_'+k],cfg['idx_'+k]);
+  return out;
+}
+
 function apply(d={}){for(const k of ['title','short','portalId','workerName','host','mission','loginImage'])$(k).value=d[k]||'';for(const a of catalog){const on=(d.agents||[]).some(x=>x.key===a.key);if($('ag-'+a.key))$('ag-'+a.key).checked=on;const x=(d.agents||[]).find(x=>x.key===a.key);if(x){$('img-'+a.key).value=x.image||'';$('vid-'+a.key).value=x.welcomeVideo||'';$('voi-'+a.key).value=x.voiceId||''}}for(const [k] of sections)if($('idx-'+k))$('idx-'+k).value=d.index?.[k]||'';tools=d.tools||[];renderTools()}
-async function loadProjects(){const d=await api(API),s=$('projectSelect');s.innerHTML='<option value="">— Nouveau portail —</option>';for(const p of d.projects||[]){const o=document.createElement('option');o.value=p.id;o.textContent=p.title;s.appendChild(o)}}async function save(){const payload={title:$('title').value||'Nouveau portail',data:draft()};const d=current?await api(API+'/'+current,{method:'PUT',body:JSON.stringify(payload)}):await api(API,{method:'POST',body:JSON.stringify(payload)});current=d.project.id;await loadProjects();$('projectSelect').value=current;return d.project}async function open(){const id=$('projectSelect').value;if(!id)return;const d=await api(API+'/'+id);current=id;apply(d.project.data||{})}
+async function loadProjects(){const d=await api(API),s=$('projectSelect');s.innerHTML='<option value="">— Nouveau portail —</option>';for(const p of d.projects||[]){const o=document.createElement('option');o.value=p.id;o.textContent=p.title;s.appendChild(o)}}async function save(){const payload={title:$('title').value||'Nouveau portail',data:draft()};const d=current?await api(API+'/'+current,{method:'PUT',body:JSON.stringify(payload)}):await api(API,{method:'POST',body:JSON.stringify(payload)});current=d.project.id;await loadProjects();$('projectSelect').value=current;return d.project}async function open(){const id=$('projectSelect').value;if(!id)return;const d=await api(API+'/'+id);current=id;const converted=normalizeLegacyProject(d.project.data||{},d.project||{});apply(converted);const st=$('projectSaveState');if(st)st.textContent='Projet chargé · anciennes données converties à l’écran si nécessaire. Clique Sauvegarder seulement après vérification.'}
 function addTool(){tools.push({id:crypto.randomUUID().replace(/-/g,'').slice(0,12),name:'',icon:'🧰',path:'/outil.html',content:''});renderTools()}function renderTools(){const h=$('tools');h.innerHTML='';tools.forEach(t=>{const d=document.createElement('div');d.className='tool';d.innerHTML='<input data-k="name" value="'+esc(t.name||'')+'" placeholder="Nom"><input data-k="path" value="'+esc(t.path||'')+'" placeholder="/outil.html"><input type="file" accept=".html,text/html"><button class="btn danger">Retirer</button>';const ins=d.querySelectorAll('input[data-k]');ins.forEach(i=>i.oninput=()=>t[i.dataset.k]=i.value);d.querySelector('input[type=file]').onchange=async e=>{const f=e.target.files[0];if(f)t.content=await f.text()};d.querySelector('button').onclick=()=>{tools=tools.filter(x=>x!==t);renderTools()};h.appendChild(d)})}
 async function saveChar(){const name=$('charName').value.trim(),code=slug($('charCode').value||name);if(!name||!code)return;const basic=await api('/api/personnages/save',{method:'POST',body:JSON.stringify({nom:name,code,portail:$('charPortal').value})});await api('/api/superadmin4/personnages/profile',{method:'POST',body:JSON.stringify({code,name,sub:$('charSub').value,prompt:$('charPrompt').value,personality:$('charPersonality').value,image:$('charImage').value,welcomeVideo:$('charVideo').value,voiceId:$('charVoice').value,portail:$('charPortal').value})});$('charStatus').textContent='Enregistré ✓';await load();if($('charExisting')){$('charExisting').value=code;loadCharacterForm(code)}}
 function b64(s){const u=new TextEncoder().encode(s);let b='';u.forEach(x=>b+=String.fromCharCode(x));return btoa(b)}function media(url){url=String(url||'').trim();if(!url)return'';if(/youtube\.com|youtu\.be|drive\.google\.com|\.mp4(?:\?|$)|\.webm(?:\?|$)/i.test(url)){let src=url,m=url.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/);if(m)src='https://www.youtube.com/embed/'+m[1];const g=url.match(/drive\.google\.com\/file\/d\/([^/]+)/);if(g)src='https://drive.google.com/file/d/'+g[1]+'/preview';return '<iframe src="'+esc(src)+'" allow="autoplay; fullscreen" loading="lazy"></iframe>'}return '<img src="'+esc(url)+'" alt="">'}
