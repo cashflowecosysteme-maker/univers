@@ -1,43 +1,28 @@
-(()=>{'use strict';const $=id=>document.getElementById(id),API='/api/superadmin4/projects';let catalog=[],profiles={},tools=[],current='',projectRows=[],portalAgents=new Map(),portalAgentCurrent='',indexPreviewTemplate='',indexPreviewCss='',indexActiveGroup='hero',indexAdvanced=false,indexPreviewTimer=null;const CORE={nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦'},diane:{name:'Diane',sub:'Créatrice & accompagnement',icon:'👑'},eric:{name:'Éric',sub:'Communication & CashFlow',icon:'💼'},lena:{name:'Léna',sub:'Spiritualité & intuition',icon:'🔮'},selena:{name:'Séléna',sub:'A.M.I.E.',icon:'🪞'},alex:{name:'Alex',sub:'Écriture',icon:'✍️'},kael:{name:'Kael',sub:'Relations',icon:'💜'},sophia:{name:'Sophia',sub:'Numérologie · La Tisseuse des Nombres',icon:'🔢'},aletheia:{name:'Aletheia',sub:'Runes · La Scribe des Murmures Runiques',icon:'ᚱ'},cassandre:{name:'Cassandre',sub:'Tarot · La Voix du Reflet',icon:'🃏'},celeste:{name:'Céleste',sub:'Mancies & rituels · La Cartographe des Présages',icon:'🌙'}};const sections=[
-['headerSocials','Réseaux sociaux (HTML)'],['headerCtaLabel','Texte du bouton'],['headerCtaUrl','URL du bouton'],
-['heroEyebrow','Petit titre'],['heroTitle','Titre principal'],['heroSubtitle','Sous-titre'],['heroText','Texte principal'],['heroNote','Note'],['heroCtaLabel','Texte du bouton'],['heroCtaUrl','URL du bouton'],['heroMedia','Image / vidéo'],
-['s2','Texte'],['s2Media','Image / vidéo'],['s3Media','Image 02 / vidéo'],
-['s45','Texte du parcours'],['s45Media','Image / vidéo'],
-['s67','Texte'],['s67Media','Image / vidéo'],
-['s89','Texte Formation Vivante'],['s89Media','Image / vidéo'],
-['s1011','Texte'],['s1011Media','Image / vidéo'],
-['s1213','Texte Atelier'],['s1213Media','Image / vidéo'],
-['s1415','Texte Résultats'],['s1415Media','Image / vidéo'],
-['marquee','Bandeau défilant (HTML / texte)'],
-['socialProof','Preuve sociale'],['socialProofMedia','Image / vidéo'],
-['toolsText','Texte boîte à outils'],['toolsMedia','Image / vidéo'],
-['transformText','Texte projection / transformation'],['transformMedia','Image / vidéo'],
-['faq','FAQ'],
-['ctaTitle','Titre'],['ctaText','Texte'],['ctaLabel','Texte du bouton'],['ctaUrl','URL du bouton'],
-['footerSocials','Réseaux du footer (HTML)'],['footerSign','Signature']
-];
+(()=>{'use strict';const $=id=>document.getElementById(id),API='/api/superadmin4/projects';let catalog=[],profiles={},tools=[],current='',projectRows=[],portalAgents=new Map(),portalAgentCurrent='',indexPreviewTemplate='',indexPreviewCss='',indexActiveGroup='hero',indexAdvanced=false,indexPreviewTimer=null;const CORE={nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦'},diane:{name:'Diane',sub:'Créatrice & accompagnement',icon:'👑'},eric:{name:'Éric',sub:'Communication & CashFlow',icon:'💼'},lena:{name:'Léna',sub:'Spiritualité & intuition',icon:'🔮'},selena:{name:'Séléna',sub:'A.M.I.E.',icon:'🪞'},alex:{name:'Alex',sub:'Écriture',icon:'✍️'},kael:{name:'Kael',sub:'Relations',icon:'💜'},sophia:{name:'Sophia',sub:'Numérologie · La Tisseuse des Nombres',icon:'🔢'},aletheia:{name:'Aletheia',sub:'Runes · La Scribe des Murmures Runiques',icon:'ᚱ'},cassandre:{name:'Cassandre',sub:'Tarot · La Voix du Reflet',icon:'🃏'},celeste:{name:'Céleste',sub:'Mancies & rituels · La Cartographe des Présages',icon:'🌙'}};const sections=[["headerSocials","Réseaux sociaux (HTML)"],["headerCtaLabel","Nom affiché dans le bouton"],["headerCtaUrl","URL du bouton"],["heroEyebrow","Petit titre"],["heroTitle","Titre principal"],["heroSubtitle","Sous-titre"],["heroText","Texte principal"],["heroNote","Note"],["heroCtaLabel","Texte du bouton"],["heroCtaUrl","URL du bouton"],["heroButtonStyle","Style du bouton"],["heroMedia","Image / vidéo"],["s2Kicker","Petit titre"],["s2Title","Titre"],["s2","Texte"],["s2Media","Image / vidéo"],["s3Media","Deuxième image / vidéo"],["s45Kicker","Petit titre"],["s45Title","Titre"],["s45","Texte du parcours"],["s45Media","Image / vidéo"],["journeyItems","Étapes du parcours"],["s67Kicker","Petit titre"],["s67Title","Titre"],["s67","Texte"],["s67Media","Image / vidéo"],["s89Kicker","Petit titre"],["s89Title","Titre"],["s89","Texte Formation Vivante"],["s89Media","Image / vidéo"],["s1011Kicker","Petit titre"],["s1011Title","Titre"],["s1011","Texte"],["s1011Media","Image / vidéo"],["s1213Kicker","Petit titre"],["s1213Title","Titre"],["s1213","Texte Atelier"],["s1213Media","Image / vidéo"],["s1415Kicker","Petit titre"],["s1415Title","Titre"],["s1415","Texte Résultats"],["s1415Media","Image / vidéo"],["socialKicker","Petit titre"],["socialTitle","Titre"],["socialProof","Texte de preuve sociale"],["socialProofMedia","Image / vidéo"],["proofItems","Témoignages"],["toolsKicker","Petit titre"],["toolsTitle","Titre"],["toolsText","Texte boîte à outils"],["toolsMedia","Image / vidéo"],["transKicker","Petit titre"],["transTitle","Titre"],["transformText","Texte projection / transformation"],["transformMedia","Image / vidéo"],["faqTitle","Titre FAQ"],["faq","FAQ"],["ctaKicker","Petit titre"],["ctaTitle","Titre"],["ctaText","Texte"],["ctaLabel","Texte du bouton"],["ctaUrl","URL du bouton"],["ctaVariant","Format du CTA"],["ctaButtonStyle","Style du bouton"],["footerSocials","Réseaux du footer (HTML)"],["footerSign","Signature"],["marquee","Bandeau défilant (HTML / texte)"],["showHeader","Affichage"],["codeModeHeader","Mode du code"],["codeHeader","Code HTML personnalisé"],["showHero","Affichage"],["codeModeHero","Mode du code"],["codeHero","Code HTML personnalisé"],["showProblem","Affichage"],["codeModeProblem","Mode du code"],["codeProblem","Code HTML personnalisé"],["showJourney","Affichage"],["codeModeJourney","Mode du code"],["codeJourney","Code HTML personnalisé"],["showContent","Affichage"],["codeModeContent","Mode du code"],["codeContent","Code HTML personnalisé"],["showFormation","Affichage"],["codeModeFormation","Mode du code"],["codeFormation","Code HTML personnalisé"],["showEvolution","Affichage"],["codeModeEvolution","Mode du code"],["codeEvolution","Code HTML personnalisé"],["showAtelier","Affichage"],["codeModeAtelier","Mode du code"],["codeAtelier","Code HTML personnalisé"],["showResults","Affichage"],["codeModeResults","Mode du code"],["codeResults","Code HTML personnalisé"],["showProof","Affichage"],["codeModeProof","Mode du code"],["codeProof","Code HTML personnalisé"],["showTools","Affichage"],["codeModeTools","Mode du code"],["codeTools","Code HTML personnalisé"],["showTransform","Affichage"],["codeModeTransform","Mode du code"],["codeTransform","Code HTML personnalisé"],["showFaq","Affichage"],["codeModeFaq","Mode du code"],["codeFaq","Code HTML personnalisé"],["showCta","Affichage"],["codeModeCta","Mode du code"],["codeCta","Code HTML personnalisé"],["showFooter","Affichage"],["codeModeFooter","Mode du code"],["codeFooter","Code HTML personnalisé"]];
 const INDEX_GROUPS=[
  {id:'header',icon:'⌂',title:'Header',keys:['headerCtaLabel','headerCtaUrl','headerSocials'],advanced:['headerSocials']},
- {id:'hero',icon:'✦',title:'Hero',keys:['heroEyebrow','heroTitle','heroSubtitle','heroText','heroNote','heroCtaLabel','heroCtaUrl','heroMedia']},
- {id:'problem',icon:'01',title:'Problème / entrée',keys:['s2','s2Media','s3Media']},
- {id:'journey',icon:'02',title:'Parcours',keys:['s45','s45Media']},
- {id:'content',icon:'03',title:'Contenu',keys:['s67','s67Media']},
- {id:'formation',icon:'04',title:'Formation Vivante',keys:['s89','s89Media']},
- {id:'evolution',icon:'05',title:'Évolution',keys:['s1011','s1011Media']},
- {id:'atelier',icon:'06',title:'Atelier',keys:['s1213','s1213Media']},
- {id:'results',icon:'07',title:'Résultats',keys:['s1415','s1415Media']},
- {id:'proof',icon:'★',title:'Preuve sociale',keys:['socialProof','socialProofMedia']},
- {id:'tools',icon:'🧰',title:'Boîte à outils',keys:['toolsText','toolsMedia']},
- {id:'transform',icon:'↗',title:'Transformation',keys:['transformText','transformMedia']},
- {id:'faq',icon:'?',title:'FAQ',keys:['faq']},
- {id:'cta',icon:'◎',title:'Rendez-vous / CTA',keys:['ctaTitle','ctaText','ctaLabel','ctaUrl']},
+ {id:'hero',icon:'✦',title:'Hero',keys:['heroEyebrow','heroTitle','heroSubtitle','heroText','heroNote','heroCtaLabel','heroCtaUrl','heroButtonStyle','heroMedia']},
+ {id:'problem',icon:'01',title:'Problème / entrée',keys:['s2Kicker','s2Title','s2','s2Media','s3Media']},
+ {id:'journey',icon:'02',title:'Parcours',keys:['s45Kicker','s45Title','s45','s45Media','journeyItems']},
+ {id:'content',icon:'03',title:'Contenu',keys:['s67Kicker','s67Title','s67','s67Media']},
+ {id:'formation',icon:'04',title:'Formation Vivante',keys:['s89Kicker','s89Title','s89','s89Media']},
+ {id:'evolution',icon:'05',title:'Évolution',keys:['s1011Kicker','s1011Title','s1011','s1011Media']},
+ {id:'atelier',icon:'06',title:'Atelier',keys:['s1213Kicker','s1213Title','s1213','s1213Media']},
+ {id:'results',icon:'07',title:'Résultats',keys:['s1415Kicker','s1415Title','s1415','s1415Media']},
+ {id:'proof',icon:'★',title:'Preuve sociale',keys:['socialKicker','socialTitle','socialProof','socialProofMedia','proofItems']},
+ {id:'tools',icon:'🧰',title:'Boîte à outils',keys:['toolsKicker','toolsTitle','toolsText','toolsMedia']},
+ {id:'transform',icon:'↗',title:'Transformation',keys:['transKicker','transTitle','transformText','transformMedia']},
+ {id:'faq',icon:'?',title:'FAQ',keys:['faqTitle','faq']},
+ {id:'cta',icon:'◎',title:'Rendez-vous / CTA',keys:['ctaKicker','ctaTitle','ctaText','ctaLabel','ctaUrl','ctaVariant','ctaButtonStyle']},
  {id:'footer',icon:'⌄',title:'Footer',keys:['footerSign','footerSocials','marquee'],advanced:['footerSocials','marquee']}
 ];
 const INDEX_MEDIA_KEYS=new Set(['heroMedia','s2Media','s3Media','s45Media','s67Media','s89Media','s1011Media','s1213Media','s1415Media','socialProofMedia','toolsMedia','transformMedia']);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const slug=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},...o});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'HTTP '+r.status);return d}
 
+
 function idxFieldLabel(key){return (sections.find(x=>x[0]===key)||[key,key])[1]}
-function idxIsLong(key){return key==='faq'||/Text$|^s\d|Proof$|marquee|footerSocials|headerSocials/.test(key)}
+function idxIsLong(key){return key==='faq'||/Text$|^s\d$|Proof$|marquee|footerSocials|headerSocials|^code/.test(key)}
+function idxCap(id){return id.charAt(0).toUpperCase()+id.slice(1)}
 function idxMediaPreviewHtml(url){
  url=String(url||'').trim();if(!url)return''
  const yt=url.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/)
@@ -52,6 +37,11 @@ function updateIdxMediaPreview(key){
  box.innerHTML=idxMediaPreviewHtml(el.value)
  box.style.display=el.value.trim()?'block':'none'
 }
+function specialSelect(key){
+ if(key==='heroButtonStyle'||key==='ctaButtonStyle')return '<select id="idx-'+key+'"><option value="gold">Or</option><option value="glass">Glass</option></select>'
+ if(key==='ctaVariant')return '<select id="idx-'+key+'"><option value="simple">Simple · Prends rendez-vous</option><option value="complete">Complet · titre + texte + bouton</option></select>'
+ return''
+}
 function indexUI(){
  const nav=$('indexSectionNav'),host=$('indexFields');if(!nav||!host)return
  nav.innerHTML='';host.innerHTML=''
@@ -61,39 +51,48 @@ function indexUI(){
    b.onclick=()=>activateIndexGroup(g.id);nav.appendChild(b)
 
    const panel=document.createElement('div');panel.className='index-group';panel.dataset.group=g.id
+   const cap=idxCap(g.id)
+   const controls=document.createElement('div');controls.className='field'
+   controls.innerHTML='<label>Afficher cette section</label><select id="idx-show'+cap+'"><option value="1">Oui · afficher</option><option value="0">Non · masquer</option></select>'
+   panel.appendChild(controls)
+
    for(const key of g.keys){
      if(key==='faq'){
-       const hidden=document.createElement('textarea');hidden.id='idx-faq';hidden.className='idx-hidden-source'
-       hidden.addEventListener('input',()=>scheduleIndexPreview())
-       panel.appendChild(hidden)
-       const wrap=document.createElement('div')
-       wrap.innerHTML='<div class="idx-faq-list" id="idxFaqList"></div><button class="btn secondary" type="button" id="idxFaqAddBtn">＋ Ajouter une question</button>'
-       panel.appendChild(wrap)
-       continue
+       const hidden=document.createElement('textarea');hidden.id='idx-faq';hidden.className='idx-hidden-source';panel.appendChild(hidden)
+       const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">Questions / réponses</label><div class="idx-faq-list" id="idxFaqList"></div><button class="btn secondary" type="button" id="idxFaqAddBtn">＋ Ajouter une question</button>';panel.appendChild(wrap);continue
      }
-     const field=document.createElement('div')
-     const isAdvanced=(g.advanced||[]).includes(key)
+     if(key==='journeyItems'){
+       const hidden=document.createElement('textarea');hidden.id='idx-journeyItems';hidden.className='idx-hidden-source';panel.appendChild(hidden)
+       const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">Étapes du parcours</label><div class="idx-faq-list" id="idxJourneyList"></div><button class="btn secondary" type="button" id="idxJourneyAddBtn">＋ Ajouter une étape</button>';panel.appendChild(wrap);continue
+     }
+     if(key==='proofItems'){
+       const hidden=document.createElement('textarea');hidden.id='idx-proofItems';hidden.className='idx-hidden-source';panel.appendChild(hidden)
+       const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">Témoignages</label><div class="idx-faq-list" id="idxProofList"></div><button class="btn secondary" type="button" id="idxProofAddBtn">＋ Ajouter un témoignage</button>';panel.appendChild(wrap);continue
+     }
+     const field=document.createElement('div'),isAdvanced=(g.advanced||[]).includes(key)
      field.className='field'+(isAdvanced?' idx-advanced':'')
-     const control=idxIsLong(key)
-       ? '<textarea id="idx-'+key+'"></textarea>'
-       : '<input id="idx-'+key+'">'
+     const special=specialSelect(key)
+     const control=special||(idxIsLong(key)?'<textarea id="idx-'+key+'"></textarea>':'<input id="idx-'+key+'">')
      field.innerHTML='<label>'+esc(idxFieldLabel(key))+(isAdvanced?' · avancé':'')+'</label>'+control
      if(INDEX_MEDIA_KEYS.has(key))field.innerHTML+='<div class="idx-media-thumb" id="idx-media-'+key+'" style="display:none"></div>'
      if(/Socials|marquee/.test(key))field.innerHTML+='<div class="idx-field-note">HTML autorisé dans cette zone.</div>'
      panel.appendChild(field)
    }
+
+   const code=document.createElement('div');code.className='idx-advanced'
+   code.innerHTML='<hr style="border:0;border-top:1px solid rgba(167,139,250,.2);margin:18px 0"><div class="field"><label>Code HTML personnalisé</label><select id="idx-codeMode'+cap+'"><option value="append">Ajouter après le contenu visuel</option><option value="replace">Remplacer entièrement cette section</option></select></div><div class="field"><label>HTML de cette section</label><textarea id="idx-code'+cap+'" style="min-height:180px" placeholder="<div>...</div>"></textarea><div class="idx-field-note">Tu peux utiliser ton propre HTML lorsque tu veux quelque chose de très précis.</div></div>'
+   panel.appendChild(code)
    host.appendChild(panel)
  }
  for(const [key] of sections){
    const el=$('idx-'+key);if(!el)continue
-   el.addEventListener('input',()=>{
-     if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key)
-     scheduleIndexPreview()
-   })
+   el.addEventListener('input',()=>{if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key);scheduleIndexPreview()})
+   el.addEventListener('change',()=>{if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key);scheduleIndexPreview()})
  }
- if($('idxFaqAddBtn'))$('idxFaqAddBtn').onclick=()=>addFaqItem()
- activateIndexGroup(indexActiveGroup)
- loadIndexPreviewTemplate()
+ if($('idxFaqAddBtn'))$('idxFaqAddBtn').onclick=addFaqItem
+ if($('idxJourneyAddBtn'))$('idxJourneyAddBtn').onclick=addJourneyItem
+ if($('idxProofAddBtn'))$('idxProofAddBtn').onclick=addProofItem
+ activateIndexGroup(indexActiveGroup);loadIndexPreviewTemplate()
 }
 function activateIndexGroup(id){
  const outerX=window.scrollX,outerY=window.scrollY
@@ -104,133 +103,89 @@ function activateIndexGroup(id){
  if($('indexEditorTitle'))$('indexEditorTitle').textContent=g.title
  for(const key of g.keys)if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key)
  if(g.id==='faq')renderFaqBuilder()
+ if(g.id==='journey')renderJourneyBuilder()
+ if(g.id==='proof')renderProofBuilder()
  scrollIndexPreviewToGroup(g.id)
  requestAnimationFrame(()=>window.scrollTo(outerX,outerY))
 }
-function currentIndexData(){
- const idx={}
- for(const [k] of sections)idx[k]=$('idx-'+k)?.value||''
- return idx
-}
-function faqData(){
- try{const v=JSON.parse($('idx-faq')?.value||'[]');return Array.isArray(v)?v:[]}catch(_){return[]}
-}
-function writeFaqData(list){
- if($('idx-faq'))$('idx-faq').value=JSON.stringify(list)
- renderFaqBuilder();scheduleIndexPreview()
-}
+function currentIndexData(){const idx={};for(const [k] of sections)idx[k]=$('idx-'+k)?.value||'';return idx}
+function jsonArray(id){try{const v=JSON.parse($(id)?.value||'[]');return Array.isArray(v)?v:[]}catch(_){return[]}}
+function setJsonArray(id,list){if($(id))$(id).value=JSON.stringify(list);scheduleIndexPreview()}
+function faqData(){return jsonArray('idx-faq')}
 function renderFaqBuilder(){
- const h=$('idxFaqList');if(!h)return
- const list=faqData();h.innerHTML=''
+ const h=$('idxFaqList');if(!h)return;const list=faqData();h.innerHTML=''
  if(!list.length){const e=document.createElement('div');e.className='idx-empty';e.textContent='Aucune question pour le moment.';h.appendChild(e)}
- list.forEach((item,i)=>{
-   const row=document.createElement('div');row.className='idx-faq-row'
-   row.innerHTML='<input data-faq-q="'+i+'" placeholder="Question" value="'+esc(item.q||'')+'"><textarea data-faq-a="'+i+'" placeholder="Réponse">'+esc(item.a||'')+'</textarea><div class="idx-faq-actions"><button class="btn danger" type="button" data-faq-del="'+i+'">Supprimer</button></div>'
-   h.appendChild(row)
- })
+ list.forEach((item,i)=>{const row=document.createElement('div');row.className='idx-faq-row';row.innerHTML='<input data-faq-q="'+i+'" placeholder="Question" value="'+esc(item.q||'')+'"><textarea data-faq-a="'+i+'" placeholder="Réponse">'+esc(item.a||'')+'</textarea><div class="idx-faq-actions"><button class="btn danger" type="button" data-faq-del="'+i+'">Supprimer</button></div>';h.appendChild(row)})
  h.querySelectorAll('[data-faq-q]').forEach(el=>el.oninput=()=>{const l=faqData(),i=+el.dataset.faqQ;l[i]={...(l[i]||{}),q:el.value};$('idx-faq').value=JSON.stringify(l);scheduleIndexPreview()})
  h.querySelectorAll('[data-faq-a]').forEach(el=>el.oninput=()=>{const l=faqData(),i=+el.dataset.faqA;l[i]={...(l[i]||{}),a:el.value};$('idx-faq').value=JSON.stringify(l);scheduleIndexPreview()})
- h.querySelectorAll('[data-faq-del]').forEach(el=>el.onclick=()=>{const l=faqData();l.splice(+el.dataset.faqDel,1);writeFaqData(l)})
+ h.querySelectorAll('[data-faq-del]').forEach(el=>el.onclick=()=>{const l=faqData();l.splice(+el.dataset.faqDel,1);setJsonArray('idx-faq',l);renderFaqBuilder()})
 }
-function addFaqItem(){const l=faqData();l.push({q:'',a:''});writeFaqData(l)}
+function addFaqItem(){const l=faqData();l.push({q:'',a:''});setJsonArray('idx-faq',l);renderFaqBuilder()}
+function journeyData(){return jsonArray('idx-journeyItems')}
+function renderJourneyBuilder(){
+ const h=$('idxJourneyList');if(!h)return;const list=journeyData();h.innerHTML=''
+ if(!list.length){const e=document.createElement('div');e.className='idx-empty';e.textContent='Aucune étape. Ajoute seulement celles dont tu as besoin.';h.appendChild(e)}
+ list.forEach((item,i)=>{const row=document.createElement('div');row.className='idx-faq-row';row.innerHTML='<input data-j-title="'+i+'" placeholder="Titre de l’étape" value="'+esc(item.title||'')+'"><textarea data-j-text="'+i+'" placeholder="Description">'+esc(item.text||'')+'</textarea><div class="idx-faq-actions"><button class="btn danger" type="button" data-j-del="'+i+'">Supprimer</button></div>';h.appendChild(row)})
+ h.querySelectorAll('[data-j-title]').forEach(el=>el.oninput=()=>{const l=journeyData(),i=+el.dataset.jTitle;l[i]={...(l[i]||{}),title:el.value};$('idx-journeyItems').value=JSON.stringify(l);scheduleIndexPreview()})
+ h.querySelectorAll('[data-j-text]').forEach(el=>el.oninput=()=>{const l=journeyData(),i=+el.dataset.jText;l[i]={...(l[i]||{}),text:el.value};$('idx-journeyItems').value=JSON.stringify(l);scheduleIndexPreview()})
+ h.querySelectorAll('[data-j-del]').forEach(el=>el.onclick=()=>{const l=journeyData();l.splice(+el.dataset.jDel,1);setJsonArray('idx-journeyItems',l);renderJourneyBuilder()})
+}
+function addJourneyItem(){const l=journeyData();l.push({title:'',text:''});setJsonArray('idx-journeyItems',l);renderJourneyBuilder()}
+function proofData(){return jsonArray('idx-proofItems')}
+function renderProofBuilder(){
+ const h=$('idxProofList');if(!h)return;const list=proofData();h.innerHTML=''
+ if(!list.length){const e=document.createElement('div');e.className='idx-empty';e.textContent='Aucun témoignage pour le moment.';h.appendChild(e)}
+ list.forEach((item,i)=>{const row=document.createElement('div');row.className='idx-faq-row';row.innerHTML='<input data-p-name="'+i+'" placeholder="Nom / signature" value="'+esc(item.name||'')+'"><input data-p-sub="'+i+'" placeholder="Résultat / sous-titre" value="'+esc(item.sub||'')+'"><input data-p-image="'+i+'" placeholder="Image ou couverture (URL)" value="'+esc(item.image||'')+'"><textarea data-p-text="'+i+'" placeholder="Témoignage">'+esc(item.text||'')+'</textarea><div class="idx-faq-actions"><button class="btn danger" type="button" data-p-del="'+i+'">Supprimer</button></div>';h.appendChild(row)})
+ for(const attr of ['name','sub','image','text'])h.querySelectorAll('[data-p-'+attr+']').forEach(el=>el.oninput=()=>{const l=proofData(),i=+el.dataset['p'+attr.charAt(0).toUpperCase()+attr.slice(1)];l[i]={...(l[i]||{}),[attr]:el.value};$('idx-proofItems').value=JSON.stringify(l);scheduleIndexPreview()})
+ h.querySelectorAll('[data-p-del]').forEach(el=>el.onclick=()=>{const l=proofData();l.splice(+el.dataset.pDel,1);setJsonArray('idx-proofItems',l);renderProofBuilder()})
+}
+function addProofItem(){const l=proofData();l.push({name:'',sub:'',image:'',text:''});setJsonArray('idx-proofItems',l);renderProofBuilder()}
 async function loadIndexPreviewTemplate(){
  const status=$('indexPreviewStatus')
  try{
    if(status)status.textContent='Chargement de la vraie coque…'
-   const r=await fetch('/superadmin4/portail-shell-template.zip',{cache:'no-store'})
-   if(!r.ok)throw Error('Coque introuvable')
-   const z=await JSZip.loadAsync(await r.arrayBuffer())
-   const hf=z.file('index.html'),cf=z.file('css/index.css')
+   const r=await fetch('/superadmin4/portail-shell-template.zip',{cache:'no-store'});if(!r.ok)throw Error('Coque introuvable')
+   const z=await JSZip.loadAsync(await r.arrayBuffer()),hf=z.file('index.html'),cf=z.file('css/index.css')
    if(!hf||!cf)throw Error('index.html ou css/index.css manque dans la coque')
-   indexPreviewTemplate=await hf.async('string')
-   indexPreviewCss=await cf.async('string')
-   if(status)status.textContent='Aperçu réel de la coque ✓'
-   refreshIndexPreview()
- }catch(e){
-   if(status)status.textContent='⚠ '+e.message
- }
+   indexPreviewTemplate=await hf.async('string');indexPreviewCss=await cf.async('string')
+   if(status)status.textContent='Aperçu réel de la coque ✓';refreshIndexPreview()
+ }catch(e){if(status)status.textContent='⚠ '+e.message}
 }
 function buildPreviewHtml(){
  if(!indexPreviewTemplate)return''
- const p={title:$('title')?.value||'Portail NyXia',mission:$('mission')?.value||'',index:currentIndexData()}
+ const p={title:$('title')?.value||'Portail NyXia',short:$('short')?.value||'',mission:$('mission')?.value||'',index:currentIndexData()}
  let doc=fillIndex(indexPreviewTemplate,p)
  doc=doc.replace(/<link[^>]+href=["']\/css\/index\.css["'][^>]*>/i,'<style>'+indexPreviewCss+'</style>')
- doc=doc.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'')
- doc=doc.replace(/<script\b[^>]*\/?>/gi,'')
+ doc=doc.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<script\b[^>]*\/?>/gi,'')
  doc=doc.replace('</head>','<style>html{scroll-behavior:smooth}body{min-width:0!important}a{cursor:default}</style></head>')
  return doc
 }
 function refreshIndexPreview(){
  const f=$('indexPreviewFrame');if(!f||!indexPreviewTemplate)return
- const outerX=window.scrollX,outerY=window.scrollY
- const active=document.activeElement
- const activeId=active&&active.id?active.id:''
- let selStart=null,selEnd=null
- try{
-   if(active&&typeof active.selectionStart==='number'){
-     selStart=active.selectionStart;selEnd=active.selectionEnd
-   }
- }catch(_){}
- let previewX=0,previewY=0
- try{
-   previewX=f.contentWindow?.scrollX||0
-   previewY=f.contentWindow?.scrollY||0
- }catch(_){}
+ const outerX=window.scrollX,outerY=window.scrollY,active=document.activeElement,activeId=active&&active.id?active.id:''
+ let selStart=null,selEnd=null;try{if(active&&typeof active.selectionStart==='number'){selStart=active.selectionStart;selEnd=active.selectionEnd}}catch(_){}
+ let previewX=0,previewY=0;try{previewX=f.contentWindow?.scrollX||0;previewY=f.contentWindow?.scrollY||0}catch(_){}
  f.srcdoc=buildPreviewHtml()
- f.onload=()=>{
-   try{
-     f.contentDocument?.addEventListener('click',e=>{
-       const a=e.target.closest?.('a')
-       if(a)e.preventDefault()
-     })
-     f.contentWindow?.scrollTo(previewX,previewY)
-   }catch(_){}
-   requestAnimationFrame(()=>{
-     window.scrollTo(outerX,outerY)
-     if(activeId){
-       const el=document.getElementById(activeId)
-       if(el){
-         try{
-           el.focus({preventScroll:true})
-           if(selStart!==null&&typeof el.setSelectionRange==='function')el.setSelectionRange(selStart,selEnd)
-         }catch(_){}
-       }
-     }
-     window.scrollTo(outerX,outerY)
-   })
+ f.onload=()=>{try{f.contentDocument?.addEventListener('click',e=>{const a=e.target.closest?.('a');if(a)e.preventDefault()});f.contentWindow?.scrollTo(previewX,previewY)}catch(_){}
+   requestAnimationFrame(()=>{window.scrollTo(outerX,outerY);if(activeId){const el=document.getElementById(activeId);if(el){try{el.focus({preventScroll:true});if(selStart!==null&&typeof el.setSelectionRange==='function')el.setSelectionRange(selStart,selEnd)}catch(_){}}}window.scrollTo(outerX,outerY)})
  }
 }
-function scheduleIndexPreview(){
- clearTimeout(indexPreviewTimer)
- indexPreviewTimer=setTimeout(()=>{
-   const x=window.scrollX,y=window.scrollY
-   refreshIndexPreview()
-   requestAnimationFrame(()=>window.scrollTo(x,y))
- },550)
-}
-function setIndexDevice(mode){
- const stage=$('indexPreviewStage');if(!stage)return
- stage.classList.toggle('mobile',mode==='mobile');stage.classList.toggle('desktop',mode!=='mobile')
- if($('indexPreviewDevice'))$('indexPreviewDevice').textContent=mode==='mobile'?'Mobile · 390 px':'Desktop'
-}
+function scheduleIndexPreview(){clearTimeout(indexPreviewTimer);indexPreviewTimer=setTimeout(()=>{const x=window.scrollX,y=window.scrollY;refreshIndexPreview();requestAnimationFrame(()=>window.scrollTo(x,y))},550)}
+function setIndexDevice(mode){const stage=$('indexPreviewStage');if(!stage)return;stage.classList.toggle('mobile',mode==='mobile');stage.classList.toggle('desktop',mode!=='mobile');if($('indexPreviewDevice'))$('indexPreviewDevice').textContent=mode==='mobile'?'Mobile · 390 px':'Desktop'}
 function scrollIndexPreviewToGroup(id){
  const f=$('indexPreviewFrame');if(!f?.contentDocument)return
- const selectors={
-  header:'.site-header',hero:'#top',problem:'#top',
-  journey:'.section-wrap:nth-of-type(2)',content:'.section-wrap:nth-of-type(3)',
-  formation:'.section-wrap:nth-of-type(4)',evolution:'.section-wrap:nth-of-type(5)',
-  atelier:'.section-wrap:nth-of-type(6)',results:'.section-wrap:nth-of-type(7)',
-  proof:'.section-wrap:nth-of-type(8)',tools:'.section-wrap:nth-of-type(9)',
-  transform:'.section-wrap:nth-of-type(10)',faq:'.faq-section',cta:'.cta-section',footer:'footer'
- }
- try{const el=f.contentDocument.querySelector(selectors[id]||'body');el?.scrollIntoView({block:'start'})}catch(_){}
+ const selectors={header:'#nx-header',hero:'#nx-hero',problem:'#nx-problem',journey:'#nx-journey',content:'#nx-content',formation:'#nx-formation',evolution:'#nx-evolution',atelier:'#nx-atelier',results:'#nx-results',proof:'#nx-proof',tools:'#nx-tools',transform:'#nx-transform',faq:'#nx-faq',cta:'#nx-cta',footer:'#nx-footer'}
+ try{f.contentDocument.querySelector(selectors[id]||'body')?.scrollIntoView({block:'start'})}catch(_){}
 }
 function resetIndexSection(){
  const g=INDEX_GROUPS.find(x=>x.id===indexActiveGroup);if(!g)return
  if(!confirm('Réinitialiser tous les champs de « '+g.title+' » ?'))return
+ const cap=idxCap(g.id)
  for(const key of g.keys){if($('idx-'+key))$('idx-'+key).value='';if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key)}
- if(g.id==='faq')renderFaqBuilder()
- scheduleIndexPreview()
+ if($('idx-show'+cap))$('idx-show'+cap).value='1'
+ if($('idx-codeMode'+cap))$('idx-codeMode'+cap).value='append'
+ if($('idx-code'+cap))$('idx-code'+cap).value=''
+ if(g.id==='faq')renderFaqBuilder();if(g.id==='journey')renderJourneyBuilder();if(g.id==='proof')renderProofBuilder();scheduleIndexPreview()
 }
 async function load(){
   const map=new Map(Object.entries(CORE).map(([k,v])=>[k,{key:k,...v,portail:'',custom:false}]));
@@ -363,21 +318,22 @@ function legacyVoiceEnv(key){return 'ELEVENLABS_'+String(key||'').normalize('NFD
 function normalizeLegacyProject(raw={},project={}){const root=legacyObj(raw),cfg={...legacyObj(root.config),...legacyObj(root.portal),...legacyObj(root.settings),...root};const out={};out.title=legacyFirst(cfg.title,cfg.portalTitle,cfg.nom,cfg.name,project.title);out.short=legacyFirst(cfg.short,cfg.shortTitle,cfg.portalShortTitle,cfg.nomCourt,cfg.short_name,out.title);out.portalId=legacyFirst(cfg.portalId,cfg.portal_id,cfg.slug,cfg.id,cfg.identifier,cfg.identifiant);out.workerName=legacyFirst(cfg.workerName,cfg.worker,cfg.worker_name,cfg.cloudflareWorker,cfg.workerCloudflare);out.host=legacyFirst(cfg.host,cfg.hostname,cfg.domain,cfg.domaine,cfg.subdomain,cfg.sousDomaine,cfg.urlHost);out.mission=legacyFirst(cfg.mission,cfg.description,cfg.portalMission,cfg.purpose);out.loginImage=legacyFirst(cfg.loginImage,cfg.login_image,cfg.loginAvatar,cfg.loginMedia,cfg.imageLogin,cfg.coverImage);out.index={...legacyObj(cfg.index),...legacyObj(cfg.indexConfig),...legacyObj(cfg.indexData),...legacyObj(cfg.landingPage)};out.tools=legacyArray(legacyFirst(cfg.tools,cfg.specialTools,cfg.outils,cfg.portalTools));let source=[];for(const v of [cfg.agents,cfg.list,cfg.characters,cfg.personnages,cfg.selectedAgents,cfg.selectedCharacters]){if(Array.isArray(v)&&v.length){source=v;break}}let selected=[];for(const v of [cfg.activeAgents,cfg.active_agents,cfg.agentKeys,cfg.charactersActive,cfg.personnagesActifs]){if(Array.isArray(v)&&v.length){selected=v;break}}const sourceByKey=new Map();for(const item of source){const k=legacyKey(item);if(k)sourceByKey.set(k,item)}const wanted=new Set();for(const item of source){const k=legacyKey(item);if(k)wanted.add(k)}for(const item of selected){const k=legacyKey(item);if(k)wanted.add(k)}const trainer=legacyKey(legacyFirst(cfg.formationAgent,cfg.trainer,cfg.formateur,cfg.mainAgent));if(trainer)wanted.add(trainer);const imageMaps=[cfg.agentImages,cfg.images,cfg.characterImages,cfg.personnageImages,cfg.avatarUrls,cfg.avatars].map(legacyObj);const videoMaps=[cfg.agentVideos,cfg.welcomeVideos,cfg.videos,cfg.characterVideos,cfg.personnageVideos].map(legacyObj);const voiceMaps=[cfg.voiceIds,cfg.voices,cfg.agentVoices,cfg.characterVoices,cfg.voiceVariables,cfg.voice_variables].map(legacyObj);out.agents=[];for(const k of wanted){const saved=legacyObj(sourceByKey.get(k));const base=catalog.find(a=>a.key===k)||profiles[k]||{};const envName=legacyFirst(saved.voiceEnv,base.voiceEnv,legacyVoiceEnv(k));let image=legacyFirst(saved.image,saved.imageUrl,saved.avatar,saved.avatarUrl,saved.photo,saved.photoUrl);if(!image)for(const m of imageMaps){image=legacyMapValue(m,k,envName);if(image)break}let video=legacyFirst(saved.welcomeVideo,saved.video,saved.videoUrl,saved.welcome_video,saved.videoAccueil);if(!video)for(const m of videoMaps){video=legacyMapValue(m,k,envName);if(video)break}let voice=legacyFirst(saved.voiceId,saved.voice_id,saved.elevenlabsVoiceId,saved.elevenVoiceId);if(!voice)for(const m of voiceMaps){voice=legacyMapValue(m,k,envName);if(voice)break}out.agents.push({...base,...saved,key:k,name:legacyFirst(saved.name,saved.nom,base.name,k),sub:legacyFirst(saved.sub,saved.role,saved.subtitle,saved.description,base.sub,'Personnage NyXia'),icon:legacyFirst(saved.icon,base.icon,'✦'),image:legacyFirst(image,base.image,''),welcomeVideo:legacyFirst(video,base.welcomeVideo,''),voiceId:legacyFirst(voice,base.voiceId,''),voiceEnv:envName,placement:legacyFirst(saved.placement,saved.position,saved.emplacement,'principal'),greeting:legacyFirst(saved.greeting,saved.welcome,saved.accueil,base.greeting,'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.'),portail:legacyFirst(saved.portail,saved.portal,base.portail,'')})}if(!out.agents.length){const keys=new Set();for(const m of [...imageMaps,...videoMaps,...voiceMaps])for(const mk of Object.keys(m)){let k=slug(mk.replace(/^ELEVENLABS_/i,'').replace(/_VOICE_ID$/i,'').replace(/_/g,'-'));if(catalog.some(a=>a.key===k))keys.add(k)}for(const k of keys){const b=catalog.find(a=>a.key===k)||{};out.agents.push({...b,key:k,name:b.name||k,image:legacyMapValue(imageMaps[0],k)||b.image||'',welcomeVideo:legacyMapValue(videoMaps[0],k)||b.welcomeVideo||'',voiceId:legacyMapValue(voiceMaps[0],k,legacyVoiceEnv(k))||b.voiceId||''})}}for(const [k] of sections)if(!out.index[k])out.index[k]=legacyFirst(cfg[k],cfg['index_'+k],cfg['idx_'+k]);return out}
 function apply(d={}){
  for(const k of ['title','short','portalId','workerName','host','mission','loginImage'])$(k).value=d[k]||''
- portalAgents=new Map()
- for(const x of (d.agents||[])){
-   if(!x||!x.key)continue
-   portalAgents.set(x.key,{...x})
+ portalAgents=new Map();for(const x of (d.agents||[])){if(x&&x.key)portalAgents.set(x.key,{...x})}
+ portalAgentCurrent='';renderPortalAgentSelect($('portalAgentSearch')?.value||'');renderPortalAgentChips();if($('portalAgentCard'))$('portalAgentCard').style.display='none'
+ const idx=d.index||{}
+ for(const [k] of sections){
+   const el=$('idx-'+k);if(!el)continue
+   if(/^show[A-Z]/.test(k))el.value=(idx[k]===undefined||idx[k]==='')?'1':String(idx[k])
+   else if(/^codeMode[A-Z]/.test(k))el.value=idx[k]||'append'
+   else if(k==='heroButtonStyle')el.value=idx[k]||'gold'
+   else if(k==='ctaButtonStyle')el.value=idx[k]||'glass'
+   else if(k==='ctaVariant')el.value=idx[k]||'simple'
+   else el.value=idx[k]||''
  }
- portalAgentCurrent=''
- renderPortalAgentSelect($('portalAgentSearch')?.value||'')
- renderPortalAgentChips()
- if($('portalAgentCard'))$('portalAgentCard').style.display='none'
- for(const [k] of sections)if($('idx-'+k))$('idx-'+k).value=d.index?.[k]||''
- tools=d.tools||[];renderTools()
- renderFaqBuilder()
- for(const key of INDEX_MEDIA_KEYS)updateIdxMediaPreview(key)
- scheduleIndexPreview()
-}async function loadProjects(){const d=await api(API),s=$('projectSelect');projectRows=Array.isArray(d.projects)?d.projects.slice():[];s.innerHTML='<option value="">— Nouveau portail —</option>';for(const p of projectRows){const o=document.createElement('option');const pid=String(p&&p.id||'').trim();o.value=pid;o.dataset.projectId=pid;o.textContent=(p&&p.title)||'Nouveau portail';s.appendChild(o)}}
+ tools=d.tools||[];renderTools();renderFaqBuilder();renderJourneyBuilder();renderProofBuilder()
+ for(const key of INDEX_MEDIA_KEYS)updateIdxMediaPreview(key);scheduleIndexPreview()
+}
+async function loadProjects(){const d=await api(API),s=$('projectSelect');projectRows=Array.isArray(d.projects)?d.projects.slice():[];s.innerHTML='<option value="">— Nouveau portail —</option>';for(const p of projectRows){const o=document.createElement('option');const pid=String(p&&p.id||'').trim();o.value=pid;o.dataset.projectId=pid;o.textContent=(p&&p.title)||'Nouveau portail';s.appendChild(o)}}
 async function ensurePortalRegistered(show=true){const id=slug($('portalId').value||$('short').value||$('title').value),name=($('title').value||$('short').value||'').trim();if(!id||!name){if(show&&$('connectionStatus'))$('connectionStatus').textContent='⚠ Nom et ID du portail requis.';return false}try{const data=await api('/api/portals');const list=Array.isArray(data.portals)?data.portals:[];const existing=list.find(p=>p.id===id);if(existing){if(existing.name!==name||existing.active===false){const next=list.map(p=>p.id===id?{...p,name,active:true}:p);await api('/api/portals',{method:'POST',body:JSON.stringify({portals:next})})}if(show&&$('connectionStatus'))$('connectionStatus').textContent='✓ Portail connecté à la liste centrale et disponible pour Dégustation.';return true}await api('/api/portals/add',{method:'POST',body:JSON.stringify({id,name})});if(show&&$('connectionStatus'))$('connectionStatus').textContent='✓ Portail ajouté à la liste centrale et disponible pour Dégustation.';return true}catch(e){if(show&&$('connectionStatus'))$('connectionStatus').textContent='⚠ Connexion portail : '+e.message;return false}}
 async function checkConnections(){const ps=$('portalRegistryStatus'),cs=$('charactersConnectionStatus'),msg=$('connectionStatus');if(ps)ps.textContent='Vérification…';if(cs)cs.textContent='Vérification…';if(msg)msg.textContent='';try{const [meta,chars]=await Promise.all([api('/api/degustations/meta'),api('/api/personnages')]);const id=slug($('portalId').value||$('short').value||$('title').value);const portals=meta.portals||[];const found=id&&portals.some(p=>p.id===id);if(ps)ps.textContent=(id?(found?'✓ '+id+' est relié à Dégustation.':'— '+id+' n’est pas encore enregistré.'):('✓ Dégustation répond · '+portals.length+' portail(s) central(aux).'));const people=chars.personnages||chars.agents||[];if(cs)cs.textContent='✓ Catalogue partagé connecté · '+people.length+' personnage(s).';return{meta,chars,found}}catch(e){if(ps)ps.textContent='⚠ '+e.message;if(cs)cs.textContent='⚠ Connexion non confirmée';if(msg)msg.textContent='Aucune donnée n’a été supprimée.';return null}}
 function selectedProjectId(){
@@ -439,7 +395,66 @@ function renderTools(){const h=$('tools');h.innerHTML='';tools.forEach(t=>{const
 function b64(s){const u=new TextEncoder().encode(s);let b='';u.forEach(x=>b+=String.fromCharCode(x));return btoa(b)}
 function media(url){url=String(url||'').trim();if(!url)return'';if(/youtube\.com|youtu\.be|drive\.google\.com|\.mp4(?:\?|$)|\.webm(?:\?|$)/i.test(url)){let src=url,m=url.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/);if(m)src='https://www.youtube.com/embed/'+m[1];const g=url.match(/drive\.google\.com\/file\/d\/([^/]+)/);if(g)src='https://drive.google.com/file/d/'+g[1]+'/preview';return '<iframe src="'+esc(src)+'" allow="autoplay; fullscreen" loading="lazy"></iframe>'}return '<img src="'+esc(url)+'" alt="">'}
 function faq(v){try{return JSON.parse(v||'[]').map(x=>'<div class="faq-item"><button class="faq-q">'+esc(x.q||'')+'</button><div class="faq-a"><p>'+esc(x.a||'')+'</p></div></div>').join('')}catch(_){return''}}
-function fillIndex(s,p){const i=p.index||{},map={'__PORTAL_TITLE__':p.title||'Portail NyXia','__PORTAL_MISSION__':p.mission||'','__INDEX_HEADER_SOCIALS__':i.headerSocials||'','__INDEX_HEADER_CTA_LABEL__':i.headerCtaLabel||'Découvrir','__INDEX_HEADER_CTA_URL__':i.headerCtaUrl||'#','__INDEX_HERO_EYEBROW__':i.heroEyebrow||'Univers NyXia','__INDEX_HERO_TITLE__':i.heroTitle||p.title,'__INDEX_HERO_SUBTITLE__':i.heroSubtitle||'','__INDEX_HERO_TEXT__':i.heroText||p.mission,'__INDEX_HERO_NOTE__':i.heroNote||'','__INDEX_HERO_CTA_LABEL__':i.heroCtaLabel||'Entrer','__INDEX_HERO_CTA_URL__':i.heroCtaUrl||'/login.html','__INDEX_HERO_MEDIA__':media(i.heroMedia),'__INDEX_S2_KICKER__':'','__INDEX_S2_TITLE__':'','__INDEX_S2_TEXT__':i.s2||'','__INDEX_S2_MEDIA__':media(i.s2Media),'__INDEX_S3_MEDIA__':media(i.s3Media),'__INDEX_S45_KICKER__':'','__INDEX_S45_TITLE__':'','__INDEX_S45_TEXT__':i.s45||'','__INDEX_S45_MEDIA__':media(i.s45Media),'__INDEX_S67_KICKER__':'','__INDEX_S67_TITLE__':'','__INDEX_S67_TEXT__':i.s67||'','__INDEX_S67_MEDIA__':media(i.s67Media),'__INDEX_S89_KICKER__':'Formation Vivante','__INDEX_S89_TITLE__':'','__INDEX_S89_TEXT__':i.s89||'','__INDEX_S89_MEDIA__':media(i.s89Media),'__INDEX_S1011_KICKER__':'','__INDEX_S1011_TITLE__':'','__INDEX_S1011_TEXT__':i.s1011||'','__INDEX_S1011_MEDIA__':media(i.s1011Media),'__INDEX_S1213_KICKER__':'Atelier','__INDEX_S1213_TITLE__':'','__INDEX_S1213_TEXT__':i.s1213||'','__INDEX_S1213_MEDIA__':media(i.s1213Media),'__INDEX_S1415_KICKER__':'Résultats','__INDEX_S1415_TITLE__':'','__INDEX_S1415_TEXT__':i.s1415||'','__INDEX_S1415_MEDIA__':media(i.s1415Media),'__INDEX_MARQUEE__':i.marquee||'','__INDEX_SOCIAL_KICKER__':'La preuve sociale','__INDEX_SOCIAL_TITLE__':'','__INDEX_SOCIAL_TEXT__':i.socialProof||'','__INDEX_SOCIAL_MEDIA__':media(i.socialProofMedia),'__INDEX_TOOLS_KICKER__':'Boîte à outils','__INDEX_TOOLS_TITLE__':'','__INDEX_TOOLS_TEXT__':i.toolsText||'','__INDEX_TOOLS_MEDIA__':media(i.toolsMedia),'__INDEX_TRANS_KICKER__':'','__INDEX_TRANS_TITLE__':'','__INDEX_TRANS_TEXT__':i.transformText||'','__INDEX_TRANS_MEDIA__':media(i.transformMedia),'__INDEX_FAQ_TITLE__':'Questions fréquentes','__INDEX_FAQ_ITEMS__':faq(i.faq),'__INDEX_CTA_KICKER__':'','__INDEX_CTA_TITLE__':i.ctaTitle||'','__INDEX_CTA_TEXT__':i.ctaText||'','__INDEX_CTA_LABEL__':i.ctaLabel||'Prendre rendez-vous','__INDEX_CTA_URL__':i.ctaUrl||'#','__INDEX_FOOTER_SOCIALS__':i.footerSocials||'','__INDEX_FOOTER_SIGN__':i.footerSign||'✨ Univers NyXia ✨'};for(const [k,v] of Object.entries(map))s=s.split(k).join(String(v));return s}
+
+function safeJsonArray(v){try{const a=JSON.parse(v||'[]');return Array.isArray(a)?a:[]}catch(_){return[]}}
+function btnHtml(label,url,style='glass'){
+ label=String(label||'').trim();url=String(url||'#').trim()||'#';if(!label)return''
+ if(style==='gold')return '<span class="cta-gold-wrap"><a class="btn-gold-xl" href="'+esc(url)+'">'+esc(label)+'</a></span>'
+ return '<span class="cta-glass-wrap"><a class="btn-glass" href="'+esc(url)+'">'+esc(label)+'</a></span>'
+}
+function mediaBlock(url,large=false){const m=media(url);return m?'<div class="img-frame'+(large?' large':'')+'">'+m+'</div>':''}
+function sectionHead(kicker,title){if(!kicker&&!title)return'';return '<div class="section-head">'+(kicker?'<span class="kicker">'+kicker+'</span>':'')+(title?'<h2 class="display">'+title+'</h2>':'')+'</div>'}
+function customSection(i,id,visual){
+ const cap=id.charAt(0).toUpperCase()+id.slice(1),show=String(i['show'+cap]??'1')
+ if(show==='0')return''
+ const code=String(i['code'+cap]||''),mode=String(i['codeMode'+cap]||'append')
+ return mode==='replace'&&code?code:visual+code
+}
+function fillIndex(s,p){
+ const i=p.index||{},title=p.title||'Portail NyXia',short=p.short||title
+ const defaultSocials='<a class="social-btn" href="https://www.facebook.com/LeMiroirdeNyXia/" target="_blank" rel="noopener" aria-label="Facebook">f</a><a class="social-btn" href="https://www.instagram.com/nyxia_ia/" target="_blank" rel="noopener" aria-label="Instagram">◎</a><a class="social-btn" href="https://www.tiktok.com/@lemiroirdenyxia" target="_blank" rel="noopener" aria-label="TikTok">♪</a>'
+ const headerLabel=String(i.headerCtaLabel||short)
+ const header='<header class="site-header" id="nx-header"><a class="brand" href="/"><img src="/images/NyXia.png" alt="NyXia"><span class="brand-name"><b>NyXia</b><span>L’univers</span></span></a><div class="header-right"><div class="socials">'+(i.headerSocials||defaultSocials)+'</div><span class="cta-glass-wrap"><a class="btn-glass" style="border-color:rgba(244,200,66,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 8px 30px rgba(244,200,66,.16)" href="'+esc(i.headerCtaUrl||'/login.html')+'">'+esc(headerLabel)+'</a></span></div></header>'
+ const hero='<section class="hero" id="nx-hero">'+(i.heroEyebrow?'<span class="hero-eyebrow">'+i.heroEyebrow+'</span>':'')+'<h1>'+(i.heroTitle||title)+'</h1>'+(i.heroSubtitle?'<h2>'+i.heroSubtitle+'</h2>':'')+(i.heroNote?'<p class="hero-note">'+i.heroNote+'</p>':'')+(i.heroText||p.mission?'<div class="hero-lead">'+(i.heroText||p.mission||'')+'</div>':'')+(i.heroCtaLabel?'<div class="hero-cta">'+btnHtml(i.heroCtaLabel,i.heroCtaUrl||'/login.html',i.heroButtonStyle||'gold')+'</div>':'')+mediaBlock(i.heroMedia,true)+'</section>'
+ const problem='<section class="section-wrap" id="nx-problem">'+sectionHead(i.s2Kicker,i.s2Title)+(i.s2?'<div class="text-block">'+i.s2+'</div>':'')+mediaBlock(i.s2Media,true)+mediaBlock(i.s3Media,false)+'</section>'
+ const journeyItems=safeJsonArray(i.journeyItems).map(x=>'<div class="parcours-item"><h4>'+esc(x.title||'')+'</h4><p>'+String(x.text||'')+'</p></div>').join('')
+ const journey='<section class="section-wrap" id="nx-journey">'+sectionHead(i.s45Kicker||'Ton parcours',i.s45Title)+(i.s45?'<div class="text-block">'+i.s45+'</div>':'')+mediaBlock(i.s45Media,true)+(journeyItems?'<div class="parcours-list">'+journeyItems+'</div>':'')+'</section>'
+ const simpleSection=(id,kicker,titleKey,textKey,mediaKey)=>'<section class="section-wrap" id="nx-'+id+'">'+sectionHead(i[kicker],i[titleKey])+(i[textKey]?'<div class="text-block">'+i[textKey]+'</div>':'')+mediaBlock(i[mediaKey],true)+'</section>'
+ const content=simpleSection('content','s67Kicker','s67Title','s67','s67Media')
+ const formation=simpleSection('formation','s89Kicker','s89Title','s89','s89Media')
+ const evolution=simpleSection('evolution','s1011Kicker','s1011Title','s1011','s1011Media')
+ const atelier=simpleSection('atelier','s1213Kicker','s1213Title','s1213','s1213Media')
+ const results=simpleSection('results','s1415Kicker','s1415Title','s1415','s1415Media')
+ const proofItems=safeJsonArray(i.proofItems).map(x=>'<div class="auteur-card">'+(x.image?'<div class="auteur-cover"><img src="'+esc(x.image)+'" alt="'+esc(x.name||'Témoignage')+'"></div>':'')+(x.name?'<h4>'+esc(x.name)+'</h4>':'')+(x.sub?'<h5>'+esc(x.sub)+'</h5>':'')+(x.text?'<p>'+String(x.text)+'</p>':'')+'</div>').join('')
+ const proof='<section class="section-wrap" id="nx-proof">'+sectionHead(i.socialKicker||'Preuve sociale',i.socialTitle||'Ce qu’ils en disent')+(i.socialProof?'<div class="text-block">'+i.socialProof+'</div>':'')+mediaBlock(i.socialProofMedia,true)+(proofItems?'<div class="auteurs-grid">'+proofItems+'</div>':'')+'</section>'
+ const tools=simpleSection('tools','toolsKicker','toolsTitle','toolsText','toolsMedia')
+ const transform=simpleSection('transform','transKicker','transTitle','transformText','transformMedia')
+ const faqItems=safeJsonArray(i.faq).map(x=>'<details class="faq-item"><summary>'+esc(x.q||'')+'</summary><div class="faq-content"><p>'+String(x.a||'')+'</p></div></details>').join('')
+ const faqBlock='<section class="section-wrap" id="nx-faq">'+sectionHead('',i.faqTitle||'Questions fréquentes')+(faqItems?'<div class="faq-container">'+faqItems+'</div>':'')+'</section>'
+ const ctaVariant=i.ctaVariant||'simple',ctaTitle=i.ctaTitle||(ctaVariant==='simple'?'Prends rendez-vous':'Parlons de ton projet')
+ const cta='<section class="cercle" id="nx-cta"><div class="cercle-inner">'+(i.ctaKicker?'<span class="kicker">'+i.ctaKicker+'</span>':'')+'<h2>'+ctaTitle+'</h2>'+(ctaVariant==='complete'&&i.ctaText?'<div class="text-block"><p>'+i.ctaText+'</p></div>':'')+'<div class="cercle-cta">'+btnHtml(i.ctaLabel||'Prendre rendez-vous',i.ctaUrl||'#',i.ctaButtonStyle||'glass')+'</div></div></section>'
+ const footer='<footer class="footer" id="nx-footer">'+(i.footerSocials?'<div class="footer-socials">'+i.footerSocials+'</div>':'')+(i.marquee?'<div style="margin-bottom:18px">'+i.marquee+'</div>':'')+'<p class="footer-sign">'+(i.footerSign||'✨ Univers <b>NyXia</b> ✨')+'</p></footer>'
+ const map={
+   '__PORTAL_TITLE__':title,'__PORTAL_MISSION__':p.mission||'',
+   '__INDEX_HEADER_BLOCK__':customSection(i,'header',header),
+   '__INDEX_HERO_BLOCK__':customSection(i,'hero',hero),
+   '__INDEX_PROBLEM_BLOCK__':customSection(i,'problem',problem),
+   '__INDEX_JOURNEY_BLOCK__':customSection(i,'journey',journey),
+   '__INDEX_CONTENT_BLOCK__':customSection(i,'content',content),
+   '__INDEX_FORMATION_BLOCK__':customSection(i,'formation',formation),
+   '__INDEX_EVOLUTION_BLOCK__':customSection(i,'evolution',evolution),
+   '__INDEX_ATELIER_BLOCK__':customSection(i,'atelier',atelier),
+   '__INDEX_RESULTS_BLOCK__':customSection(i,'results',results),
+   '__INDEX_PROOF_BLOCK__':customSection(i,'proof',proof),
+   '__INDEX_TOOLS_BLOCK__':customSection(i,'tools',tools),
+   '__INDEX_TRANSFORM_BLOCK__':customSection(i,'transform',transform),
+   '__INDEX_FAQ_BLOCK__':customSection(i,'faq',faqBlock),
+   '__INDEX_CTA_BLOCK__':customSection(i,'cta',cta),
+   '__INDEX_FOOTER_BLOCK__':customSection(i,'footer',footer)
+ }
+ for(const [k,v] of Object.entries(map))s=s.split(k).join(String(v))
+ return s
+}
 async function compile(){try{const pr=await save(),p=pr.data;const registered=await ensurePortalRegistered(false);if(!registered)throw Error('Le portail n’a pas pu être relié à la liste centrale / Dégustation.');const r=await fetch('/superadmin4/portail-shell-template.zip',{cache:'no-store'});if(!r.ok)throw Error('Coque introuvable');const z=await JSZip.loadAsync(await r.arrayBuffer()),agents=p.agents||[];if(!agents.length)throw Error('Choisis au moins un personnage pour ce portail.');const cfg={id:p.portalId||slug(p.short||p.title),title:p.title,shortTitle:p.short||p.title,mission:p.mission,loginImage:p.loginImage,activeAgents:agents.map(a=>a.key),agents};let w=await z.file('_worker.js').async('string');w=w.replace("const PORTAL_CONFIG_B64='__PORTAL_CONFIG_B64__';","const PORTAL_CONFIG_B64='"+b64(JSON.stringify(cfg))+"';");z.file('_worker.js',w);let wr=await z.file('wrangler.toml').async('string');wr=wr.replaceAll('__WORKER_NAME__',p.workerName||slug(p.short||p.title)).replaceAll('__HOST__',p.host).replaceAll('__PORTAL_ID__',cfg.id);z.file('wrangler.toml',wr);let ind=await z.file('index.html').async('string');z.file('index.html',fillIndex(ind,p));let log=await z.file('login.html').async('string');log=log.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_LOGIN_IMAGE__',p.loginImage||'');z.file('login.html',log);const pages={},meta={};const principals=agents.filter(a=>(a.placement||'principal')==='principal');const atelierAgents=agents.filter(a=>a.placement==='atelier');const visibleAgents=agents.filter(a=>a.placement!=='hidden');let chat=await z.file('chat-base.html').async('string');for(const a of visibleAgents){pages[a.key]='/chat-'+a.key+'.html';meta[a.key]=a;let c=chat.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_TITLE_JSON__',JSON.stringify(p.title)).replaceAll('__AGENT_KEY__',a.key).replaceAll('__AGENT_NAME__',esc(a.name)).replaceAll('__AGENT_SUB__',esc(a.sub||'Personnage NyXia')).replaceAll('__AGENT_JSON__',JSON.stringify(a)).replaceAll('__AGENT_NAME_JSON__',JSON.stringify(a.name)).replaceAll('__AGENT_SUB_JSON__',JSON.stringify(a.sub||'Personnage NyXia')).replaceAll('__AGENT_GREETING_JSON__',JSON.stringify(a.greeting||'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.')).replaceAll('__AGENT_IMAGE_JSON__',JSON.stringify(a.image||'')).replaceAll('__AGENT_VIDEO_JSON__',JSON.stringify(a.welcomeVideo||'')).replaceAll('__AGENT_AVATAR_HTML__',a.image?'<img src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="avatar-fallback">✦</span>');z.file('chat-'+a.key+'.html',c)}z.remove('chat-base.html');for(const t of p.tools||[]){if(t.content)z.file((t.path||'/outil.html').replace(/^\//,''),t.content);pages['tool-'+t.id]=t.path}let dash=await z.file('dashbord.html').async('string');const avatarHtml=a=>a.image?'<img class="nav-avatar" src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="nav-avatar" style="display:flex;align-items:center;justify-content:center">'+esc(a.icon||'✦')+'</span>';const nav=principals.map((a,i)=>'<div class="nav-item'+(i===0?' active':'')+'" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const atelierNav=atelierAgents.map(a=>'<div class="nav-item" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const toolnav=(p.tools||[]).map(t=>'<div class="nav-item" id="nav-tool-'+t.id+'" onclick="openAgentTab(\'tool-'+t.id+'\')"><span class="nav-icon">'+esc(t.icon||'🧰')+'</span><span class="nav-text"><span class="nav-name">'+esc(t.name||'Outil')+'</span></span><span class="nav-arrow">›</span></div>').join('');dash=dash.replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_AGENT_NAV__',nav).replaceAll('__PORTAL_ATELIER_NAV__',atelierNav).replaceAll('__PORTAL_SPECIAL_TOOLS__',toolnav).replaceAll('__PORTAL_AGENT_PAGES__','').replaceAll('__PORTAL_PAGES_JSON__',JSON.stringify(pages)).replaceAll('__PORTAL_AGENT_META_JSON__',JSON.stringify(meta)).replaceAll('__PORTAL_DEFAULT_AGENT_JSON__',JSON.stringify((principals[0]||visibleAgents[0]||agents[0]).key)).replaceAll('__PORTAL_ATELIER_KEYS_JSON__',JSON.stringify(atelierAgents.map(a=>a.key))).replaceAll('__PORTAL_TITLE__',p.title);
 z.file('dashbord.html',dash);
 
@@ -520,4 +535,4 @@ function bind(){
    if($(id))$(id).addEventListener('change',savePortalAgentEditor)
  }
 $('saveProjectBtn').onclick=async()=>{try{await save();const st=$('projectSaveState');if(st)st.textContent='Portail sauvegardé ✓'}catch(e){const st=$('projectSaveState');if(st)st.textContent='⚠ '+e.message;const cs=$('compileStatus');if(cs)cs.textContent='⚠ '+e.message}};$('openProjectBtn').onclick=open;$('newProjectBtn').onclick=newProject;if($('deleteProjectBtn'))$('deleteProjectBtn').onclick=deleteProject;$('compileBtn').onclick=compile;$('addToolBtn').onclick=addTool;if($('checkConnectionsBtn'))$('checkConnectionsBtn').onclick=checkConnections;if($('registerPortalBtn'))$('registerPortalBtn').onclick=async()=>{await ensurePortalRegistered(true);await checkConnections()};$('logoutBtn').onclick=()=>location.href='/';for(const id of ['portalId','short','title'])if($(id))$(id).addEventListener('change',checkConnections);
- for(const id of ['title','mission'])if($(id))$(id).addEventListener('input',scheduleIndexPreview);if($('projectSelect'))$('projectSelect').addEventListener('change',()=>{syncDeleteButton();const st=$('projectSaveState');if(st&&$('projectSelect').selectedIndex>0)st.textContent='Portail sélectionné · Ouvrir pour modifier, ou Supprimer directement.'})}document.addEventListener('DOMContentLoaded',async()=>{indexUI();bind();await load();syncDeleteButton();await checkConnections()})})();
+ for(const id of ['title','short','mission'])if($(id))$(id).addEventListener('input',scheduleIndexPreview);if($('projectSelect'))$('projectSelect').addEventListener('change',()=>{syncDeleteButton();const st=$('projectSaveState');if(st&&$('projectSelect').selectedIndex>0)st.textContent='Portail sélectionné · Ouvrir pour modifier, ou Supprimer directement.'})}document.addEventListener('DOMContentLoaded',async()=>{indexUI();bind();await load();syncDeleteButton();await checkConnections()})})();
