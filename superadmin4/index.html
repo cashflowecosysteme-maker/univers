@@ -1,25 +1,25 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>NyXia · Super Admin 4 · Portails</title><link rel="icon" href="/FavIcon.png"><link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=17"><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script><script src="/starry-bg.js" defer></script><script src="/superadmin4/js/superadmin4.js?v=30" defer></script>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>NyXia · Super Admin 4 · Portails</title><link rel="icon" href="/FavIcon.png"><link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=17"><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script><script src="/starry-bg.js" defer></script><script src="/superadmin4/js/superadmin4.js?v=31" defer></script>
 <style id="sa4-index-builder-css">
-.index-builder-card{overflow:visible;width:calc(100vw - 32px);max-width:none;margin-left:50%;transform:translateX(-50%);box-sizing:border-box}
+.index-builder-card{overflow-anchor:none;overflow:visible;width:calc(100vw - 32px);max-width:none;margin-left:50%;transform:translateX(-50%);box-sizing:border-box}
 .index-builder-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}
 .index-builder-head h2{margin-bottom:4px}
 .index-builder-actions{display:flex;gap:8px;flex-wrap:wrap}
 .index-builder{display:grid;grid-template-columns:220px minmax(620px,1fr) minmax(340px,430px);gap:16px;align-items:start}
-.index-nav,.index-editor,.index-preview-column{min-width:0}
-.index-nav,.index-editor{border:1px solid rgba(167,139,250,.22);background:rgba(7,11,28,.66);border-radius:16px;padding:12px}
+.index-nav,.index-editor,.index-preview-column{overflow-anchor:none;min-width:0}
+.index-nav,.index-editor{overflow-anchor:none;border:1px solid rgba(167,139,250,.22);background:rgba(7,11,28,.66);border-radius:16px;padding:12px}
 .index-nav-title{font-size:.78rem;text-transform:uppercase;letter-spacing:.09em;color:#a78bfa;margin:4px 6px 10px;font-weight:700}
 .index-nav-btn{width:100%;border:0;background:transparent;color:#cbd5e1;text-align:left;padding:9px 10px;border-radius:10px;cursor:pointer;font:inherit;display:flex;gap:8px;align-items:center;margin-bottom:3px}
 .index-nav-btn:hover{background:rgba(123,92,255,.10);color:#fff}
 .index-nav-btn.active{background:linear-gradient(135deg,rgba(123,92,255,.25),rgba(167,139,250,.12));color:#fff;box-shadow:inset 0 0 0 1px rgba(167,139,250,.28)}
 .index-nav-btn .idx-dot{width:7px;height:7px;border-radius:50%;background:#7b5cff;box-shadow:0 0 10px rgba(123,92,255,.8);flex:none}
-.index-preview-column{position:sticky;top:68px}
+.index-preview-column{overflow-anchor:none;position:sticky;top:68px}
 .index-preview-toolbar{height:38px;border:1px solid rgba(167,139,250,.22);border-bottom:0;border-radius:14px 14px 0 0;background:rgba(7,11,28,.82);display:flex;align-items:center;justify-content:space-between;padding:0 12px;gap:10px;color:#94a3b8;font-size:.8rem}
 .index-preview-stage{height:760px;border:1px solid rgba(167,139,250,.25);border-radius:0 0 14px 14px;background:#030611;overflow:auto;padding:0;display:flex;justify-content:center;align-items:flex-start}
 .index-preview-stage iframe{display:block;border:0;background:#060a18;height:100%;transition:width .2s ease;box-shadow:0 0 30px rgba(0,0,0,.32)}
 .index-preview-stage.desktop iframe{width:100%}
 .index-preview-stage.mobile{padding:12px}
 .index-preview-stage.mobile iframe{width:390px;max-width:100%;border-radius:16px}
-.index-editor{position:sticky;top:68px;max-height:760px;overflow:auto}
+.index-editor{overflow-anchor:none;position:sticky;top:68px;max-height:760px;overflow:auto}
 .index-editor-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:12px}
 .index-editor-top h3{margin:2px 0 0}
 .index-editor-top .btn{padding:7px 9px;font-size:.76rem}
@@ -42,12 +42,12 @@
 .idx-hidden-source{display:none!important}
 @media(max-width:1100px){
   .index-builder{grid-template-columns:170px minmax(360px,1fr)}
-  .index-editor{grid-column:1/-1;position:static;max-height:none}
+  .index-editor{overflow-anchor:none;grid-column:1/-1;position:static;max-height:none}
 }
 @media(max-width:820px){
-  .index-builder-card{width:calc(100vw - 16px);}
+  .index-builder-card{overflow-anchor:none;width:calc(100vw - 16px);}
   .index-builder{grid-template-columns:1fr}
-  .index-nav,.index-editor,.index-preview-column{position:static}
+  .index-nav,.index-editor,.index-preview-column{overflow-anchor:none;position:static}
   .index-preview-stage{height:560px}
   .index-nav #indexSectionNav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
 }

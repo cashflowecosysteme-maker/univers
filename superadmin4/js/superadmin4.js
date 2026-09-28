@@ -96,6 +96,7 @@ function indexUI(){
  loadIndexPreviewTemplate()
 }
 function activateIndexGroup(id){
+ const outerX=window.scrollX,outerY=window.scrollY
  indexActiveGroup=id
  const g=INDEX_GROUPS.find(x=>x.id===id)||INDEX_GROUPS[0]
  document.querySelectorAll('.index-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.group===g.id))
@@ -104,6 +105,7 @@ function activateIndexGroup(id){
  for(const key of g.keys)if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key)
  if(g.id==='faq')renderFaqBuilder()
  scrollIndexPreviewToGroup(g.id)
+ requestAnimationFrame(()=>window.scrollTo(outerX,outerY))
 }
 function currentIndexData(){
  const idx={}
@@ -160,18 +162,51 @@ function buildPreviewHtml(){
 }
 function refreshIndexPreview(){
  const f=$('indexPreviewFrame');if(!f||!indexPreviewTemplate)return
- let oldScroll=0;try{oldScroll=f.contentWindow?.scrollY||0}catch(_){}
+ const outerX=window.scrollX,outerY=window.scrollY
+ const active=document.activeElement
+ const activeId=active&&active.id?active.id:''
+ let selStart=null,selEnd=null
+ try{
+   if(active&&typeof active.selectionStart==='number'){
+     selStart=active.selectionStart;selEnd=active.selectionEnd
+   }
+ }catch(_){}
+ let previewX=0,previewY=0
+ try{
+   previewX=f.contentWindow?.scrollX||0
+   previewY=f.contentWindow?.scrollY||0
+ }catch(_){}
  f.srcdoc=buildPreviewHtml()
  f.onload=()=>{
    try{
-     f.contentDocument?.addEventListener('click',e=>{const a=e.target.closest?.('a');if(a)e.preventDefault()})
-     f.contentWindow?.scrollTo(0,oldScroll)
+     f.contentDocument?.addEventListener('click',e=>{
+       const a=e.target.closest?.('a')
+       if(a)e.preventDefault()
+     })
+     f.contentWindow?.scrollTo(previewX,previewY)
    }catch(_){}
+   requestAnimationFrame(()=>{
+     window.scrollTo(outerX,outerY)
+     if(activeId){
+       const el=document.getElementById(activeId)
+       if(el){
+         try{
+           el.focus({preventScroll:true})
+           if(selStart!==null&&typeof el.setSelectionRange==='function')el.setSelectionRange(selStart,selEnd)
+         }catch(_){}
+       }
+     }
+     window.scrollTo(outerX,outerY)
+   })
  }
 }
 function scheduleIndexPreview(){
  clearTimeout(indexPreviewTimer)
- indexPreviewTimer=setTimeout(refreshIndexPreview,220)
+ indexPreviewTimer=setTimeout(()=>{
+   const x=window.scrollX,y=window.scrollY
+   refreshIndexPreview()
+   requestAnimationFrame(()=>window.scrollTo(x,y))
+ },550)
 }
 function setIndexDevice(mode){
  const stage=$('indexPreviewStage');if(!stage)return
