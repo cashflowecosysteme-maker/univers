@@ -1,4 +1,4 @@
-(()=>{'use strict';const $=id=>document.getElementById(id),API='/api/superadmin4/projects';let catalog=[],profiles={},tools=[],current='';const CORE={nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦'},diane:{name:'Diane',sub:'Créatrice & accompagnement',icon:'👑'},eric:{name:'Éric',sub:'Communication & CashFlow',icon:'💼'},lena:{name:'Léna',sub:'Spiritualité & intuition',icon:'🔮'},selena:{name:'Séléna',sub:'A.M.I.E.',icon:'🪞'},alex:{name:'Alex',sub:'Écriture',icon:'✍️'},kael:{name:'Kael',sub:'Relations',icon:'💜'},sophia:{name:'Sophia',sub:'Numérologie · La Tisseuse des Nombres',icon:'🔢'},aletheia:{name:'Aletheia',sub:'Runes · La Scribe des Murmures Runiques',icon:'ᚱ'},cassandre:{name:'Cassandre',sub:'Tarot · La Voix du Reflet',icon:'🃏'},celeste:{name:'Céleste',sub:'Mancies & rituels · La Cartographe des Présages',icon:'🌙'}};const sections=[['headerSocials','Header · Réseaux sociaux (HTML boutons)'],['headerCtaLabel','Header · Bouton texte'],['headerCtaUrl','Header · Bouton URL'],['heroEyebrow','Hero · Eyebrow'],['heroTitle','Hero · Titre'],['heroSubtitle','Hero · Sous-titre'],['heroText','Hero · Texte'],['heroNote','Hero · Note'],['heroCtaLabel','Hero · CTA texte'],['heroCtaUrl','Hero · CTA URL'],['heroMedia','Hero · Image/vidéo URL'],['s2','2. Problème · texte'],['s2Media','2. Média URL'],['s3Media','3. Image 02 · média URL'],['s45','4-5. Parcours · texte'],['s45Media','4-5. Média URL'],['s67','6-7. Texte'],['s67Media','6-7. Média URL'],['s89','8-9. Formation Vivante · texte'],['s89Media','8-9. Média URL'],['s1011','10-11. Évolution · texte'],['s1011Media','10-11. Média URL'],['s1213','12-13. Atelier · texte'],['s1213Media','12-13. Média URL'],['s1415','14-15. Résultats · texte'],['s1415Media','14-15. Média URL'],['marquee','Bandeau défilant · HTML/texte'],['socialProof','Preuve sociale · texte'],['socialProofMedia','Preuve sociale · image/vidéo URL'],['toolsText','Boîte à outils · texte'],['toolsMedia','Boîte à outils · média URL'],['transformText','Projection / transformation · texte'],['transformMedia','Projection · média URL'],['faq','FAQ · JSON [{q,a}]'],['ctaTitle','Rendez-vous · titre'],['ctaText','Rendez-vous · texte'],['ctaLabel','Rendez-vous · bouton'],['ctaUrl','Rendez-vous · URL'],['footerSocials','Footer · réseaux (HTML boutons)'],['footerSign','Footer · signature']];
+(()=>{'use strict';const $=id=>document.getElementById(id),API='/api/superadmin4/projects';let catalog=[],profiles={},tools=[],current='',projectRows=[],portalAgents=new Map(),portalAgentCurrent='';const CORE={nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦'},diane:{name:'Diane',sub:'Créatrice & accompagnement',icon:'👑'},eric:{name:'Éric',sub:'Communication & CashFlow',icon:'💼'},lena:{name:'Léna',sub:'Spiritualité & intuition',icon:'🔮'},selena:{name:'Séléna',sub:'A.M.I.E.',icon:'🪞'},alex:{name:'Alex',sub:'Écriture',icon:'✍️'},kael:{name:'Kael',sub:'Relations',icon:'💜'},sophia:{name:'Sophia',sub:'Numérologie · La Tisseuse des Nombres',icon:'🔢'},aletheia:{name:'Aletheia',sub:'Runes · La Scribe des Murmures Runiques',icon:'ᚱ'},cassandre:{name:'Cassandre',sub:'Tarot · La Voix du Reflet',icon:'🃏'},celeste:{name:'Céleste',sub:'Mancies & rituels · La Cartographe des Présages',icon:'🌙'}};const sections=[['headerSocials','Header · Réseaux sociaux (HTML boutons)'],['headerCtaLabel','Header · Bouton texte'],['headerCtaUrl','Header · Bouton URL'],['heroEyebrow','Hero · Eyebrow'],['heroTitle','Hero · Titre'],['heroSubtitle','Hero · Sous-titre'],['heroText','Hero · Texte'],['heroNote','Hero · Note'],['heroCtaLabel','Hero · CTA texte'],['heroCtaUrl','Hero · CTA URL'],['heroMedia','Hero · Image/vidéo URL'],['s2','2. Problème · texte'],['s2Media','2. Média URL'],['s3Media','3. Image 02 · média URL'],['s45','4-5. Parcours · texte'],['s45Media','4-5. Média URL'],['s67','6-7. Texte'],['s67Media','6-7. Média URL'],['s89','8-9. Formation Vivante · texte'],['s89Media','8-9. Média URL'],['s1011','10-11. Évolution · texte'],['s1011Media','10-11. Média URL'],['s1213','12-13. Atelier · texte'],['s1213Media','12-13. Média URL'],['s1415','14-15. Résultats · texte'],['s1415Media','14-15. Média URL'],['marquee','Bandeau défilant · HTML/texte'],['socialProof','Preuve sociale · texte'],['socialProofMedia','Preuve sociale · image/vidéo URL'],['toolsText','Boîte à outils · texte'],['toolsMedia','Boîte à outils · média URL'],['transformText','Projection / transformation · texte'],['transformMedia','Projection · média URL'],['faq','FAQ · JSON [{q,a}]'],['ctaTitle','Rendez-vous · titre'],['ctaText','Rendez-vous · texte'],['ctaLabel','Rendez-vous · bouton'],['ctaUrl','Rendez-vous · URL'],['footerSocials','Footer · réseaux (HTML boutons)'],['footerSign','Footer · signature']];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const slug=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},...o});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'HTTP '+r.status);return d}
 function indexUI(){const h=$('indexFields');h.innerHTML='';for(const [k,l] of sections){const d=document.createElement('div');d.className='field';d.innerHTML='<label>'+esc(l)+'</label>'+(k==='faq'||/Text|s\d|Proof|marquee|footerSocials/.test(k)?'<textarea id="idx-'+k+'"></textarea>':'<input id="idx-'+k+'">');h.appendChild(d)}}
 async function load(){
@@ -12,9 +12,121 @@ async function load(){
 function renderCharacterSelect(){const s=$('charExisting');if(!s)return;const prev=s.value;s.innerHTML='<option value="">— Choisir dans la liste —</option>';for(const a of catalog){const o=document.createElement('option');o.value=a.key;o.textContent=a.name+(a.portail?' · '+a.portail:'');s.appendChild(o)}if([...s.options].some(o=>o.value===prev))s.value=prev}
 function clearCharacterForm(){for(const id of ['charName','charCode','charSub','charPortal','charPrompt','charPersonality','charImage','charVideo','charVoice'])if($(id))$(id).value='';if($('charExisting'))$('charExisting').value='';$('charStatus').textContent=''}
 function loadCharacterForm(code){if(!code)return clearCharacterForm();const a=catalog.find(x=>x.key===code)||profiles[code]||{};const p=profiles[code]||a;$('charName').value=p.name||a.name||'';$('charCode').value=code;$('charSub').value=p.sub||a.sub||'';$('charPortal').value=p.portail||a.portail||'';$('charPrompt').value=p.prompt||'';$('charPersonality').value=p.personality||'';$('charImage').value=p.image||a.image||'';$('charVideo').value=p.welcomeVideo||'';$('charVoice').value=p.voiceId||'';$('charStatus').textContent='Fiche chargée'}
-function syncPlacementRow(key){const on=$('ag-'+key)?.checked;const place=$('place-'+key);if(place)place.disabled=!on}
-function renderAgents(){renderCharacterSelect();const h=$('agents');h.innerHTML='';for(const a of catalog){const row=document.createElement('div');row.className='agent';row.innerHTML='<label class="agent-toggle"><input type="checkbox" id="ag-'+a.key+'"> <strong>'+esc(a.name)+'</strong> <small>'+esc(a.sub||'')+'</small></label><div class="field"><label>Emplacement dans ce portail</label><select id="place-'+a.key+'"><option value="principal">💬 Mes Conversations</option><option value="atelier">✨ Atelier</option><option value="hidden">Masqué</option></select></div><div class="field"><label>Image URL</label><input id="img-'+a.key+'" value="'+esc(a.image||'')+'"></div><div class="field"><label>Vidéo accueil URL</label><input id="vid-'+a.key+'" value="'+esc(a.welcomeVideo||'')+'"></div><div class="field"><label>Voice ID</label><input id="voi-'+a.key+'" value="'+esc(a.voiceId||'')+'"></div>';h.appendChild(row);$('ag-'+a.key).addEventListener('change',()=>syncPlacementRow(a.key))}}
-function active(){return catalog.filter(a=>$('ag-'+a.key)?.checked).map(a=>({...a,image:$('img-'+a.key)?.value||a.image||'',welcomeVideo:$('vid-'+a.key)?.value||'',voiceId:$('voi-'+a.key)?.value||'',placement:$('place-'+a.key)?.value||'principal'}))}
+
+function portalAgentBase(key){return catalog.find(a=>a.key===key)||profiles[key]||null}
+function portalAgentValue(key){
+ const base=portalAgentBase(key)
+ if(!base)return null
+ const saved=portalAgents.get(key)||{}
+ return {...base,...saved,key,
+  image:saved.image??base.image??'',
+  welcomeVideo:saved.welcomeVideo??base.welcomeVideo??'',
+  voiceId:saved.voiceId??base.voiceId??'',
+  placement:saved.placement||'principal'}
+}
+function renderPortalAgentSelect(filterText=''){
+ const s=$('portalAgentSelect');if(!s)return
+ const keep=portalAgentCurrent||s.value||''
+ const q=String(filterText||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+ s.innerHTML='<option value="">— Choisir un personnage —</option>'
+ for(const a of catalog){
+   const hay=[a.name,a.sub,a.portail,a.key].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+   if(q&&!hay.includes(q))continue
+   const o=document.createElement('option');o.value=a.key
+   o.textContent=a.name+(a.sub?' · '+a.sub:'')
+   s.appendChild(o)
+ }
+ if([...s.options].some(o=>o.value===keep))s.value=keep
+}
+function renderPortalAgentChips(){
+ const h=$('portalAgentChips');if(!h)return
+ h.innerHTML=''
+ const keys=[...portalAgents.keys()]
+ if(!keys.length){
+   const e=document.createElement('span');e.className='hint';e.textContent='Aucun personnage sélectionné pour ce portail.';h.appendChild(e);return
+ }
+ for(const key of keys){
+   const a=portalAgentValue(key);if(!a)continue
+   const b=document.createElement('button');b.type='button';b.className='btn secondary'
+   b.style.padding='7px 10px';b.style.borderRadius='999px';b.style.display='inline-flex';b.style.alignItems='center';b.style.gap='7px'
+   if(a.image){
+     const img=document.createElement('img');img.src=a.image;img.alt='';img.style.width='22px';img.style.height='22px';img.style.borderRadius='50%';img.style.objectFit='cover';b.appendChild(img)
+   }
+   const t=document.createElement('span');t.textContent=a.name||key;b.appendChild(t)
+   b.onclick=()=>selectPortalAgent(key)
+   h.appendChild(b)
+ }
+}
+function updatePortalAgentButtons(){
+ const key=portalAgentCurrent,on=!!(key&&portalAgents.has(key))
+ if($('portalAgentAddBtn'))$('portalAgentAddBtn').style.display=key&&!on?'inline-flex':'none'
+ if($('portalAgentRemoveBtn'))$('portalAgentRemoveBtn').style.display=key&&on?'inline-flex':'none'
+}
+function selectPortalAgent(key){
+ portalAgentCurrent=String(key||'')
+ const card=$('portalAgentCard')
+ if(!portalAgentCurrent){if(card)card.style.display='none';updatePortalAgentButtons();return}
+ const a=portalAgentValue(portalAgentCurrent)
+ if(!a){if(card)card.style.display='none';return}
+ if(card)card.style.display='block'
+ if($('portalAgentSelect'))$('portalAgentSelect').value=portalAgentCurrent
+ $('portalAgentName').textContent=a.name||portalAgentCurrent
+ $('portalAgentSub').textContent=a.sub||a.portail||''
+ const av=$('portalAgentAvatar');av.innerHTML=''
+ if(a.image){const img=document.createElement('img');img.src=a.image;img.alt=a.name||'';img.style.width='100%';img.style.height='100%';img.style.objectFit='cover';av.appendChild(img)}
+ else av.textContent=a.icon||'✦'
+ $('portalAgentPlacement').value=a.placement||'principal'
+ $('portalAgentImage').value=a.image||''
+ $('portalAgentVideo').value=a.welcomeVideo||''
+ $('portalAgentVoice').value=a.voiceId||''
+ $('portalAgentStatus').textContent=portalAgents.has(portalAgentCurrent)?'✓ Ce personnage est dans ce portail.':'Ce personnage n’est pas encore dans ce portail.'
+ updatePortalAgentButtons()
+}
+function savePortalAgentEditor(){
+ if(!portalAgentCurrent||!portalAgents.has(portalAgentCurrent))return
+ const base=portalAgentBase(portalAgentCurrent)||{}
+ portalAgents.set(portalAgentCurrent,{
+   ...portalAgents.get(portalAgentCurrent),
+   key:portalAgentCurrent,
+   name:base.name||portalAgentCurrent,
+   sub:base.sub||'',
+   portail:base.portail||'',
+   custom:!!base.custom,
+   icon:base.icon||'✦',
+   image:$('portalAgentImage')?.value||'',
+   welcomeVideo:$('portalAgentVideo')?.value||'',
+   voiceId:$('portalAgentVoice')?.value||'',
+   placement:$('portalAgentPlacement')?.value||'principal'
+ })
+ renderPortalAgentChips()
+}
+function addPortalAgent(){
+ const key=portalAgentCurrent;if(!key)return
+ const base=portalAgentBase(key);if(!base)return
+ portalAgents.set(key,{...base,key,
+   image:$('portalAgentImage')?.value||base.image||'',
+   welcomeVideo:$('portalAgentVideo')?.value||base.welcomeVideo||'',
+   voiceId:$('portalAgentVoice')?.value||base.voiceId||'',
+   placement:$('portalAgentPlacement')?.value||'principal'
+ })
+ renderPortalAgentChips();selectPortalAgent(key)
+}
+function removePortalAgent(){
+ const key=portalAgentCurrent;if(!key||!portalAgents.has(key))return
+ const a=portalAgentValue(key)
+ if(!confirm('Retirer '+(a?.name||key)+' de ce portail ?'))return
+ portalAgents.delete(key);renderPortalAgentChips();selectPortalAgent(key)
+}
+function renderAgents(){
+ renderCharacterSelect()
+ renderPortalAgentSelect($('portalAgentSearch')?.value||'')
+ renderPortalAgentChips()
+ if(portalAgentCurrent)selectPortalAgent(portalAgentCurrent)
+}
+function active(){
+ savePortalAgentEditor()
+ return [...portalAgents.keys()].map(k=>portalAgentValue(k)).filter(Boolean)
+}
 function draft(){const idx={};for(const [k] of sections)idx[k]=$('idx-'+k)?.value||'';return{title:$('title').value,short:$('short').value,portalId:$('portalId').value,workerName:$('workerName').value,host:$('host').value,mission:$('mission').value,loginImage:$('loginImage').value,agents:active(),index:idx,tools}}
 function legacyFirst(){for(const v of arguments){if(v!==undefined&&v!==null&&v!=='')return v}return''}
 function legacyObj(v){return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}
@@ -23,38 +135,73 @@ function legacyKey(v){if(v&&typeof v==='object')v=v.key||v.code||v.id||v.slug||v
 function legacyMapValue(map,key,envName){map=legacyObj(map);return legacyFirst(map[key],map[key.replace(/-/g,'_')],envName&&map[envName],envName&&map[envName.toLowerCase()])}
 function legacyVoiceEnv(key){return 'ELEVENLABS_'+String(key||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'')+'_VOICE_ID'}
 function normalizeLegacyProject(raw={},project={}){const root=legacyObj(raw),cfg={...legacyObj(root.config),...legacyObj(root.portal),...legacyObj(root.settings),...root};const out={};out.title=legacyFirst(cfg.title,cfg.portalTitle,cfg.nom,cfg.name,project.title);out.short=legacyFirst(cfg.short,cfg.shortTitle,cfg.portalShortTitle,cfg.nomCourt,cfg.short_name,out.title);out.portalId=legacyFirst(cfg.portalId,cfg.portal_id,cfg.slug,cfg.id,cfg.identifier,cfg.identifiant);out.workerName=legacyFirst(cfg.workerName,cfg.worker,cfg.worker_name,cfg.cloudflareWorker,cfg.workerCloudflare);out.host=legacyFirst(cfg.host,cfg.hostname,cfg.domain,cfg.domaine,cfg.subdomain,cfg.sousDomaine,cfg.urlHost);out.mission=legacyFirst(cfg.mission,cfg.description,cfg.portalMission,cfg.purpose);out.loginImage=legacyFirst(cfg.loginImage,cfg.login_image,cfg.loginAvatar,cfg.loginMedia,cfg.imageLogin,cfg.coverImage);out.index={...legacyObj(cfg.index),...legacyObj(cfg.indexConfig),...legacyObj(cfg.indexData),...legacyObj(cfg.landingPage)};out.tools=legacyArray(legacyFirst(cfg.tools,cfg.specialTools,cfg.outils,cfg.portalTools));let source=[];for(const v of [cfg.agents,cfg.list,cfg.characters,cfg.personnages,cfg.selectedAgents,cfg.selectedCharacters]){if(Array.isArray(v)&&v.length){source=v;break}}let selected=[];for(const v of [cfg.activeAgents,cfg.active_agents,cfg.agentKeys,cfg.charactersActive,cfg.personnagesActifs]){if(Array.isArray(v)&&v.length){selected=v;break}}const sourceByKey=new Map();for(const item of source){const k=legacyKey(item);if(k)sourceByKey.set(k,item)}const wanted=new Set();for(const item of source){const k=legacyKey(item);if(k)wanted.add(k)}for(const item of selected){const k=legacyKey(item);if(k)wanted.add(k)}const trainer=legacyKey(legacyFirst(cfg.formationAgent,cfg.trainer,cfg.formateur,cfg.mainAgent));if(trainer)wanted.add(trainer);const imageMaps=[cfg.agentImages,cfg.images,cfg.characterImages,cfg.personnageImages,cfg.avatarUrls,cfg.avatars].map(legacyObj);const videoMaps=[cfg.agentVideos,cfg.welcomeVideos,cfg.videos,cfg.characterVideos,cfg.personnageVideos].map(legacyObj);const voiceMaps=[cfg.voiceIds,cfg.voices,cfg.agentVoices,cfg.characterVoices,cfg.voiceVariables,cfg.voice_variables].map(legacyObj);out.agents=[];for(const k of wanted){const saved=legacyObj(sourceByKey.get(k));const base=catalog.find(a=>a.key===k)||profiles[k]||{};const envName=legacyFirst(saved.voiceEnv,base.voiceEnv,legacyVoiceEnv(k));let image=legacyFirst(saved.image,saved.imageUrl,saved.avatar,saved.avatarUrl,saved.photo,saved.photoUrl);if(!image)for(const m of imageMaps){image=legacyMapValue(m,k,envName);if(image)break}let video=legacyFirst(saved.welcomeVideo,saved.video,saved.videoUrl,saved.welcome_video,saved.videoAccueil);if(!video)for(const m of videoMaps){video=legacyMapValue(m,k,envName);if(video)break}let voice=legacyFirst(saved.voiceId,saved.voice_id,saved.elevenlabsVoiceId,saved.elevenVoiceId);if(!voice)for(const m of voiceMaps){voice=legacyMapValue(m,k,envName);if(voice)break}out.agents.push({...base,...saved,key:k,name:legacyFirst(saved.name,saved.nom,base.name,k),sub:legacyFirst(saved.sub,saved.role,saved.subtitle,saved.description,base.sub,'Personnage NyXia'),icon:legacyFirst(saved.icon,base.icon,'✦'),image:legacyFirst(image,base.image,''),welcomeVideo:legacyFirst(video,base.welcomeVideo,''),voiceId:legacyFirst(voice,base.voiceId,''),voiceEnv:envName,placement:legacyFirst(saved.placement,saved.position,saved.emplacement,'principal'),greeting:legacyFirst(saved.greeting,saved.welcome,saved.accueil,base.greeting,'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.'),portail:legacyFirst(saved.portail,saved.portal,base.portail,'')})}if(!out.agents.length){const keys=new Set();for(const m of [...imageMaps,...videoMaps,...voiceMaps])for(const mk of Object.keys(m)){let k=slug(mk.replace(/^ELEVENLABS_/i,'').replace(/_VOICE_ID$/i,'').replace(/_/g,'-'));if(catalog.some(a=>a.key===k))keys.add(k)}for(const k of keys){const b=catalog.find(a=>a.key===k)||{};out.agents.push({...b,key:k,name:b.name||k,image:legacyMapValue(imageMaps[0],k)||b.image||'',welcomeVideo:legacyMapValue(videoMaps[0],k)||b.welcomeVideo||'',voiceId:legacyMapValue(voiceMaps[0],k,legacyVoiceEnv(k))||b.voiceId||''})}}for(const [k] of sections)if(!out.index[k])out.index[k]=legacyFirst(cfg[k],cfg['index_'+k],cfg['idx_'+k]);return out}
-function apply(d={}){for(const k of ['title','short','portalId','workerName','host','mission','loginImage'])$(k).value=d[k]||'';for(const a of catalog){const x=(d.agents||[]).find(x=>x.key===a.key);const on=!!x;if($('ag-'+a.key))$('ag-'+a.key).checked=on;if(x){$('img-'+a.key).value=x.image||'';$('vid-'+a.key).value=x.welcomeVideo||'';$('voi-'+a.key).value=x.voiceId||'';$('place-'+a.key).value=x.placement||'principal'}syncPlacementRow(a.key)}for(const [k] of sections)if($('idx-'+k))$('idx-'+k).value=d.index?.[k]||'';tools=d.tools||[];renderTools()}
-async function loadProjects(){const d=await api(API),s=$('projectSelect');s.innerHTML='<option value="">— Nouveau portail —</option>';for(const p of d.projects||[]){const o=document.createElement('option');o.value=p.id;o.textContent=p.title;s.appendChild(o)}}
+function apply(d={}){
+ for(const k of ['title','short','portalId','workerName','host','mission','loginImage'])$(k).value=d[k]||''
+ portalAgents=new Map()
+ for(const x of (d.agents||[])){
+   if(!x||!x.key)continue
+   portalAgents.set(x.key,{...x})
+ }
+ portalAgentCurrent=''
+ renderPortalAgentSelect($('portalAgentSearch')?.value||'')
+ renderPortalAgentChips()
+ if($('portalAgentCard'))$('portalAgentCard').style.display='none'
+ for(const [k] of sections)if($('idx-'+k))$('idx-'+k).value=d.index?.[k]||''
+ tools=d.tools||[];renderTools()
+}async function loadProjects(){const d=await api(API),s=$('projectSelect');projectRows=Array.isArray(d.projects)?d.projects.slice():[];s.innerHTML='<option value="">— Nouveau portail —</option>';for(const p of projectRows){const o=document.createElement('option');const pid=String(p&&p.id||'').trim();o.value=pid;o.dataset.projectId=pid;o.textContent=(p&&p.title)||'Nouveau portail';s.appendChild(o)}}
 async function ensurePortalRegistered(show=true){const id=slug($('portalId').value||$('short').value||$('title').value),name=($('title').value||$('short').value||'').trim();if(!id||!name){if(show&&$('connectionStatus'))$('connectionStatus').textContent='⚠ Nom et ID du portail requis.';return false}try{const data=await api('/api/portals');const list=Array.isArray(data.portals)?data.portals:[];const existing=list.find(p=>p.id===id);if(existing){if(existing.name!==name||existing.active===false){const next=list.map(p=>p.id===id?{...p,name,active:true}:p);await api('/api/portals',{method:'POST',body:JSON.stringify({portals:next})})}if(show&&$('connectionStatus'))$('connectionStatus').textContent='✓ Portail connecté à la liste centrale et disponible pour Dégustation.';return true}await api('/api/portals/add',{method:'POST',body:JSON.stringify({id,name})});if(show&&$('connectionStatus'))$('connectionStatus').textContent='✓ Portail ajouté à la liste centrale et disponible pour Dégustation.';return true}catch(e){if(show&&$('connectionStatus'))$('connectionStatus').textContent='⚠ Connexion portail : '+e.message;return false}}
 async function checkConnections(){const ps=$('portalRegistryStatus'),cs=$('charactersConnectionStatus'),msg=$('connectionStatus');if(ps)ps.textContent='Vérification…';if(cs)cs.textContent='Vérification…';if(msg)msg.textContent='';try{const [meta,chars]=await Promise.all([api('/api/degustations/meta'),api('/api/personnages')]);const id=slug($('portalId').value||$('short').value||$('title').value);const portals=meta.portals||[];const found=id&&portals.some(p=>p.id===id);if(ps)ps.textContent=(id?(found?'✓ '+id+' est relié à Dégustation.':'— '+id+' n’est pas encore enregistré.'):('✓ Dégustation répond · '+portals.length+' portail(s) central(aux).'));const people=chars.personnages||chars.agents||[];if(cs)cs.textContent='✓ Catalogue partagé connecté · '+people.length+' personnage(s).';return{meta,chars,found}}catch(e){if(ps)ps.textContent='⚠ '+e.message;if(cs)cs.textContent='⚠ Connexion non confirmée';if(msg)msg.textContent='Aucune donnée n’a été supprimée.';return null}}
-function selectedProjectId(){return String($('projectSelect')?.value||'').trim()}
-function syncDeleteButton(){const b=$('deleteProjectBtn');if(b)b.disabled=!selectedProjectId()}
+function selectedProjectId(){
+ const s=$('projectSelect');if(!s||s.selectedIndex<=0)return'';
+ const o=s.options[s.selectedIndex];
+ const byData=String(o?.dataset?.projectId||'').trim();
+ const byValue=String(o?.value||'').trim();
+ const byIndex=String(projectRows[s.selectedIndex-1]?.id||'').trim();
+ return byData||byValue||byIndex
+}
+function syncDeleteButton(){
+ const b=$('deleteProjectBtn'),s=$('projectSelect');
+ if(!b)return;
+ const hasRealSelection=!!(s&&s.selectedIndex>0&&selectedProjectId());
+ b.disabled=!hasRealSelection
+}
 function hasPortalDraftContent(){const d=draft();return !!(String(d.title||'').trim()||String(d.short||'').trim()||String(d.portalId||'').trim()||String(d.workerName||'').trim()||String(d.host||'').trim()||String(d.mission||'').trim()||String(d.loginImage||'').trim()||(d.agents||[]).length||(d.tools||[]).length||Object.values(d.index||{}).some(v=>String(v||'').trim()))}
 async function newProject(){if(hasPortalDraftContent()&&!confirm('Abandonner le formulaire actuel et préparer un nouveau portail ?'))return;current='';apply({});$('projectSelect').value='';syncDeleteButton();const st=$('projectSaveState');if(st)st.textContent='Nouveau portail non enregistré.';await checkConnections()}
 async function deleteProject(){
- const id=selectedProjectId();if(!id)return;
- const selected=$('projectSelect');const option=selected&&selected.options[selected.selectedIndex];
- let displayName=(option&&option.textContent)||'ce portail',portalId='';
+ const s=$('projectSelect');
+ if(!s||s.selectedIndex<=0)return;
+ const row=projectRows[s.selectedIndex-1]||{};
+ const option=s.options[s.selectedIndex];
+ const id=String(row.id||option?.dataset?.projectId||option?.value||'').trim();
+ if(!id){const cs=$('compileStatus');if(cs)cs.textContent='⚠ Impossible d’identifier ce brouillon.';return}
+ let displayName=String(row.title||option?.textContent||'Nouveau portail').trim()||'Nouveau portail';
+ let portalId='';
  try{
-  const info=await api(API+'/'+id);
+  const info=await api(API+'/'+encodeURIComponent(id));
   const project=info.project||{};
-  displayName=project.title||displayName;
+  displayName=String(project.title||displayName).trim()||displayName;
   const d=project.data||{};
-  portalId=slug(d.portalId||d.short||d.title||'');
- }catch(e){console.warn('Lecture du portail avant suppression impossible:',e)}
+  portalId=slug(d.portalId||'');
+ }catch(e){
+  console.warn('Projet ancien ou vide : suppression directe par ID technique.',e)
+ }
  if(!confirm('Supprimer définitivement « '+displayName+' » de Création de Portail ?'))return;
  try{
-  await api(API+'/'+id,{method:'DELETE'});
-  if(portalId){try{await api('/api/portals/remove',{method:'POST',body:JSON.stringify({id:portalId})})}catch(e){console.warn('Projet supprimé, mais retrait de la liste centrale non confirmé:',e)}}
-  const deletedWasOpen=current===id;
-  if(deletedWasOpen){current='';apply({})}
+  await api(API+'/'+encodeURIComponent(id),{method:'DELETE'});
+  if(portalId){
+   try{await api('/api/portals/remove',{method:'POST',body:JSON.stringify({id:portalId})})}
+   catch(e){console.warn('Projet supprimé, mais retrait de la liste centrale non confirmé:',e)}
+  }
+  if(current===id){current='';apply({})}
   await loadProjects();
-  if(current&&[...$('projectSelect').options].some(o=>o.value===current))$('projectSelect').value=current;else $('projectSelect').value='';
+  $('projectSelect').selectedIndex=0;
   syncDeleteButton();
   const st=$('projectSaveState');if(st)st.textContent='Portail supprimé.';
   const cs=$('compileStatus');if(cs)cs.textContent='Portail supprimé ✓';
   await checkConnections()
- }catch(e){const cs=$('compileStatus');if(cs)cs.textContent='⚠ '+e.message}
+ }catch(e){
+  const cs=$('compileStatus');if(cs)cs.textContent='⚠ '+e.message
+ }
 }
 async function save(){const title=String($('title').value||'').trim(),portalId=slug($('portalId').value||'');if(!title)throw Error('Le nom complet du portail est requis avant sauvegarde.');if(!portalId)throw Error('L’ID portail est requis avant sauvegarde.');$('title').value=title;$('portalId').value=portalId;const payload={title:title,data:draft()};const d=current?await api(API+'/'+current,{method:'PUT',body:JSON.stringify(payload)}):await api(API,{method:'POST',body:JSON.stringify(payload)});current=d.project.id;await loadProjects();$('projectSelect').value=current;syncDeleteButton();await ensurePortalRegistered(false);await checkConnections();return d.project}
 async function open(){const id=$('projectSelect').value;if(!id)return;const d=await api(API+'/'+id);current=id;syncDeleteButton();const converted=normalizeLegacyProject(d.project.data||{},d.project||{});apply(converted);const st=$('projectSaveState');if(st)st.textContent='Projet chargé · anciennes données converties à l’écran si nécessaire. Clique Sauvegarder seulement après vérification.';await checkConnections()}
@@ -126,4 +273,12 @@ for(const a of visibleAgents){
   }
 }
 const blob=await z.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:9}}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='Portail-'+slug(p.short||p.title)+'.zip';a.click();setTimeout(()=>URL.revokeObjectURL(u),20000);$('compileStatus').textContent='ZIP prêt ✓ · portail relié à Dégustation'}catch(e){$('compileStatus').textContent='⚠ '+e.message}}
-function bind(){$('charExisting').onchange=e=>loadCharacterForm(e.target.value);$('newCharBtn').onclick=clearCharacterForm;$('saveProjectBtn').onclick=async()=>{try{await save();const st=$('projectSaveState');if(st)st.textContent='Portail sauvegardé ✓'}catch(e){const st=$('projectSaveState');if(st)st.textContent='⚠ '+e.message;const cs=$('compileStatus');if(cs)cs.textContent='⚠ '+e.message}};$('openProjectBtn').onclick=open;$('newProjectBtn').onclick=newProject;if($('deleteProjectBtn'))$('deleteProjectBtn').onclick=deleteProject;$('compileBtn').onclick=compile;$('saveCharBtn').onclick=saveChar;$('addToolBtn').onclick=addTool;if($('checkConnectionsBtn'))$('checkConnectionsBtn').onclick=checkConnections;if($('registerPortalBtn'))$('registerPortalBtn').onclick=async()=>{await ensurePortalRegistered(true);await checkConnections()};$('logoutBtn').onclick=()=>location.href='/';for(const id of ['portalId','short','title'])if($(id))$(id).addEventListener('change',checkConnections);if($('projectSelect'))$('projectSelect').addEventListener('change',()=>{syncDeleteButton()})}document.addEventListener('DOMContentLoaded',async()=>{indexUI();bind();await load();syncDeleteButton();await checkConnections()})})();
+function bind(){
+ if($('portalAgentSearch'))$('portalAgentSearch').oninput=e=>renderPortalAgentSelect(e.target.value)
+ if($('portalAgentSelect'))$('portalAgentSelect').onchange=e=>selectPortalAgent(e.target.value)
+ if($('portalAgentAddBtn'))$('portalAgentAddBtn').onclick=addPortalAgent
+ if($('portalAgentRemoveBtn'))$('portalAgentRemoveBtn').onclick=removePortalAgent
+ for(const id of ['portalAgentPlacement','portalAgentImage','portalAgentVideo','portalAgentVoice']){
+   if($(id))$(id).addEventListener('change',savePortalAgentEditor)
+ }
+ $('charExisting').onchange=e=>loadCharacterForm(e.target.value);$('newCharBtn').onclick=clearCharacterForm;$('saveProjectBtn').onclick=async()=>{try{await save();const st=$('projectSaveState');if(st)st.textContent='Portail sauvegardé ✓'}catch(e){const st=$('projectSaveState');if(st)st.textContent='⚠ '+e.message;const cs=$('compileStatus');if(cs)cs.textContent='⚠ '+e.message}};$('openProjectBtn').onclick=open;$('newProjectBtn').onclick=newProject;if($('deleteProjectBtn'))$('deleteProjectBtn').onclick=deleteProject;$('compileBtn').onclick=compile;$('saveCharBtn').onclick=saveChar;$('addToolBtn').onclick=addTool;if($('checkConnectionsBtn'))$('checkConnectionsBtn').onclick=checkConnections;if($('registerPortalBtn'))$('registerPortalBtn').onclick=async()=>{await ensurePortalRegistered(true);await checkConnections()};$('logoutBtn').onclick=()=>location.href='/';for(const id of ['portalId','short','title'])if($(id))$(id).addEventListener('change',checkConnections);if($('projectSelect'))$('projectSelect').addEventListener('change',()=>{syncDeleteButton();const st=$('projectSaveState');if(st&&$('projectSelect').selectedIndex>0)st.textContent='Portail sélectionné · Ouvrir pour modifier, ou Supprimer directement.'})}document.addEventListener('DOMContentLoaded',async()=>{indexUI();bind();await load();syncDeleteButton();await checkConnections()})})();

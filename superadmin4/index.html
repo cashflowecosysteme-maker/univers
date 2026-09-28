@@ -1,11 +1,70 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>NyXia · Super Admin 4 · Portails</title><link rel="icon" href="/FavIcon.png"><link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=17"><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script><script src="/starry-bg.js" defer></script><script src="/superadmin4/js/superadmin4.js?v=20" defer></script></head><body><canvas id="starry-canvas"></canvas>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>NyXia · Super Admin 4 · Portails</title><link rel="icon" href="/FavIcon.png"><link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=17"><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script><script src="/starry-bg.js" defer></script><script src="/superadmin4/js/superadmin4.js?v=22" defer></script></head><body><canvas id="starry-canvas"></canvas>
 <div class="shell" id="app"><header class="topbar"><div class="brand"><img src="/NyXia.png" alt="NyXia"><div><strong>NyXia · Super Admin 4</strong><span>Création de Portails NyXia</span></div></div><div class="super-switch"><a href="/">Super 1 · Gestion</a><a href="/superadmin4/" class="active">Super 4 · Portails</a>
       <a href="/personnages/" class="labo" style="border-color:rgba(167,139,250,.45);color:#ddd6fe">✨ Personnages Premium</a><button class="logout" id="logoutBtn">Déconnexion</button></div></header><main>
 <div class="hero"><div><h1>🪞 Création de Portail</h1><p>Même coque, même KV, même D1. Les personnages sont librement sélectionnables selon le portail.</p></div><div class="pill">🔒 Univers NyXia</div></div>
 <section class="card"><h2>Mes portails</h2><div class="projectbar"><select id="projectSelect"><option value="">— Nouveau portail —</option></select><button class="btn secondary" id="openProjectBtn">Ouvrir</button><button class="btn primary" id="saveProjectBtn">Sauvegarder</button><button class="btn secondary" id="newProjectBtn">Nouveau</button><button class="btn danger" id="deleteProjectBtn" disabled>🗑 Supprimer</button><button class="btn primary" id="compileBtn">Créer le ZIP</button></div><div class="status" id="compileStatus">Prêt.</div></section>
 <section class="card"><h2>🔗 Connexions écosystème</h2><div class="note ok"><strong>Aucune fonction retirée.</strong> Cette section vérifie seulement les branchements du portail vers la liste centrale, les dégustations et les personnages partagés.</div><div class="grid"><div class="field"><label>Portail central / Dégustation</label><div class="status" id="portalRegistryStatus">Vérification…</div></div><div class="field"><label>Personnages partagés</label><div class="status" id="charactersConnectionStatus">Vérification…</div></div></div><div class="actions" style="margin-top:12px"><button class="btn secondary" type="button" id="checkConnectionsBtn">↻ Vérifier les connexions</button><button class="btn primary" type="button" id="registerPortalBtn">✓ Enregistrer ce portail pour Dégustation</button></div><div class="status" id="connectionStatus" style="margin-top:10px"></div></section>
 <section class="card"><h2>Identité</h2><div class="grid"><div class="field"><label>Nom complet</label><input id="title"></div><div class="field"><label>Nom court</label><input id="short"></div><div class="field"><label>ID portail</label><input id="portalId"></div><div class="field"><label>Worker</label><input id="workerName"></div><div class="field"><label>Sous-domaine</label><input id="host" placeholder="monportail.nyxia.top"></div><div class="field"><label>Mission</label><textarea id="mission"></textarea></div><div class="field"><label>Image Login (URL)</label><input id="loginImage" placeholder="https://..."></div></div></section>
-<section class="card"><h2>Personnages</h2><div class="note ok"><strong>Aucun personnage n’est obligatoire.</strong> NyXia, Diane, Éric et les formateurs de base sont activables selon le portail. Les personnages existants du Super Admin 1 apparaissent automatiquement ici et peuvent être sélectionnés, modifiés puis attribués à un portail / Formation Vivante.</div><div class="agents" id="agents"></div><hr><h3>Créer / modifier un personnage</h3><div class="grid"><div class="field full"><label>1. Choisir un personnage existant</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="charExisting" style="flex:1;min-width:260px"><option value="">— Choisir dans la liste —</option></select><button class="btn secondary" type="button" id="newCharBtn">＋ Nouveau personnage</button></div><span class="hint">La liste se remplit automatiquement avec les personnages du Super Admin 1. Choisis un nom : sa fiche se charge toute seule.</span></div><div class="field"><label>Nom</label><input id="charName"></div><div class="field"><label>Code</label><input id="charCode"></div><div class="field"><label>Rôle / sous-titre</label><input id="charSub"></div><div class="field"><label>Portail / Formation Vivante</label><input id="charPortal" placeholder="lena, kael, etc."></div><div class="field full"><label>Prompt / mission</label><textarea id="charPrompt"></textarea></div><div class="field full"><label>Personnalité</label><textarea id="charPersonality"></textarea></div><div class="field"><label>Image URL</label><input id="charImage"></div><div class="field"><label>Vidéo accueil URL</label><input id="charVideo"></div><div class="field"><label>Voice ID ElevenLabs</label><input id="charVoice"></div></div><button class="btn primary" id="saveCharBtn">Enregistrer le personnage</button><span class="status" id="charStatus"></span></section>
+<section class="card"><h2>Personnages</h2>
+<div class="note ok"><strong>Aucun personnage n’est obligatoire.</strong> Choisis seulement les personnages utiles à ce portail. Leur identité, leur voix et leurs fonctions restent celles du catalogue partagé.</div>
+
+<div style="display:grid;grid-template-columns:minmax(260px,1fr) minmax(260px,1fr);gap:12px;align-items:end;margin:14px 0 10px">
+  <div class="field">
+    <label>🔎 Rechercher un personnage</label>
+    <input id="portalAgentSearch" placeholder="Tape un nom, un rôle ou un portail...">
+  </div>
+  <div class="field">
+    <label>Choisir un personnage</label>
+    <select id="portalAgentSelect"><option value="">— Choisir un personnage —</option></select>
+  </div>
+</div>
+
+<div class="field full" style="margin:8px 0 14px">
+  <label>Personnages dans ce portail</label>
+  <div id="portalAgentChips" style="display:flex;flex-wrap:wrap;gap:8px;min-height:38px;align-items:center"></div>
+</div>
+
+<div id="portalAgentCard" style="display:none;border:1px solid rgba(123,92,255,.35);background:rgba(8,15,38,.72);border-radius:16px;padding:16px;margin:12px 0 20px;box-shadow:0 0 28px rgba(123,92,255,.08)">
+  <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px">
+    <div style="display:flex;gap:12px;align-items:center">
+      <div id="portalAgentAvatar" style="width:54px;height:54px;border-radius:50%;overflow:hidden;border:1px solid rgba(167,139,250,.45);display:flex;align-items:center;justify-content:center;background:rgba(123,92,255,.12)">✦</div>
+      <div>
+        <strong id="portalAgentName" style="font-size:18px">Personnage</strong>
+        <div id="portalAgentSub" class="hint" style="margin-top:4px"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" type="button" id="portalAgentAddBtn">＋ Ajouter au portail</button>
+      <button class="btn danger" type="button" id="portalAgentRemoveBtn" style="display:none">Retirer du portail</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="field">
+      <label>Emplacement dans ce portail</label>
+      <select id="portalAgentPlacement">
+        <option value="principal">💬 Mes Conversations</option>
+        <option value="atelier">✨ Atelier</option>
+        <option value="hidden">Masqué</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Image URL</label>
+      <input id="portalAgentImage" placeholder="https://...">
+    </div>
+    <div class="field">
+      <label>Vidéo accueil URL</label>
+      <input id="portalAgentVideo" placeholder="https://...">
+    </div>
+    <div class="field">
+      <label>Voice ID</label>
+      <input id="portalAgentVoice">
+    </div>
+  </div>
+  <div class="status" id="portalAgentStatus" style="margin-top:10px"></div>
+</div>
+
+<hr><h3>Créer / modifier un personnage</h3><div class="grid"><div class="field full"><label>1. Choisir un personnage existant</label><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="charExisting" style="flex:1;min-width:260px"><option value="">— Choisir dans la liste —</option></select><button class="btn secondary" type="button" id="newCharBtn">＋ Nouveau personnage</button></div><span class="hint">La liste se remplit automatiquement avec les personnages du Super Admin 1. Choisis un nom : sa fiche se charge toute seule.</span></div><div class="field"><label>Nom</label><input id="charName"></div><div class="field"><label>Code</label><input id="charCode"></div><div class="field"><label>Rôle / sous-titre</label><input id="charSub"></div><div class="field"><label>Portail / Formation Vivante</label><input id="charPortal" placeholder="lena, kael, etc."></div><div class="field full"><label>Prompt / mission</label><textarea id="charPrompt"></textarea></div><div class="field full"><label>Personnalité</label><textarea id="charPersonality"></textarea></div><div class="field"><label>Image URL</label><input id="charImage"></div><div class="field"><label>Vidéo accueil URL</label><input id="charVideo"></div><div class="field"><label>Voice ID ElevenLabs</label><input id="charVoice"></div></div><button class="btn primary" id="saveCharBtn">Enregistrer le personnage</button><span class="status" id="charStatus"></span></section>
 <section class="card"><h2>Index</h2><div class="note">Le CSS d’origine est conservé. Ici tu modifies uniquement le contenu et les médias.</div><div id="indexFields"></div></section>
 <section class="card"><h2>Outils spécialisés</h2><div id="tools"></div><button class="btn secondary" id="addToolBtn">+ Ajouter un outil HTML</button></section>
 
