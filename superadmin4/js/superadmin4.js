@@ -1,6 +1,202 @@
-(()=>{'use strict';const $=id=>document.getElementById(id),API='/api/superadmin4/projects';let catalog=[],profiles={},tools=[],current='',projectRows=[],portalAgents=new Map(),portalAgentCurrent='';const CORE={nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦'},diane:{name:'Diane',sub:'Créatrice & accompagnement',icon:'👑'},eric:{name:'Éric',sub:'Communication & CashFlow',icon:'💼'},lena:{name:'Léna',sub:'Spiritualité & intuition',icon:'🔮'},selena:{name:'Séléna',sub:'A.M.I.E.',icon:'🪞'},alex:{name:'Alex',sub:'Écriture',icon:'✍️'},kael:{name:'Kael',sub:'Relations',icon:'💜'},sophia:{name:'Sophia',sub:'Numérologie · La Tisseuse des Nombres',icon:'🔢'},aletheia:{name:'Aletheia',sub:'Runes · La Scribe des Murmures Runiques',icon:'ᚱ'},cassandre:{name:'Cassandre',sub:'Tarot · La Voix du Reflet',icon:'🃏'},celeste:{name:'Céleste',sub:'Mancies & rituels · La Cartographe des Présages',icon:'🌙'}};const sections=[['headerSocials','Header · Réseaux sociaux (HTML boutons)'],['headerCtaLabel','Header · Bouton texte'],['headerCtaUrl','Header · Bouton URL'],['heroEyebrow','Hero · Eyebrow'],['heroTitle','Hero · Titre'],['heroSubtitle','Hero · Sous-titre'],['heroText','Hero · Texte'],['heroNote','Hero · Note'],['heroCtaLabel','Hero · CTA texte'],['heroCtaUrl','Hero · CTA URL'],['heroMedia','Hero · Image/vidéo URL'],['s2','2. Problème · texte'],['s2Media','2. Média URL'],['s3Media','3. Image 02 · média URL'],['s45','4-5. Parcours · texte'],['s45Media','4-5. Média URL'],['s67','6-7. Texte'],['s67Media','6-7. Média URL'],['s89','8-9. Formation Vivante · texte'],['s89Media','8-9. Média URL'],['s1011','10-11. Évolution · texte'],['s1011Media','10-11. Média URL'],['s1213','12-13. Atelier · texte'],['s1213Media','12-13. Média URL'],['s1415','14-15. Résultats · texte'],['s1415Media','14-15. Média URL'],['marquee','Bandeau défilant · HTML/texte'],['socialProof','Preuve sociale · texte'],['socialProofMedia','Preuve sociale · image/vidéo URL'],['toolsText','Boîte à outils · texte'],['toolsMedia','Boîte à outils · média URL'],['transformText','Projection / transformation · texte'],['transformMedia','Projection · média URL'],['faq','FAQ · JSON [{q,a}]'],['ctaTitle','Rendez-vous · titre'],['ctaText','Rendez-vous · texte'],['ctaLabel','Rendez-vous · bouton'],['ctaUrl','Rendez-vous · URL'],['footerSocials','Footer · réseaux (HTML boutons)'],['footerSign','Footer · signature']];
+(()=>{'use strict';const $=id=>document.getElementById(id),API='/api/superadmin4/projects';let catalog=[],profiles={},tools=[],current='',projectRows=[],portalAgents=new Map(),portalAgentCurrent='',indexPreviewTemplate='',indexPreviewCss='',indexActiveGroup='hero',indexAdvanced=false,indexPreviewTimer=null;const CORE={nyxia:{name:'NyXia',sub:'Orientation & technique',icon:'✦'},diane:{name:'Diane',sub:'Créatrice & accompagnement',icon:'👑'},eric:{name:'Éric',sub:'Communication & CashFlow',icon:'💼'},lena:{name:'Léna',sub:'Spiritualité & intuition',icon:'🔮'},selena:{name:'Séléna',sub:'A.M.I.E.',icon:'🪞'},alex:{name:'Alex',sub:'Écriture',icon:'✍️'},kael:{name:'Kael',sub:'Relations',icon:'💜'},sophia:{name:'Sophia',sub:'Numérologie · La Tisseuse des Nombres',icon:'🔢'},aletheia:{name:'Aletheia',sub:'Runes · La Scribe des Murmures Runiques',icon:'ᚱ'},cassandre:{name:'Cassandre',sub:'Tarot · La Voix du Reflet',icon:'🃏'},celeste:{name:'Céleste',sub:'Mancies & rituels · La Cartographe des Présages',icon:'🌙'}};const sections=[
+['headerSocials','Réseaux sociaux (HTML)'],['headerCtaLabel','Texte du bouton'],['headerCtaUrl','URL du bouton'],
+['heroEyebrow','Petit titre'],['heroTitle','Titre principal'],['heroSubtitle','Sous-titre'],['heroText','Texte principal'],['heroNote','Note'],['heroCtaLabel','Texte du bouton'],['heroCtaUrl','URL du bouton'],['heroMedia','Image / vidéo'],
+['s2','Texte'],['s2Media','Image / vidéo'],['s3Media','Image 02 / vidéo'],
+['s45','Texte du parcours'],['s45Media','Image / vidéo'],
+['s67','Texte'],['s67Media','Image / vidéo'],
+['s89','Texte Formation Vivante'],['s89Media','Image / vidéo'],
+['s1011','Texte'],['s1011Media','Image / vidéo'],
+['s1213','Texte Atelier'],['s1213Media','Image / vidéo'],
+['s1415','Texte Résultats'],['s1415Media','Image / vidéo'],
+['marquee','Bandeau défilant (HTML / texte)'],
+['socialProof','Preuve sociale'],['socialProofMedia','Image / vidéo'],
+['toolsText','Texte boîte à outils'],['toolsMedia','Image / vidéo'],
+['transformText','Texte projection / transformation'],['transformMedia','Image / vidéo'],
+['faq','FAQ'],
+['ctaTitle','Titre'],['ctaText','Texte'],['ctaLabel','Texte du bouton'],['ctaUrl','URL du bouton'],
+['footerSocials','Réseaux du footer (HTML)'],['footerSign','Signature']
+];
+const INDEX_GROUPS=[
+ {id:'header',icon:'⌂',title:'Header',keys:['headerCtaLabel','headerCtaUrl','headerSocials'],advanced:['headerSocials']},
+ {id:'hero',icon:'✦',title:'Hero',keys:['heroEyebrow','heroTitle','heroSubtitle','heroText','heroNote','heroCtaLabel','heroCtaUrl','heroMedia']},
+ {id:'problem',icon:'01',title:'Problème / entrée',keys:['s2','s2Media','s3Media']},
+ {id:'journey',icon:'02',title:'Parcours',keys:['s45','s45Media']},
+ {id:'content',icon:'03',title:'Contenu',keys:['s67','s67Media']},
+ {id:'formation',icon:'04',title:'Formation Vivante',keys:['s89','s89Media']},
+ {id:'evolution',icon:'05',title:'Évolution',keys:['s1011','s1011Media']},
+ {id:'atelier',icon:'06',title:'Atelier',keys:['s1213','s1213Media']},
+ {id:'results',icon:'07',title:'Résultats',keys:['s1415','s1415Media']},
+ {id:'proof',icon:'★',title:'Preuve sociale',keys:['socialProof','socialProofMedia']},
+ {id:'tools',icon:'🧰',title:'Boîte à outils',keys:['toolsText','toolsMedia']},
+ {id:'transform',icon:'↗',title:'Transformation',keys:['transformText','transformMedia']},
+ {id:'faq',icon:'?',title:'FAQ',keys:['faq']},
+ {id:'cta',icon:'◎',title:'Rendez-vous / CTA',keys:['ctaTitle','ctaText','ctaLabel','ctaUrl']},
+ {id:'footer',icon:'⌄',title:'Footer',keys:['footerSign','footerSocials','marquee'],advanced:['footerSocials','marquee']}
+];
+const INDEX_MEDIA_KEYS=new Set(['heroMedia','s2Media','s3Media','s45Media','s67Media','s89Media','s1011Media','s1213Media','s1415Media','socialProofMedia','toolsMedia','transformMedia']);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const slug=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},...o});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'HTTP '+r.status);return d}
-function indexUI(){const h=$('indexFields');h.innerHTML='';for(const [k,l] of sections){const d=document.createElement('div');d.className='field';d.innerHTML='<label>'+esc(l)+'</label>'+(k==='faq'||/Text|s\d|Proof|marquee|footerSocials/.test(k)?'<textarea id="idx-'+k+'"></textarea>':'<input id="idx-'+k+'">');h.appendChild(d)}}
+
+function idxFieldLabel(key){return (sections.find(x=>x[0]===key)||[key,key])[1]}
+function idxIsLong(key){return key==='faq'||/Text$|^s\d|Proof$|marquee|footerSocials|headerSocials/.test(key)}
+function idxMediaPreviewHtml(url){
+ url=String(url||'').trim();if(!url)return''
+ const yt=url.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/)
+ const gd=url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
+ if(yt)return '<iframe src="https://www.youtube.com/embed/'+esc(yt[1])+'" loading="lazy"></iframe>'
+ if(gd)return '<iframe src="https://drive.google.com/file/d/'+esc(gd[1])+'/preview" loading="lazy"></iframe>'
+ if(/\.(mp4|webm)(?:\?|$)/i.test(url))return '<video src="'+esc(url)+'" controls></video>'
+ return '<img src="'+esc(url)+'" alt="Aperçu média">'
+}
+function updateIdxMediaPreview(key){
+ const el=$('idx-'+key),box=$('idx-media-'+key);if(!el||!box)return
+ box.innerHTML=idxMediaPreviewHtml(el.value)
+ box.style.display=el.value.trim()?'block':'none'
+}
+function indexUI(){
+ const nav=$('indexSectionNav'),host=$('indexFields');if(!nav||!host)return
+ nav.innerHTML='';host.innerHTML=''
+ for(const g of INDEX_GROUPS){
+   const b=document.createElement('button');b.type='button';b.className='index-nav-btn';b.dataset.group=g.id
+   b.innerHTML='<span class="idx-dot"></span><span>'+esc(g.icon+'  '+g.title)+'</span>'
+   b.onclick=()=>activateIndexGroup(g.id);nav.appendChild(b)
+
+   const panel=document.createElement('div');panel.className='index-group';panel.dataset.group=g.id
+   for(const key of g.keys){
+     if(key==='faq'){
+       const hidden=document.createElement('textarea');hidden.id='idx-faq';hidden.className='idx-hidden-source'
+       hidden.addEventListener('input',()=>scheduleIndexPreview())
+       panel.appendChild(hidden)
+       const wrap=document.createElement('div')
+       wrap.innerHTML='<div class="idx-faq-list" id="idxFaqList"></div><button class="btn secondary" type="button" id="idxFaqAddBtn">＋ Ajouter une question</button>'
+       panel.appendChild(wrap)
+       continue
+     }
+     const field=document.createElement('div')
+     const isAdvanced=(g.advanced||[]).includes(key)
+     field.className='field'+(isAdvanced?' idx-advanced':'')
+     const control=idxIsLong(key)
+       ? '<textarea id="idx-'+key+'"></textarea>'
+       : '<input id="idx-'+key+'">'
+     field.innerHTML='<label>'+esc(idxFieldLabel(key))+(isAdvanced?' · avancé':'')+'</label>'+control
+     if(INDEX_MEDIA_KEYS.has(key))field.innerHTML+='<div class="idx-media-thumb" id="idx-media-'+key+'" style="display:none"></div>'
+     if(/Socials|marquee/.test(key))field.innerHTML+='<div class="idx-field-note">HTML autorisé dans cette zone.</div>'
+     panel.appendChild(field)
+   }
+   host.appendChild(panel)
+ }
+ for(const [key] of sections){
+   const el=$('idx-'+key);if(!el)continue
+   el.addEventListener('input',()=>{
+     if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key)
+     scheduleIndexPreview()
+   })
+ }
+ if($('idxFaqAddBtn'))$('idxFaqAddBtn').onclick=()=>addFaqItem()
+ activateIndexGroup(indexActiveGroup)
+ loadIndexPreviewTemplate()
+}
+function activateIndexGroup(id){
+ indexActiveGroup=id
+ const g=INDEX_GROUPS.find(x=>x.id===id)||INDEX_GROUPS[0]
+ document.querySelectorAll('.index-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.group===g.id))
+ document.querySelectorAll('.index-group').forEach(p=>p.classList.toggle('active',p.dataset.group===g.id))
+ if($('indexEditorTitle'))$('indexEditorTitle').textContent=g.title
+ for(const key of g.keys)if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key)
+ if(g.id==='faq')renderFaqBuilder()
+ scrollIndexPreviewToGroup(g.id)
+}
+function currentIndexData(){
+ const idx={}
+ for(const [k] of sections)idx[k]=$('idx-'+k)?.value||''
+ return idx
+}
+function faqData(){
+ try{const v=JSON.parse($('idx-faq')?.value||'[]');return Array.isArray(v)?v:[]}catch(_){return[]}
+}
+function writeFaqData(list){
+ if($('idx-faq'))$('idx-faq').value=JSON.stringify(list)
+ renderFaqBuilder();scheduleIndexPreview()
+}
+function renderFaqBuilder(){
+ const h=$('idxFaqList');if(!h)return
+ const list=faqData();h.innerHTML=''
+ if(!list.length){const e=document.createElement('div');e.className='idx-empty';e.textContent='Aucune question pour le moment.';h.appendChild(e)}
+ list.forEach((item,i)=>{
+   const row=document.createElement('div');row.className='idx-faq-row'
+   row.innerHTML='<input data-faq-q="'+i+'" placeholder="Question" value="'+esc(item.q||'')+'"><textarea data-faq-a="'+i+'" placeholder="Réponse">'+esc(item.a||'')+'</textarea><div class="idx-faq-actions"><button class="btn danger" type="button" data-faq-del="'+i+'">Supprimer</button></div>'
+   h.appendChild(row)
+ })
+ h.querySelectorAll('[data-faq-q]').forEach(el=>el.oninput=()=>{const l=faqData(),i=+el.dataset.faqQ;l[i]={...(l[i]||{}),q:el.value};$('idx-faq').value=JSON.stringify(l);scheduleIndexPreview()})
+ h.querySelectorAll('[data-faq-a]').forEach(el=>el.oninput=()=>{const l=faqData(),i=+el.dataset.faqA;l[i]={...(l[i]||{}),a:el.value};$('idx-faq').value=JSON.stringify(l);scheduleIndexPreview()})
+ h.querySelectorAll('[data-faq-del]').forEach(el=>el.onclick=()=>{const l=faqData();l.splice(+el.dataset.faqDel,1);writeFaqData(l)})
+}
+function addFaqItem(){const l=faqData();l.push({q:'',a:''});writeFaqData(l)}
+async function loadIndexPreviewTemplate(){
+ const status=$('indexPreviewStatus')
+ try{
+   if(status)status.textContent='Chargement de la vraie coque…'
+   const r=await fetch('/superadmin4/portail-shell-template.zip',{cache:'no-store'})
+   if(!r.ok)throw Error('Coque introuvable')
+   const z=await JSZip.loadAsync(await r.arrayBuffer())
+   const hf=z.file('index.html'),cf=z.file('css/index.css')
+   if(!hf||!cf)throw Error('index.html ou css/index.css manque dans la coque')
+   indexPreviewTemplate=await hf.async('string')
+   indexPreviewCss=await cf.async('string')
+   if(status)status.textContent='Aperçu réel de la coque ✓'
+   refreshIndexPreview()
+ }catch(e){
+   if(status)status.textContent='⚠ '+e.message
+ }
+}
+function buildPreviewHtml(){
+ if(!indexPreviewTemplate)return''
+ const p={title:$('title')?.value||'Portail NyXia',mission:$('mission')?.value||'',index:currentIndexData()}
+ let doc=fillIndex(indexPreviewTemplate,p)
+ doc=doc.replace(/<link[^>]+href=["']\/css\/index\.css["'][^>]*>/i,'<style>'+indexPreviewCss+'</style>')
+ doc=doc.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'')
+ doc=doc.replace(/<script\b[^>]*\/?>/gi,'')
+ doc=doc.replace('</head>','<style>html{scroll-behavior:smooth}body{min-width:0!important}a{cursor:default}</style></head>')
+ return doc
+}
+function refreshIndexPreview(){
+ const f=$('indexPreviewFrame');if(!f||!indexPreviewTemplate)return
+ let oldScroll=0;try{oldScroll=f.contentWindow?.scrollY||0}catch(_){}
+ f.srcdoc=buildPreviewHtml()
+ f.onload=()=>{
+   try{
+     f.contentDocument?.addEventListener('click',e=>{const a=e.target.closest?.('a');if(a)e.preventDefault()})
+     f.contentWindow?.scrollTo(0,oldScroll)
+   }catch(_){}
+ }
+}
+function scheduleIndexPreview(){
+ clearTimeout(indexPreviewTimer)
+ indexPreviewTimer=setTimeout(refreshIndexPreview,220)
+}
+function setIndexDevice(mode){
+ const stage=$('indexPreviewStage');if(!stage)return
+ stage.classList.toggle('mobile',mode==='mobile');stage.classList.toggle('desktop',mode!=='mobile')
+ if($('indexPreviewDevice'))$('indexPreviewDevice').textContent=mode==='mobile'?'Mobile · 390 px':'Desktop'
+}
+function scrollIndexPreviewToGroup(id){
+ const f=$('indexPreviewFrame');if(!f?.contentDocument)return
+ const selectors={
+  header:'.site-header',hero:'#top',problem:'#top',
+  journey:'.section-wrap:nth-of-type(2)',content:'.section-wrap:nth-of-type(3)',
+  formation:'.section-wrap:nth-of-type(4)',evolution:'.section-wrap:nth-of-type(5)',
+  atelier:'.section-wrap:nth-of-type(6)',results:'.section-wrap:nth-of-type(7)',
+  proof:'.section-wrap:nth-of-type(8)',tools:'.section-wrap:nth-of-type(9)',
+  transform:'.section-wrap:nth-of-type(10)',faq:'.faq-section',cta:'.cta-section',footer:'footer'
+ }
+ try{const el=f.contentDocument.querySelector(selectors[id]||'body');el?.scrollIntoView({block:'start'})}catch(_){}
+}
+function resetIndexSection(){
+ const g=INDEX_GROUPS.find(x=>x.id===indexActiveGroup);if(!g)return
+ if(!confirm('Réinitialiser tous les champs de « '+g.title+' » ?'))return
+ for(const key of g.keys){if($('idx-'+key))$('idx-'+key).value='';if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key)}
+ if(g.id==='faq')renderFaqBuilder()
+ scheduleIndexPreview()
+}
 async function load(){
   const map=new Map(Object.entries(CORE).map(([k,v])=>[k,{key:k,...v,portail:'',custom:false}]));
   profiles={};catalog=[...map.values()];renderAgents();
@@ -143,6 +339,9 @@ function apply(d={}){
  if($('portalAgentCard'))$('portalAgentCard').style.display='none'
  for(const [k] of sections)if($('idx-'+k))$('idx-'+k).value=d.index?.[k]||''
  tools=d.tools||[];renderTools()
+ renderFaqBuilder()
+ for(const key of INDEX_MEDIA_KEYS)updateIdxMediaPreview(key)
+ scheduleIndexPreview()
 }async function loadProjects(){const d=await api(API),s=$('projectSelect');projectRows=Array.isArray(d.projects)?d.projects.slice():[];s.innerHTML='<option value="">— Nouveau portail —</option>';for(const p of projectRows){const o=document.createElement('option');const pid=String(p&&p.id||'').trim();o.value=pid;o.dataset.projectId=pid;o.textContent=(p&&p.title)||'Nouveau portail';s.appendChild(o)}}
 async function ensurePortalRegistered(show=true){const id=slug($('portalId').value||$('short').value||$('title').value),name=($('title').value||$('short').value||'').trim();if(!id||!name){if(show&&$('connectionStatus'))$('connectionStatus').textContent='⚠ Nom et ID du portail requis.';return false}try{const data=await api('/api/portals');const list=Array.isArray(data.portals)?data.portals:[];const existing=list.find(p=>p.id===id);if(existing){if(existing.name!==name||existing.active===false){const next=list.map(p=>p.id===id?{...p,name,active:true}:p);await api('/api/portals',{method:'POST',body:JSON.stringify({portals:next})})}if(show&&$('connectionStatus'))$('connectionStatus').textContent='✓ Portail connecté à la liste centrale et disponible pour Dégustation.';return true}await api('/api/portals/add',{method:'POST',body:JSON.stringify({id,name})});if(show&&$('connectionStatus'))$('connectionStatus').textContent='✓ Portail ajouté à la liste centrale et disponible pour Dégustation.';return true}catch(e){if(show&&$('connectionStatus'))$('connectionStatus').textContent='⚠ Connexion portail : '+e.message;return false}}
 async function checkConnections(){const ps=$('portalRegistryStatus'),cs=$('charactersConnectionStatus'),msg=$('connectionStatus');if(ps)ps.textContent='Vérification…';if(cs)cs.textContent='Vérification…';if(msg)msg.textContent='';try{const [meta,chars]=await Promise.all([api('/api/degustations/meta'),api('/api/personnages')]);const id=slug($('portalId').value||$('short').value||$('title').value);const portals=meta.portals||[];const found=id&&portals.some(p=>p.id===id);if(ps)ps.textContent=(id?(found?'✓ '+id+' est relié à Dégustation.':'— '+id+' n’est pas encore enregistré.'):('✓ Dégustation répond · '+portals.length+' portail(s) central(aux).'));const people=chars.personnages||chars.agents||[];if(cs)cs.textContent='✓ Catalogue partagé connecté · '+people.length+' personnage(s).';return{meta,chars,found}}catch(e){if(ps)ps.textContent='⚠ '+e.message;if(cs)cs.textContent='⚠ Connexion non confirmée';if(msg)msg.textContent='Aucune donnée n’a été supprimée.';return null}}
@@ -268,6 +467,16 @@ for(const a of visibleAgents){
 }
 const blob=await z.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:9}}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='Portail-'+slug(p.short||p.title)+'.zip';a.click();setTimeout(()=>URL.revokeObjectURL(u),20000);$('compileStatus').textContent='ZIP prêt ✓ · portail relié à Dégustation'}catch(e){$('compileStatus').textContent='⚠ '+e.message}}
 function bind(){
+ if($('indexDesktopBtn'))$('indexDesktopBtn').onclick=()=>setIndexDevice('desktop')
+ if($('indexMobileBtn'))$('indexMobileBtn').onclick=()=>setIndexDevice('mobile')
+ if($('indexRefreshBtn'))$('indexRefreshBtn').onclick=refreshIndexPreview
+ if($('indexAdvancedBtn'))$('indexAdvancedBtn').onclick=()=>{
+   indexAdvanced=!indexAdvanced
+   document.querySelector('.index-builder-card')?.classList.toggle('advanced',indexAdvanced)
+   $('indexAdvancedBtn').textContent=indexAdvanced?'✓ Mode avancé':'</> Mode avancé'
+ }
+ if($('indexResetSectionBtn'))$('indexResetSectionBtn').onclick=resetIndexSection
+
  if($('portalAgentSearch'))$('portalAgentSearch').oninput=e=>renderPortalAgentSelect(e.target.value)
  if($('portalAgentSelect'))$('portalAgentSelect').onchange=e=>selectPortalAgent(e.target.value)
  if($('portalAgentAddBtn'))$('portalAgentAddBtn').onclick=addPortalAgent
@@ -275,4 +484,5 @@ function bind(){
  for(const id of ['portalAgentPlacement','portalAgentImage','portalAgentVideo','portalAgentVoice']){
    if($(id))$(id).addEventListener('change',savePortalAgentEditor)
  }
-$('saveProjectBtn').onclick=async()=>{try{await save();const st=$('projectSaveState');if(st)st.textContent='Portail sauvegardé ✓'}catch(e){const st=$('projectSaveState');if(st)st.textContent='⚠ '+e.message;const cs=$('compileStatus');if(cs)cs.textContent='⚠ '+e.message}};$('openProjectBtn').onclick=open;$('newProjectBtn').onclick=newProject;if($('deleteProjectBtn'))$('deleteProjectBtn').onclick=deleteProject;$('compileBtn').onclick=compile;$('addToolBtn').onclick=addTool;if($('checkConnectionsBtn'))$('checkConnectionsBtn').onclick=checkConnections;if($('registerPortalBtn'))$('registerPortalBtn').onclick=async()=>{await ensurePortalRegistered(true);await checkConnections()};$('logoutBtn').onclick=()=>location.href='/';for(const id of ['portalId','short','title'])if($(id))$(id).addEventListener('change',checkConnections);if($('projectSelect'))$('projectSelect').addEventListener('change',()=>{syncDeleteButton();const st=$('projectSaveState');if(st&&$('projectSelect').selectedIndex>0)st.textContent='Portail sélectionné · Ouvrir pour modifier, ou Supprimer directement.'})}document.addEventListener('DOMContentLoaded',async()=>{indexUI();bind();await load();syncDeleteButton();await checkConnections()})})();
+$('saveProjectBtn').onclick=async()=>{try{await save();const st=$('projectSaveState');if(st)st.textContent='Portail sauvegardé ✓'}catch(e){const st=$('projectSaveState');if(st)st.textContent='⚠ '+e.message;const cs=$('compileStatus');if(cs)cs.textContent='⚠ '+e.message}};$('openProjectBtn').onclick=open;$('newProjectBtn').onclick=newProject;if($('deleteProjectBtn'))$('deleteProjectBtn').onclick=deleteProject;$('compileBtn').onclick=compile;$('addToolBtn').onclick=addTool;if($('checkConnectionsBtn'))$('checkConnectionsBtn').onclick=checkConnections;if($('registerPortalBtn'))$('registerPortalBtn').onclick=async()=>{await ensurePortalRegistered(true);await checkConnections()};$('logoutBtn').onclick=()=>location.href='/';for(const id of ['portalId','short','title'])if($(id))$(id).addEventListener('change',checkConnections);
+ for(const id of ['title','mission'])if($(id))$(id).addEventListener('input',scheduleIndexPreview);if($('projectSelect'))$('projectSelect').addEventListener('change',()=>{syncDeleteButton();const st=$('projectSaveState');if(st&&$('projectSelect').selectedIndex>0)st.textContent='Portail sélectionné · Ouvrir pour modifier, ou Supprimer directement.'})}document.addEventListener('DOMContentLoaded',async()=>{indexUI();bind();await load();syncDeleteButton();await checkConnections()})})();
