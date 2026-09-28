@@ -1,4 +1,4 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>NyXia · Super Admin 4 · Portails</title><link rel="icon" href="/FavIcon.png"><link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=17"><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script><script src="/starry-bg.js" defer></script><script src="/superadmin4/js/superadmin4.js?v=43" defer></script>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>NyXia · Super Admin 4 · Portails</title><link rel="icon" href="/FavIcon.png"><link rel="stylesheet" href="/superadmin4/css/superadmin4.css?v=17"><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script><script src="/starry-bg.js" defer></script><script src="/superadmin4/js/superadmin4.js?v=44" defer></script>
 <style id="sa4-index-builder-css">
 .index-builder-card{overflow-anchor:none;overflow:visible;width:calc(100vw - 32px);max-width:none;margin-left:50%;transform:translateX(-50%);box-sizing:border-box}
 .index-builder-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}
@@ -57,7 +57,26 @@
 <div class="shell" id="app"><header class="topbar"><div class="brand"><img src="/NyXia.png" alt="NyXia"><div><strong>NyXia · Super Admin 4</strong><span>Création de Portails NyXia</span></div></div><div class="super-switch"><a href="/">Super 1 · Gestion</a><a href="/superadmin4/" class="active">Super 4 · Portails</a>
       <a href="/personnages/" class="labo" style="border-color:rgba(167,139,250,.45);color:#ddd6fe">✨ Personnages Premium</a><button class="logout" id="logoutBtn">Déconnexion</button></div></header><main>
 <div class="hero"><div><h1>🪞 Création de Portail</h1><p>Même coque, même KV, même D1. Les personnages sont librement sélectionnables selon le portail.</p></div><div class="pill">🔒 Univers NyXia</div></div>
-<section class="card"><h2>Mes portails</h2><div class="projectbar"><select id="projectSelect"><option value="">— Nouveau portail —</option></select><button class="btn secondary" id="openProjectBtn">Ouvrir</button><button class="btn primary" id="saveProjectBtn">Sauvegarder</button><button class="btn secondary" id="newProjectBtn">Nouveau</button><button class="btn danger" id="deleteProjectBtn" disabled>🗑 Supprimer</button><button class="btn primary" id="compileBtn">Créer le ZIP</button></div><div class="status" id="compileStatus">Prêt.</div></section>
+<section class="card project-card">
+  <h2>💾 Mes portails sauvegardés</h2>
+  <div class="projectbar">
+    <div class="field project-select-wrap">
+      <label>Projet sauvegardé</label>
+      <select id="projectSelect"><option value="">— Aucun projet ouvert —</option></select>
+    </div>
+    <button class="btn secondary" id="openProjectBtn" type="button">✏️ Ouvrir / Modifier</button>
+    <button class="btn primary" id="saveProjectBtn" type="button">💾 Sauvegarder le portail</button>
+    <button class="btn secondary" id="newProjectBtn" type="button">＋ Nouveau</button>
+    <button class="btn secondary" id="duplicateProjectBtn" type="button">⧉ Dupliquer</button>
+    <button class="btn danger" id="deleteProjectBtn" type="button" disabled>🗑 Supprimer</button>
+    <button class="btn primary" id="compileBtn" type="button">Créer le ZIP</button>
+  </div>
+  <div class="project-state-row" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:10px">
+    <span class="status" id="projectSaveState">Prêt.</span>
+    <span class="status" id="projectInfo"></span>
+    <span class="status" id="compileStatus">Prêt.</span>
+  </div>
+</section>
 <section class="card"><h2>🔗 Connexions écosystème</h2><div class="note ok"><strong>Aucune fonction retirée.</strong> Cette section vérifie seulement les branchements du portail vers la liste centrale, les dégustations et les personnages partagés.</div><div class="grid"><div class="field"><label>Portail central / Dégustation</label><div class="status" id="portalRegistryStatus">Vérification…</div></div><div class="field"><label>Personnages partagés</label><div class="status" id="charactersConnectionStatus">Vérification…</div></div></div><div class="actions" style="margin-top:12px"><button class="btn secondary" type="button" id="checkConnectionsBtn">↻ Vérifier les connexions</button><button class="btn primary" type="button" id="registerPortalBtn">✓ Enregistrer ce portail pour Dégustation</button></div><div class="status" id="connectionStatus" style="margin-top:10px"></div></section>
 <section class="card"><h2>Identité</h2><div class="grid"><div class="field"><label>Nom complet</label><input id="title"></div><div class="field"><label>Nom court</label><input id="short"></div><div class="field"><label>ID portail</label><input id="portalId"></div><div class="field"><label>Worker</label><input id="workerName"></div><div class="field"><label>Sous-domaine</label><input id="host" placeholder="monportail.nyxia.top"></div><div class="field"><label>Mission</label><textarea id="mission"></textarea></div><div class="field"><label>Image Login (URL)</label><input id="loginImage" placeholder="https://..."></div></div></section>
 <section class="card"><h2>Personnages</h2>
@@ -120,6 +139,7 @@
 </div>
 
 </section>
+<section class="card"><h2>Outils spécialisés</h2><div id="tools"></div><button class="btn secondary" id="addToolBtn">+ Ajouter un outil HTML</button></section>
 <section class="card index-builder-card">
   <div class="index-builder-head">
     <div>
@@ -162,6 +182,4 @@
     </aside>
   </div>
 </section>
-<section class="card"><h2>Outils spécialisés</h2><div id="tools"></div><button class="btn secondary" id="addToolBtn">+ Ajouter un outil HTML</button></section>
-
 </main></div></body></html>
