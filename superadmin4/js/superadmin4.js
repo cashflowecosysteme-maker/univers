@@ -431,7 +431,7 @@ function fillIndex(s,p){
  const hero='<section class="hero" id="nx-hero">'+(i.heroEyebrow?'<span class="hero-eyebrow">'+i.heroEyebrow+'</span>':'')+'<h1>'+(i.heroTitle||title)+'</h1>'+(i.heroSubtitle?'<h2>'+i.heroSubtitle+'</h2>':'')+(i.heroNote?'<p class="hero-note">'+i.heroNote+'</p>':'')+(i.heroText||p.mission?'<div class="hero-lead">'+(i.heroText||p.mission||'')+'</div>':'')+(i.heroCtaLabel?'<div class="hero-cta">'+btnHtml(i.heroCtaLabel,i.heroCtaUrl||'/login.html',i.heroButtonStyle||'gold')+'</div>':'')+mediaBlock(i.heroMedia,true)+'</section>'
  const problem='<section class="section-wrap" id="nx-problem">'+sectionHead(i.s2Kicker,i.s2Title)+(i.s2?'<div class="text-block">'+i.s2+'</div>':'')+mediaBlock(i.s2Media,true)+mediaBlock(i.s3Media,false)+'</section>'
  const journeyItems=safeJsonArray(i.journeyItems).map(x=>'<div class="parcours-item"><h4>'+esc(x.title||'')+'</h4><p>'+String(x.text||'')+'</p></div>').join('')
- const journey='<section class="section-wrap" id="nx-journey">'+sectionHead(i.s45Kicker||'Ton parcours',i.s45Title)+(i.s45?'<div class="text-block">'+i.s45+'</div>':'')+mediaBlock(i.s45Media,true)+(journeyItems?'<div class="parcours-list">'+journeyItems+'</div>':'')+'</section>'
+ const journey='<section class="section-wrap" id="nx-journey">'+sectionHead(i.s45Kicker,i.s45Title)+(i.s45?'<div class="text-block">'+i.s45+'</div>':'')+mediaBlock(i.s45Media,true)+(journeyItems?'<div class="parcours-list">'+journeyItems+'</div>':'')+'</section>'
  const simpleSection=(id,kicker,titleKey,textKey,mediaKey)=>'<section class="section-wrap" id="nx-'+id+'">'+sectionHead(i[kicker],i[titleKey])+(i[textKey]?'<div class="text-block">'+i[textKey]+'</div>':'')+mediaBlock(i[mediaKey],true)+'</section>'
  const content=simpleSection('content','s67Kicker','s67Title','s67','s67Media')
  const formation=simpleSection('formation','s89Kicker','s89Title','s89','s89Media')
@@ -439,7 +439,7 @@ function fillIndex(s,p){
  const atelier=simpleSection('atelier','s1213Kicker','s1213Title','s1213','s1213Media')
  const results=simpleSection('results','s1415Kicker','s1415Title','s1415','s1415Media')
  const proofItems=safeJsonArray(i.proofItems).map(x=>'<div class="auteur-card">'+(x.image?'<div class="auteur-cover"><img src="'+esc(x.image)+'" alt="'+esc(x.name||'Témoignage')+'"></div>':'')+(x.name?'<h4>'+esc(x.name)+'</h4>':'')+(x.sub?'<h5>'+esc(x.sub)+'</h5>':'')+(x.text?'<p>'+String(x.text)+'</p>':'')+'</div>').join('')
- const proof='<section class="section-wrap" id="nx-proof">'+sectionHead(i.socialKicker||'Preuve sociale',i.socialTitle||'Ce qu’ils en disent')+(i.socialProof?'<div class="text-block">'+i.socialProof+'</div>':'')+mediaBlock(i.socialProofMedia,true)+(proofItems?'<div class="auteurs-grid">'+proofItems+'</div>':'')+'</section>'
+ const proof='<section class="section-wrap" id="nx-proof">'+sectionHead(i.socialKicker,i.socialTitle)+(i.socialProof?'<div class="text-block">'+i.socialProof+'</div>':'')+mediaBlock(i.socialProofMedia,true)+(proofItems?'<div class="auteurs-grid">'+proofItems+'</div>':'')+'</section>'
  const tools=simpleSection('tools','toolsKicker','toolsTitle','toolsText','toolsMedia')
  const transform=simpleSection('transform','transKicker','transTitle','transformText','transformMedia')
  const faqItems=safeJsonArray(i.faq).map(x=>'<details class="faq-item"><summary>'+esc(x.q||'')+'</summary><div class="faq-content"><p>'+String(x.a||'')+'</p></div></details>').join('')
