@@ -1,0 +1,94 @@
+:root {
+  color-scheme: dark;
+  --nyx-scroll-track: rgba(7, 12, 32, 0.92);
+  --nyx-scroll-track-2: rgba(16, 24, 58, 0.96);
+  --nyx-scroll-thumb-1: #7b5cff;
+  --nyx-scroll-thumb-2: #a78bfa;
+  --nyx-scroll-accent: rgba(244, 196, 66, 0.28);
+  --nyx-scroll-glow: rgba(123, 92, 255, 0.35);
+}
+
+html, body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nyx-scroll-thumb-1) var(--nyx-scroll-track);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nyx-scroll-thumb-1) var(--nyx-scroll-track);
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: linear-gradient(180deg, var(--nyx-scroll-track), var(--nyx-scroll-track-2));
+  border-radius: 999px;
+  border: 1px solid rgba(123, 92, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--nyx-scroll-thumb-2), var(--nyx-scroll-thumb-1));
+  border-radius: 999px;
+  border: 2px solid rgba(7, 12, 32, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.03),
+    0 0 18px var(--nyx-scroll-glow),
+    inset 0 0 10px rgba(255,255,255,0.12);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #c2a9ff, #8f73ff);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.05),
+    0 0 20px rgba(167, 139, 250, 0.5),
+    0 0 0 1px var(--nyx-scroll-accent),
+    inset 0 0 10px rgba(255,255,255,0.18);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #d7c1ff, #7b5cff);
+}
+
+*::-webkit-scrollbar-corner {
+  background: rgba(7, 12, 32, 0.92);
+}
+
+/* Cibles les zones les plus visibles de Personnages Premium */
+.list,
+#panel,
+.tabs,
+.sticky-list,
+.two-pane,
+.card,
+textarea,
+select,
+input,
+main,
+aside,
+body {
+  scrollbar-gutter: stable;
+}
+
+.list::-webkit-scrollbar,
+#panel::-webkit-scrollbar,
+.tabs::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.list::-webkit-scrollbar-thumb,
+#panel::-webkit-scrollbar-thumb,
+.tabs::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #b69bff, #7b5cff 55%, #5b43d6);
+}
+
+.list::-webkit-scrollbar-track,
+#panel::-webkit-scrollbar-track,
+.tabs::-webkit-scrollbar-track {
+  background: linear-gradient(180deg, rgba(9, 15, 39, 0.96), rgba(20, 28, 66, 0.96));
+  border: 1px solid rgba(167, 139, 250, 0.18);
+}
