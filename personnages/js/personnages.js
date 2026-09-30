@@ -7,7 +7,7 @@ const TABS=[['identite','Identité'],['mission','Mission & prompt'],['personnali
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function slug(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)}
 async function api(path,opt={}){const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(opt.headers||{})},...opt});const d=await r.json().catch(()=>({}));if(r.status===401){location.href='/';throw Error('Session expirée.')}if(!r.ok)throw Error(d.error||d.message||('Erreur '+r.status));return d}
-function blank(){return{schemaVersion:3,code:'',name:'',visibleRole:'',shortDescription:'',biography:'',mission:'',systemPrompt:'',personality:'',values:'',tone:'',languageStyle:'',favoriteExpressions:'',avoidExpressions:'',expertise:'',skills:'',methods:'',teachingStyle:'',ethics:'',limits:'',canDo:'',cannotDo:'',welcomeMessage:'',suggestions:[],image:'',welcomeVideo:'',voiceName:'',voiceId:'',voiceNotes:'',modelPrimary:'',modelFallback:'',primaryPortal:'',portalAssignments:[],formationRefs:[],vectorNamespace:'',resources:[],allowedMedia:[...MEDIA],tools:[...TOOLS],internalNotes:'',tags:[],active:true}}
+function blank(){return{schemaVersion:4,code:'',name:'',visibleRole:'',shortDescription:'',biography:'',mission:'',systemPrompt:'',personality:'',values:'',tone:'',languageStyle:'',favoriteExpressions:'',avoidExpressions:'',expertise:'',skills:'',methods:'',teachingStyle:'',ethics:'',limits:'',canDo:'',cannotDo:'',welcomeMessage:'',suggestions:[],image:'',welcomeVideo:'',voiceName:'',voiceId:'',voiceNotes:'',modelPrimary:'',modelFallback:'',primaryPortal:'',portalAssignments:[],formationRefs:[],vectorNamespace:'',resources:[],allowedMedia:[...MEDIA],tools:[...TOOLS],internalNotes:'',tags:[],active:true}}
 function normalize(p={}){const b=blank();return{...b,...p,code:slug(p.code||p.id||p.name),name:p.name||p.nom||'',visibleRole:p.visibleRole||p.sub||'',mission:p.mission||p.prompt||'',systemPrompt:p.systemPrompt||'',welcomeMessage:p.welcomeMessage||p.greeting||'',primaryPortal:p.primaryPortal||p.portail||'',suggestions:Array.isArray(p.suggestions)?p.suggestions:[],tags:Array.isArray(p.tags)?p.tags:[],resources:Array.isArray(p.resources)?p.resources:[],allowedMedia:Array.isArray(p.allowedMedia)&&p.allowedMedia.length?p.allowedMedia:[...MEDIA],tools:Array.isArray(p.tools)?p.tools:[...TOOLS],portalAssignments:Array.isArray(p.portalAssignments)?p.portalAssignments:[]}}
 function status(t,k=''){const e=$('status');e.textContent=t;e.className='status '+k}
 async function auth(){try{const d=await api('/api/check-auth',{method:'POST',body:'{}'});if(!d.valid){location.href='/';return false}return true}catch(_){location.href='/';return false}}
@@ -19,14 +19,101 @@ async function refreshRelated(){if(!current){history=[];formations=[];brain=null
 function newCharacter(){collect();current='';form=blank();history=[];formations=[];brain=null;activeFormation=null;fillSelect();renderCharacterList();renderAll();status('Nouvelle fiche.')}
 function tabs(){const h=$('tabs');h.innerHTML=TABS.map(([k,l])=>`<button data-tab="${k}" class="${tab===k?'active':''}">${l}</button>`).join('');qsa('[data-tab]').forEach(b=>b.onclick=()=>{collect();tab=b.dataset.tab;tabs();renderPanel()})}
 function inp(k,label,type='input',hint=''){const v=form[k]??'';return `<div class="${type==='textarea'?'full large':''}"><label>${esc(label)}</label>${type==='textarea'?`<textarea id="f-${k}">${esc(v)}</textarea>`:`<input id="f-${k}" value="${esc(v)}">`}${hint?`<div class="hint">${esc(hint)}</div>`:''}</div>`}
-function collect(){qsa('[id^="f-"]').forEach(el=>form[el.id.slice(2)]=el.value);if($('suggestions'))form.suggestions=$('suggestions').value.split('\n').map(x=>x.trim()).filter(Boolean);if($('tags'))form.tags=$('tags').value.split(',').map(x=>x.trim()).filter(Boolean);if($('primaryPortal'))form.primaryPortal=$('primaryPortal').value.trim();if($('vectorNamespace'))form.vectorNamespace=$('vectorNamespace').value.trim();if($('activeToggle'))form.active=$('activeToggle').checked;form.allowedMedia=qsa('[data-media]:checked').map(x=>x.dataset.media);form.tools=qsa('[data-tool]:checked').map(x=>x.dataset.tool)}
+function collect(){qsa('[id^="f-"]').forEach(el=>form[el.id.slice(2)]=el.value);collectSuggestions();if($('tags'))form.tags=$('tags').value.split(',').map(x=>x.trim()).filter(Boolean);if($('primaryPortal'))form.primaryPortal=$('primaryPortal').value.trim();if($('vectorNamespace'))form.vectorNamespace=$('vectorNamespace').value.trim();if($('activeToggle'))form.active=$('activeToggle').checked;form.allowedMedia=qsa('[data-media]:checked').map(x=>x.dataset.media);form.tools=qsa('[data-tool]:checked').map(x=>x.dataset.tool)}
 function renderAll(){tabs();renderPanel();renderCharacterList();fillSelect();if($('characterSelect'))$('characterSelect').value=current||''}
 function renderPanel(){const h=$('panel');if(!h)return;if(tab==='identite')h.innerHTML=`<div class="card"><h2>Identité complète</h2><div class="section-note">Cette fiche définit qui est le personnage, indépendamment des portails et des formations qu’il enseigne.</div><div class="grid">${inp('name','Nom affiché')}${inp('code','Code agent / cerveau','input','Stable : ex. keven, lena, celeste.')}${inp('visibleRole','Rôle visible / sous-titre')}${inp('shortDescription','Description courte','textarea')}${inp('biography','Biographie / histoire du personnage','textarea')}<div class="full"><label>Actif</label><label class="chip"><input id="activeToggle" type="checkbox" ${form.active!==false?'checked':''}> Personnage actif</label></div></div></div>`;
 else if(tab==='mission')h.innerHTML=`<div class="card"><h2>Mission & intelligence</h2><div class="grid">${inp('mission','Mission / raison d’exister','textarea')}${inp('systemPrompt','Prompt système complet','textarea','Règles permanentes du personnage. Peut être très détaillé.')}</div></div>`;
 else if(tab==='personnalite')h.innerHTML=`<div class="card"><h2>Personnalité & langage</h2><div class="grid">${inp('personality','Personnalité','textarea')}${inp('values','Valeurs','textarea')}${inp('tone','Ton','textarea')}${inp('languageStyle','Style de langage','textarea')}${inp('favoriteExpressions','Expressions favorites','textarea')}${inp('avoidExpressions','Expressions / formulations à éviter','textarea')}</div></div>`;
 else if(tab==='expertise')h.innerHTML=`<div class="card"><h2>Expertise, pédagogie & limites</h2><div class="grid">${inp('expertise','Domaines d’expertise','textarea')}${inp('skills','Compétences','textarea')}${inp('methods','Méthodes / pratiques','textarea')}${inp('teachingStyle','Style pédagogique','textarea')}${inp('ethics','Cadre éthique','textarea')}${inp('limits','Limites professionnelles','textarea')}${inp('canDo','Ce qu’il peut faire','textarea')}${inp('cannotDo','Ce qu’il ne doit jamais faire','textarea')}</div></div>`;
-else if(tab==='presence')h.innerHTML=`<div class="card"><h2>Accueil & présence dans le chat</h2><div class="grid">${inp('welcomeMessage','Message d’accueil','textarea')}<div class="full"><label>Suggestions de départ — une par ligne</label><textarea id="suggestions">${esc((form.suggestions||[]).join('\n'))}</textarea></div></div></div>`;
+else if(tab==='presence')renderPresence();
 else if(tab==='voix')renderVoice();else if(tab==='formation')renderFormations();else if(tab==='cerveau')renderBrain();else if(tab==='portails')renderPortals();else if(tab==='notes')renderNotes();}
+
+const NYXIA_TRIGGER_PREFIX='@NYXIA_TRIGGER:';
+const SUGGESTION_ACTIONS=[
+  {v:'chat',label:'💬 Conversation'},
+  {v:'video',label:'🎥 Vidéo'},
+  {v:'audio',label:'🎧 MP3'},
+  {v:'pdf',label:'📄 PDF'},
+  {v:'link',label:'🔗 Lien'},
+  {v:'canva',label:'🎨 Canva'}
+];
+function decodeStoredSuggestion(raw){
+  if(raw&&typeof raw==='object')return{label:String(raw.label||raw.text||raw.title||''),action:String(raw.action||raw.type||'chat'),message:String(raw.message||raw.value||''),url:String(raw.url||''),intro:String(raw.intro||''),resourceTitle:String(raw.resourceTitle||raw.resource||'')};
+  const text=String(raw||'').trim();if(!text)return null;
+  if(text.startsWith(NYXIA_TRIGGER_PREFIX)){try{const x=JSON.parse(text.slice(NYXIA_TRIGGER_PREFIX.length));return{label:String(x.l||x.label||''),action:String(x.a||x.action||'chat'),message:String(x.m||x.message||''),url:String(x.u||x.url||''),intro:String(x.i||x.intro||''),resourceTitle:String(x.r||x.resourceTitle||'')}}catch(_){}}
+  return{label:text,action:'chat',message:text,url:'',intro:'',resourceTitle:''};
+}
+function suggestionObjects(){return(form.suggestions||[]).map(decodeStoredSuggestion).filter(Boolean)}
+function encodeSuggestion(x){
+  const action=String(x.action||'chat').toLowerCase();
+  const label=String(x.label||'').trim();
+  if(!label)return'';
+  if(action==='chat'&&String(x.message||'').trim()===label&&!x.url&&!x.intro&&!x.resourceTitle)return label;
+  const data={l:label,a:action};
+  if(String(x.message||'').trim())data.m=String(x.message).trim();
+  if(String(x.url||'').trim())data.u=String(x.url).trim();
+  if(String(x.intro||'').trim())data.i=String(x.intro).trim();
+  if(String(x.resourceTitle||'').trim())data.r=String(x.resourceTitle).trim();
+  return NYXIA_TRIGGER_PREFIX+JSON.stringify(data);
+}
+function compatibleResources(action){
+  const map={video:['VIDEO'],audio:['AUDIO'],pdf:['PDF'],link:['LINK'],canva:['CANVA']};
+  const wanted=map[action]||[];
+  return(form.resources||[]).filter(r=>r&&wanted.includes(String(r.type||'').toUpperCase())&&r.title);
+}
+function collectSuggestions(){
+  const rows=qsa('[data-suggestion-row]');
+  if(!rows.length)return;
+  form.suggestions=rows.map(row=>{
+    const action=row.querySelector('[data-s="action"]')?.value||'chat';
+    const res=row.querySelector('[data-s="resource"]')?.value||'';
+    const resObj=(form.resources||[]).find(r=>String(r.title||'')===res);
+    return encodeSuggestion({
+      label:row.querySelector('[data-s="label"]')?.value||'',
+      action,
+      message:row.querySelector('[data-s="message"]')?.value||'',
+      url:(resObj&&resObj.url)||row.querySelector('[data-s="url"]')?.value||'',
+      intro:row.querySelector('[data-s="intro"]')?.value||'',
+      resourceTitle:res
+    });
+  }).filter(Boolean).slice(0,30);
+}
+function renderPresence(){
+  const h=$('panel');
+  h.innerHTML=`<div class="card"><h2>Accueil & présence dans le chat</h2><div class="grid">${inp('welcomeMessage','Message d’accueil','textarea')}<div class="full"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><label>Suggestions de départ</label><div class="hint">Chaque bouton peut lancer une conversation ou remettre directement une vidéo, un MP3, un PDF, un lien ou une présentation Canva.</div></div><button class="btn" id="addSuggestion" type="button">＋ Ajouter un déclencheur</button></div><div id="suggestionRows" style="margin-top:12px"></div></div></div></div>`;
+  renderSuggestionRows();
+  $('addSuggestion').onclick=()=>{collectSuggestions();form.suggestions=form.suggestions||[];form.suggestions.push(encodeSuggestion({label:'Nouveau bouton',action:'chat',message:'Nouveau bouton'}));renderSuggestionRows()};
+}
+function suggestionRowHtml(x,i){
+  const action=String(x.action||'chat').toLowerCase();
+  const resources=compatibleResources(action);
+  const resourceOptions=['<option value="">— URL / message manuel —</option>'].concat(resources.map(r=>`<option value="${esc(r.title)}" ${String(x.resourceTitle||'')===String(r.title)?'selected':''}>${esc(r.title)}</option>`)).join('');
+  const isChat=action==='chat';
+  const urlLabel=action==='video'?'URL vidéo':action==='audio'?'URL MP3':action==='pdf'?'URL PDF':action==='canva'?'URL Canva':'URL du lien';
+  return `<div class="resource-row" data-suggestion-row data-si="${i}" style="margin-bottom:12px">
+    <div><label>Texte du bouton</label><input data-s="label" value="${esc(x.label||'')}" placeholder="Ex. 🎥 Voir la démonstration"></div>
+    <div><label>Déclencheur</label><select data-s="action">${SUGGESTION_ACTIONS.map(o=>`<option value="${o.v}" ${action===o.v?'selected':''}>${esc(o.label)}</option>`).join('')}</select></div>
+    ${isChat?`<div class="resource-usage"><label>Message envoyé au personnage</label><textarea data-s="message" placeholder="Ex. Commence mon initiation au pendule.">${esc(x.message||x.label||'')}</textarea><input data-s="url" type="hidden" value=""><input data-s="intro" type="hidden" value=""><input data-s="resource" type="hidden" value=""></div>`:`<div><label>Ressource enregistrée (optionnel)</label><select data-s="resource">${resourceOptions}</select><div class="hint">Choisis une ressource de « Voix & médias », ou laisse vide pour coller une URL.</div></div><div><label>${esc(urlLabel)}</label><input data-s="url" value="${esc(x.url||'')}" placeholder="https://..."></div><div class="resource-usage"><label>Phrase d’accompagnement (optionnelle)</label><textarea data-s="intro" placeholder="Ex. Je te laisse ton cahier juste ici ✨">${esc(x.intro||'')}</textarea><input data-s="message" type="hidden" value=""></div>`}
+    <div class="resource-remove"><div class="actions-row" style="margin:0;flex-wrap:nowrap"><button class="btn small" data-sug-up="${i}" type="button">↑</button><button class="btn small" data-sug-down="${i}" type="button">↓</button><button class="btn danger small" data-del-suggestion="${i}" type="button">Retirer</button></div></div>
+  </div>`;
+}
+function renderSuggestionRows(){
+  const host=$('suggestionRows');if(!host)return;
+  const list=suggestionObjects();
+  host.innerHTML=list.length?list.map(suggestionRowHtml).join(''):'<div class="empty">Aucun déclencheur de départ. Ajoute le premier bouton.</div>';
+  qsa('[data-s="action"]').forEach(s=>s.onchange=()=>{collectSuggestions();renderSuggestionRows()});
+  qsa('[data-s="resource"]').forEach(s=>s.onchange=()=>{
+    const row=s.closest('[data-suggestion-row]'),title=s.value,res=(form.resources||[]).find(r=>String(r.title||'')===String(title));
+    if(res&&row){const u=row.querySelector('[data-s="url"]');if(u)u.value=res.url||''}
+  });
+  qsa('[data-del-suggestion]').forEach(b=>b.onclick=()=>{collectSuggestions();const a=suggestionObjects();a.splice(Number(b.dataset.delSuggestion),1);form.suggestions=a.map(encodeSuggestion);renderSuggestionRows()});
+  qsa('[data-sug-up]').forEach(b=>b.onclick=()=>moveSuggestion(Number(b.dataset.sugUp),-1));
+  qsa('[data-sug-down]').forEach(b=>b.onclick=()=>moveSuggestion(Number(b.dataset.sugDown),1));
+}
+function moveSuggestion(i,dir){
+  collectSuggestions();const a=suggestionObjects(),j=i+dir;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];form.suggestions=a.map(encodeSuggestion);renderSuggestionRows();
+}
+
 function renderVoice(){const h=$('panel');h.innerHTML=`<div class="card"><h2>Voix, modèle IA & ressources</h2><div class="section-note">Tu configures ici ce que le personnage peut remettre dans le chat. Aucun marqueur technique à écrire.</div><div class="grid">${inp('image','Image / avatar URL')}${inp('welcomeVideo','Vidéo d’accueil URL')}${inp('voiceName','Nom lisible de la voix')}${inp('voiceId','Voice ID ElevenLabs')}${inp('voiceNotes','Notes de voix','textarea')}<div><label>Modèle IA principal</label><input id="f-modelPrimary" list="ai-model-presets" value="${esc(form.modelPrimary||'')}" placeholder="Vide = modèle par défaut du portail"><div class="hint">Tu peux coller n’importe quel ID de modèle OpenRouter.</div></div><div><label>Modèle IA de secours</label><input id="f-modelFallback" list="ai-model-presets" value="${esc(form.modelFallback||'')}" placeholder="Vide = secours par défaut"><div class="hint">Utilisé seulement si le modèle principal ne répond pas.</div></div><datalist id="ai-model-presets"><option value="deepseek/deepseek-v3.2"><option value="mistralai/mistral-small-3.2-24b-instruct"></datalist><div class="full preview">${form.image?`<img class="avatar" src="${esc(form.image)}" alt="${esc(form.name)}">`:''}<div><button class="btn" id="testVoice">🔊 Tester la voix</button><div class="hint">Teste directement le Voice ID de cette fiche.</div></div></div><div class="full"><label>Capacités média autorisées</label><div class="chips">${MEDIA.map(m=>`<label class="chip"><input data-media="${m}" type="checkbox" ${(form.allowedMedia||[]).includes(m)?'checked':''}> ${m}</label>`).join('')}</div></div><div class="full"><h3>🎁 Ressources & objets que le personnage peut remettre</h3><div class="hint" style="margin-bottom:10px">Vidéo YouTube / Google Drive, MP3, PDF, image, lien, Canva ou création d’image IA.</div><div id="resources" class="resources-table"></div><div class="actions-row"><button id="addVideo" class="btn small" type="button">＋ 🎥 Vidéo</button><button id="addAudio" class="btn small" type="button">＋ 🎧 MP3</button><button id="addPdf" class="btn small" type="button">＋ 📄 PDF</button><button id="addImage" class="btn small" type="button">＋ 🖼 Image</button><button id="addLink" class="btn small" type="button">＋ 🔗 Lien</button><button id="addCanva" class="btn small" type="button">＋ 🎨 Canva</button><button id="addImageGen" class="btn small" type="button">＋ ✨ Image IA</button></div></div></div></div>`;renderResources();const add=(type)=>{collectResources();form.resources.push({type,title:'',url:'',buttonLabel:'',usage:'',autoShare:true,prompt:''});renderVoice()};$('addVideo').onclick=()=>add('VIDEO');$('addAudio').onclick=()=>add('AUDIO');$('addPdf').onclick=()=>add('PDF');$('addImage').onclick=()=>add('IMAGE');$('addLink').onclick=()=>add('LINK');$('addCanva').onclick=()=>add('CANVA');$('addImageGen').onclick=()=>add('IMAGE_GENERATE');$('testVoice').onclick=testVoice}
 function collectResources(){const rows=qsa('[data-resource]');if(!rows.length)return;form.resources=rows.map(r=>({type:r.querySelector('[data-r="type"]').value,title:r.querySelector('[data-r="title"]').value,url:(r.querySelector('[data-r="url"]')?.value||''),buttonLabel:r.querySelector('[data-r="buttonLabel"]').value,usage:r.querySelector('[data-r="usage"]').value,autoShare:!!r.querySelector('[data-r="autoShare"]').checked,prompt:(r.querySelector('[data-r="prompt"]')?.value||'')})).filter(x=>x.title||x.url||x.prompt)}
 function renderResources(){const h=$('resources');if(!h)return;const r=form.resources||[];h.innerHTML=r.length?r.map((x,i)=>`<div class="resource-row" data-resource><div><label>Type</label><select data-r="type">${['PDF','AUDIO','VIDEO','IMAGE','LINK','CANVA','IMAGE_GENERATE'].map(t=>`<option ${x.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div><label>Titre</label><input data-r="title" value="${esc(x.title||'')}" placeholder="Ex. Consultation chamanique de groupe"></div><div><label>${x.type==='IMAGE_GENERATE'?'Description image IA':'URL HTTPS'}</label>${x.type==='IMAGE_GENERATE'?`<input data-r="prompt" value="${esc(x.prompt||x.url||'')}" placeholder="Ex. Illustration symbolique du voyage intérieur"><input data-r="url" type="hidden" value="">`:`<input data-r="url" value="${esc(x.url||'')}" placeholder="https://..."><input data-r="prompt" type="hidden" value="${esc(x.prompt||'')}">`}</div><div><label>Texte du bouton</label><input data-r="buttonLabel" value="${esc(x.buttonLabel||'')}" placeholder="Ex. 🎥 Voir la consultation"></div><div class="resource-usage"><label>Quand l’utiliser</label><textarea data-r="usage" placeholder="Ex. Quand la personne demande comment se déroule une séance à distance.">${esc(x.usage||'')}</textarea></div><div class="resource-auto"><label class="chip"><input data-r="autoShare" type="checkbox" ${x.autoShare!==false?'checked':''}> Peut la proposer spontanément</label></div><div class="resource-remove"><button class="btn danger small" data-del-resource="${i}" type="button">Retirer</button></div></div>`).join(''):'<div class="empty">Aucune ressource enregistrée.</div>';qsa('[data-del-resource]').forEach(b=>b.onclick=()=>{collectResources();form.resources.splice(Number(b.dataset.delResource),1);renderVoice()})}
