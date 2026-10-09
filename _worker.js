@@ -1098,11 +1098,16 @@ async function dgNormalizeCampaign(env, body, existing) {
   const portalIds = Array.isArray(body.portalIds) ? body.portalIds.map(dgId).filter((id) => validIds.has(id)) : [];
   const name = dgText(body.name, 180);
   const durationHours = Math.max(1, Math.round(dgNumber(body.durationHours, 72) || 72));
-  const startMode = body.startMode === 'activation' ? 'activation' : 'first_login';
+  const fixedEndRaw = dgText(body.fixedEndAt, 60);
+  const fixedEndAt = fixedEndRaw && Number.isFinite(Date.parse(fixedEndRaw)) ? new Date(fixedEndRaw).toISOString() : '';
+  if (fixedEndRaw && !fixedEndAt) throw new Error('La date de fin commune est invalide.');
+  // Fin commune : l’accès commence à l’activation, et non à la première connexion.
+  const startMode = fixedEndAt ? 'activation' : (body.startMode === 'activation' ? 'activation' : 'first_login');
   const status = ['draft','active','ended'].includes(body.status) ? body.status : 'draft';
   const availableFrom = body.availableFrom && Number.isFinite(Date.parse(body.availableFrom)) ? new Date(body.availableFrom).toISOString() : '';
   const availableUntil = body.availableUntil && Number.isFinite(Date.parse(body.availableUntil)) ? new Date(body.availableUntil).toISOString() : '';
   if (availableFrom && availableUntil && Date.parse(availableUntil) < Date.parse(availableFrom)) throw new Error('La fin de disponibilité doit être après le début.');
+  if (fixedEndAt && availableFrom && Date.parse(fixedEndAt) <= Date.parse(availableFrom)) throw new Error('La fin commune doit être après le début des activations.');
   const registrationRaw = dgText(body.registrationUrl, 2000); const registrationUrl = registrationRaw ? dgUrl(registrationRaw) : '';
   if (registrationRaw && !registrationUrl) throw new Error('Le lien d’inscription Systeme.io est invalide.');
   const checkoutRaw = dgText(body.checkoutUrl, 2000); const checkoutUrl = checkoutRaw ? dgUrl(checkoutRaw) : '';
@@ -1119,7 +1124,7 @@ async function dgNormalizeCampaign(env, body, existing) {
   }).filter((x) => x.label || x.price != null || x.url);
   return {
     id: dgId(body.id) || (existing && existing.id) || crypto.randomUUID(),
-    name, status, portalIds, durationHours, startMode,
+    name, status, portalIds, durationHours, startMode, fixedEndAt,
     availableFrom, availableUntil,
     price: dgNumber(body.price, null), currency: ['CAD','EUR','USD'].includes(body.currency) ? body.currency : 'CAD',
     registrationUrl, checkoutUrl, afterExpiry: { type: afterType, url: afterUrl }, continuation,
@@ -1132,6 +1137,7 @@ function dgCampaignObtainable(c) {
   const now = Date.now();
   if (c.availableFrom && Date.parse(c.availableFrom) > now) return false;
   if (c.availableUntil && Date.parse(c.availableUntil) < now) return false;
+  if (c.fixedEndAt && Date.parse(c.fixedEndAt) <= now) return false;
   return true;
 }
 
@@ -1139,14 +1145,15 @@ async function dgCreateOrReuseActivation(env, campaign, email, source, forceAdmi
   email = dgEmail(email);
   if (!email) throw new Error('Courriel requis.');
   if (!forceAdmin && !dgCampaignObtainable(campaign)) throw new Error('Cette dégustation n’est pas disponible actuellement.');
+  if (campaign.fixedEndAt && Date.parse(campaign.fixedEndAt) <= Date.now()) throw new Error('La dégustation est terminée.');
   const aKey = dgActivationKey(email, campaign.id);
   const oldRaw = await env.CASHFLOW_KV.get(aKey);
   if (oldRaw) {
     try { const old = JSON.parse(oldRaw); if (old && old.campaignId) return old; } catch (_) {}
   }
-  const pending = campaign.startMode === 'first_login';
+  const pending = !campaign.fixedEndAt && campaign.startMode === 'first_login';
   const startedAt = pending ? '' : dgNow();
-  const expiresAt = pending ? '' : new Date(Date.parse(startedAt) + Number(campaign.durationHours) * 3600000).toISOString();
+  const expiresAt = pending ? '' : (campaign.fixedEndAt || new Date(Date.parse(startedAt) + Number(campaign.durationHours) * 3600000).toISOString());
   const activation = { email, campaignId: campaign.id, campaignName: campaign.name, source: source || 'manual', pending, startedAt, expiresAt, createdAt: dgNow() };
   await env.CASHFLOW_KV.put(aKey, JSON.stringify(activation));
   for (const portalId of campaign.portalIds || []) {
@@ -1171,7 +1178,7 @@ async function dgStartPendingCampaign(env, email, campaignId) {
   if (!activation) return null;
   if (!activation.pending && activation.startedAt) return activation;
   const startedAt = dgNow();
-  const expiresAt = new Date(Date.parse(startedAt) + Number(campaign.durationHours || 72) * 3600000).toISOString();
+  const expiresAt = campaign.fixedEndAt || new Date(Date.parse(startedAt) + Number(campaign.durationHours || 72) * 3600000).toISOString();
   activation.pending = false; activation.startedAt = startedAt; activation.expiresAt = expiresAt; activation.updatedAt = dgNow();
   await env.CASHFLOW_KV.put(aKey, JSON.stringify(activation));
   // Même compteur pour TOUS les portails de cette campagne.
@@ -1228,9 +1235,11 @@ async function dgCheckAccess(env, email, portalId) {
     await dgStartPendingCampaign(env, email, pending.campaignId);
     grants = await dgGrantsFor(env, email, portalId);
   }
-  const active = grants.find((g) => g.expiresAt && Date.parse(g.expiresAt) > Date.now());
+  const campaignsForExpiry = await dgReadCampaigns(env);
+  const grantEffectiveExpiry = (g) => { const c = campaignsForExpiry.find(x => x.id === g.campaignId); return c && c.fixedEndAt ? Math.min(Date.parse(g.expiresAt || c.fixedEndAt), Date.parse(c.fixedEndAt)) : Date.parse(g.expiresAt || ''); };
+  const active = grants.find((g) => g.expiresAt && grantEffectiveExpiry(g) > Date.now());
   if (active) return { allowed:true, accessType:'temporary', campaignId:active.campaignId, campaignName:active.campaignName, startedAt:active.startedAt, expiresAt:active.expiresAt };
-  const expired = grants.find((g) => g.expiresAt && Date.parse(g.expiresAt) <= Date.now());
+  const expired = grants.find((g) => g.expiresAt && grantEffectiveExpiry(g) <= Date.now());
   if (expired) {
     const campaigns = await dgReadCampaigns(env); const c = campaigns.find((x)=>x.id===expired.campaignId) || {};
     return { allowed:false, reason:'expired', campaignId:expired.campaignId, campaignName:expired.campaignName, expiresAt:expired.expiresAt, afterExpiry:c.afterExpiry || null, continuation:c.continuation || [] };

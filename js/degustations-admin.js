@@ -83,6 +83,13 @@ function dgDurationPresetChanged(){
   if(wrap)wrap.style.display=preset==='custom'?'block':'none';
   if(preset!=='custom')document.getElementById('dg-duration-hours').value=preset;
 }
+function dgFixedEndChanged(){
+  var enabled=document.getElementById('dg-fixed-end-enabled').checked;
+  document.getElementById('dg-fixed-end-wrap').style.display=enabled?'block':'none';
+  var mode=document.getElementById('dg-start-mode');
+  mode.disabled=enabled;
+  if(enabled)mode.value='activation';
+}
 function dgAfterTypeChanged(){
   var t=document.getElementById('dg-after-type').value;
   var hint=document.getElementById('dg-after-url-hint');
@@ -97,6 +104,9 @@ function dgResetCampaign(){
   document.getElementById('dg-duration-hours').value='72';
   document.getElementById('dg-duration-custom-wrap').style.display='none';
   document.getElementById('dg-start-mode').value='first_login';
+  document.getElementById('dg-fixed-end-enabled').checked=false;
+  document.getElementById('dg-fixed-end').value='2026-11-01T23:59';
+  dgFixedEndChanged();
   document.getElementById('dg-available-from').value='';
   document.getElementById('dg-available-until').value='';
   document.getElementById('dg-price').value='';
@@ -128,6 +138,7 @@ function dgCampaignBody(){
     portalIds:dgChecked('dg-campaign-portal'),
     durationHours:duration,
     startMode:document.getElementById('dg-start-mode').value,
+    fixedEndAt:document.getElementById('dg-fixed-end-enabled').checked?dgIsoFromInput('dg-fixed-end'):'',
     availableFrom:dgIsoFromInput('dg-available-from'),
     availableUntil:dgIsoFromInput('dg-available-until'),
     price:document.getElementById('dg-price').value===''?null:Number(document.getElementById('dg-price').value),
@@ -164,6 +175,9 @@ function dgEditCampaign(id){
   document.getElementById('dg-duration-hours').value=h;
   document.getElementById('dg-duration-custom-wrap').style.display=preset==='custom'?'block':'none';
   document.getElementById('dg-start-mode').value=c.startMode||'first_login';
+  document.getElementById('dg-fixed-end-enabled').checked=!!c.fixedEndAt;
+  document.getElementById('dg-fixed-end').value=dgLocalDate(c.fixedEndAt)||'2026-11-01T23:59';
+  dgFixedEndChanged();
   document.getElementById('dg-available-from').value=dgLocalDate(c.availableFrom);
   document.getElementById('dg-available-until').value=dgLocalDate(c.availableUntil);
   document.getElementById('dg-price').value=c.price==null?'':c.price;
