@@ -1319,11 +1319,53 @@ async function handleDgDeleteGrant(request, env) {
   if (!(await requireAdmin(request, env))) return json({error:'Non autorisé.'},401);
   const b=await request.json().catch(()=>({}));const key=String(b.key||'');if(!key.startsWith(DG_GRANT_PREFIX))return json({error:'Clé invalide.'},400);await env.CASHFLOW_KV.delete(key);return json({success:true});
 }
+// Invitation unique Systeme.io : générée par le webhook, jamais par un formulaire courriel supplémentaire.
+async function dgInvitationHash(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function dgSendPasswordInvitation(env, email, campaign) {
+  if (!env.SYSTEME_API_KEY || !env.SYSTEME_ACTIVATION_FIELD || !env.SYSTEME_ACTIVATION_TAG_ID) {
+    throw new Error('Variables Systeme.io manquantes dans le Worker Super Admin 1.');
+  }
+  const field=String(env.SYSTEME_ACTIVATION_FIELD).trim(), tagId=Number(env.SYSTEME_ACTIVATION_TAG_ID);
+  if (!/^[\w-]+$/.test(field) || !Number.isSafeInteger(tagId) || tagId<=0) throw new Error('Configuration Systeme.io invalide.');
+  const headers={'X-API-Key':String(env.SYSTEME_API_KEY),'Accept':'application/json'};
+  const root='https://api.systeme.io/api';
+  const lookup=await fetch(root+'/contacts?email='+encodeURIComponent(email),{headers});
+  if(!lookup.ok) throw new Error('Recherche contact Systeme.io : HTTP '+lookup.status);
+  const data=await lookup.json();
+  const contacts=Array.isArray(data)?data:(data['hydra:member']||data.items||data.contacts||[]);
+  const contact=contacts.find(c=>String(c.email||'').trim().toLowerCase()===email);
+  if(!contact?.id) throw new Error('Contact introuvable dans Systeme.io.');
+  const existing=await env.CASHFLOW_KV.get('client:'+email);
+  if(existing) {
+    // Ne pas remplacer le mot de passe d'un client existant par une première activation.
+    return {existingAccount:true,invitationSent:false};
+  }
+  const tokenBytes=new Uint8Array(32);crypto.getRandomValues(tokenBytes);
+  const token=[...tokenBytes].map(x=>x.toString(16).padStart(2,'0')).join('');
+  const key='password-reset:studio-prompt:'+await dgInvitationHash(token);
+  const destination='https://portail-prompts.nyxia.top/reinitialiser-mot-de-passe.html?token='+encodeURIComponent(token);
+  await env.CASHFLOW_KV.put(key,JSON.stringify({email,studioFirstAccess:true,createdAt:new Date().toISOString()}),{expirationTtl:1200});
+  try {
+    const cId=encodeURIComponent(String(contact.id));
+    const saved=await fetch(root+'/contacts/'+cId,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:destination}]})});
+    if(!saved.ok) throw new Error('Champ activation Systeme.io : HTTP '+saved.status);
+    // Le tag d'activation doit être réservé à CE webhook, pas ajouté sur l'inscription.
+    const tagged=await fetch(root+'/contacts/'+cId+'/tags',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tagId})});
+    if(!tagged.ok) throw new Error('Tag activation Systeme.io : HTTP '+tagged.status);
+    return {existingAccount:false,invitationSent:true};
+  }catch(error) {
+    await env.CASHFLOW_KV.delete(key);
+    throw error;
+  }
+}
 async function handleDgActivate(request, env) {
   const url=new URL(request.url);const campaignId=dgId(url.searchParams.get('campaign'));const key=String(url.searchParams.get('key')||'');const campaigns=await dgReadCampaigns(env);const c=campaigns.find((x)=>x.id===campaignId);
   if(!c||!key||key!==c.webhookKey)return dgCors(json({error:'Webhook invalide.'},403));
   const b=await request.json().catch(()=>({}));const email=dgExtractEmail(b);if(!email)return dgCors(json({error:'Courriel introuvable dans le webhook.'},400));
-  try{const activation=await dgCreateOrReuseActivation(env,c,email,'systeme.io',false);return dgCors(json({success:true,activation}));}catch(e){return dgCors(json({error:e.message},400));}
+  try{const activation=await dgCreateOrReuseActivation(env,c,email,'systeme.io',false);const invitation=await dgSendPasswordInvitation(env,email,c);return dgCors(json({success:true,activation,invitation}));}catch(e){console.error('degustation webhook invitation',e);return dgCors(json({error:e.message},502));}
 }
 async function handleDgAccessCheck(request, env) {
   if (!(await dgAccessCallerAllowed(request,env))) return dgCors(json({error:'Non autorisé.'},401));
