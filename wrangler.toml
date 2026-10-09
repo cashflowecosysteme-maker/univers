@@ -22,6 +22,8 @@ database_id = "a21fd813-06fa-41f1-b744-07bf1c5c7951"
 
 [vars]
 SITE_URL = "https://univers.nyxia.top"
+SYSTEME_ACTIVATION_FIELD = "lien_activation_nyxia"
+SYSTEME_ACTIVATION_TAG_ID = "2221814"
 
 [[vectorize]]
 binding = "VECTORIZE_INDEX"
