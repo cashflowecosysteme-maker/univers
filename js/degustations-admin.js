@@ -100,8 +100,6 @@ function dgResetCampaign(){
   document.getElementById('dg-access-start').value='';
   document.getElementById('dg-access-end').value='';
   document.getElementById('dg-legacy-options').open=false;
-  document.getElementById('dg-available-from').value='';
-  document.getElementById('dg-available-until').value='';
   document.getElementById('dg-price').value='';
   document.getElementById('dg-currency').value='CAD';
   document.getElementById('dg-registration-url').value='';
@@ -133,8 +131,6 @@ function dgCampaignBody(){
     startMode:document.getElementById('dg-start-mode').value,
     fixedStartAt:dgIsoFromInput('dg-access-start'),
     fixedEndAt:dgIsoFromInput('dg-access-end'),
-    availableFrom:dgIsoFromInput('dg-available-from'),
-    availableUntil:dgIsoFromInput('dg-available-until'),
     price:document.getElementById('dg-price').value===''?null:Number(document.getElementById('dg-price').value),
     currency:document.getElementById('dg-currency').value,
     registrationUrl:document.getElementById('dg-registration-url').value.trim(),
@@ -173,8 +169,6 @@ function dgEditCampaign(id){
   document.getElementById('dg-access-start').value=dgLocalDate(c.fixedStartAt);
   document.getElementById('dg-access-end').value=dgLocalDate(c.fixedEndAt);
   document.getElementById('dg-legacy-options').open=!c.fixedStartAt;
-  document.getElementById('dg-available-from').value=dgLocalDate(c.availableFrom);
-  document.getElementById('dg-available-until').value=dgLocalDate(c.availableUntil);
   document.getElementById('dg-price').value=c.price==null?'':c.price;
   document.getElementById('dg-currency').value=c.currency||'CAD';
   document.getElementById('dg-registration-url').value=c.registrationUrl||'';

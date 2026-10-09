@@ -1109,10 +1109,12 @@ async function dgNormalizeCampaign(env, body, existing) {
   // Fin commune : l’accès commence à l’activation, et non à la première connexion.
   const startMode = fixedEndAt ? 'activation' : (body.startMode === 'activation' ? 'activation' : 'first_login');
   const status = ['draft','active','ended'].includes(body.status) ? body.status : 'draft';
-  const availableFrom = body.availableFrom && Number.isFinite(Date.parse(body.availableFrom)) ? new Date(body.availableFrom).toISOString() : '';
-  const availableUntil = body.availableUntil && Number.isFinite(Date.parse(body.availableUntil)) ? new Date(body.availableUntil).toISOString() : '';
-  if (availableFrom && availableUntil && Date.parse(availableUntil) < Date.parse(availableFrom)) throw new Error('La fin de disponibilité doit être après le début.');
-  if (fixedEndAt && availableFrom && Date.parse(fixedEndAt) <= Date.parse(availableFrom)) throw new Error('La fin commune doit être après le début des activations.');
+  // Anciennes campagnes : conserver leurs limites sans les exposer comme doublons.
+  // Campagnes à dates fixes : seules les dates de début/fin des accès font foi.
+  const legacyFrom = existing && existing.availableFrom || '';
+  const legacyUntil = existing && existing.availableUntil || '';
+  const availableFrom = fixedEndAt ? '' : legacyFrom;
+  const availableUntil = fixedEndAt ? '' : legacyUntil;
   const registrationRaw = dgText(body.registrationUrl, 2000); const registrationUrl = registrationRaw ? dgUrl(registrationRaw) : '';
   if (registrationRaw && !registrationUrl) throw new Error('Le lien d’inscription Systeme.io est invalide.');
   const checkoutRaw = dgText(body.checkoutUrl, 2000); const checkoutUrl = checkoutRaw ? dgUrl(checkoutRaw) : '';
