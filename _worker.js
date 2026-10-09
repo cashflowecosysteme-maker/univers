@@ -1340,19 +1340,27 @@ async function dgSendPasswordInvitation(env, email, campaign) {
   if(!contact?.id) throw new Error('Contact introuvable dans Systeme.io.');
   const existing=await env.CASHFLOW_KV.get('client:'+email);
   if(existing) {
-    // Ne pas remplacer le mot de passe d'un client existant par une première activation.
-    return {existingAccount:true,invitationSent:false};
+    // Un compte avec un vrai mot de passe reste intact ; ne pas le réinitialiser.
+    let account={};try{account=JSON.parse(existing)}catch(_){}
+    if(account.passwordHash||account.password) return {existingAccount:true,invitationSent:false};
+    // Une fiche incomplète ne doit pas bloquer la première création du mot de passe.
   }
   const tokenBytes=new Uint8Array(32);crypto.getRandomValues(tokenBytes);
   const token=[...tokenBytes].map(x=>x.toString(16).padStart(2,'0')).join('');
   const key='password-reset:studio-prompt:'+await dgInvitationHash(token);
-  const destination='https://portail-prompts.nyxia.top/reinitialiser-mot-de-passe.html?token='+encodeURIComponent(token);
+  const destination='https://portail-prompts.nyxia.top/premiere-connexion?token='+encodeURIComponent(token);
   await env.CASHFLOW_KV.put(key,JSON.stringify({email,studioFirstAccess:true,createdAt:new Date().toISOString()}),{expirationTtl:1200});
   try {
     const cId=encodeURIComponent(String(contact.id));
     const saved=await fetch(root+'/contacts/'+cId,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:destination}]})});
     if(!saved.ok) throw new Error('Champ activation Systeme.io : HTTP '+saved.status);
-    // Le tag d'activation doit être réservé à CE webhook, pas ajouté sur l'inscription.
+    // Réarmement ciblé : un tag déjà présent ne déclenche pas de nouvel e-mail.
+    // Il s'agit uniquement du tag dédié à la première activation NyXia.
+    const alreadyTagged=Array.isArray(contact.tags)&&contact.tags.some(t=>Number(t?.id||t)===tagId);
+    if(alreadyTagged){
+      const removed=await fetch(root+'/contacts/'+cId+'/tags/'+tagId,{method:'DELETE',headers});
+      if(!removed.ok && removed.status!==404) throw new Error('Réarmement du tag Systeme.io : HTTP '+removed.status);
+    }
     const tagged=await fetch(root+'/contacts/'+cId+'/tags',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tagId})});
     if(!tagged.ok) throw new Error('Tag activation Systeme.io : HTTP '+tagged.status);
     return {existingAccount:false,invitationSent:true};
