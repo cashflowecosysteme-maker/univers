@@ -34,11 +34,20 @@ function dgPortalName(id){
 function dgPortalChecks(containerId,selected,className){
   var box=document.getElementById(containerId);if(!box)return;
   var chosen=Array.isArray(selected)?selected:[];
-  var active=DG_STATE.portals.filter(function(p){return p.active!==false;});
+  // Un seul choix par nom dans le gestionnaire des dégustations, sans modifier
+  // ni supprimer les enregistrements KV ou les accès clients existants.
+  var allActive=DG_STATE.portals.filter(function(p){return p.active!==false;});
+  var byName={};
+  allActive.forEach(function(p){
+    var key=String(p.name||'').trim().toLocaleLowerCase('fr');
+    var canonical=key.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'');
+    if(!byName[key] || (String(p.id||'')===canonical && String(byName[key].id||'')!==canonical))byName[key]=p;
+  });
+  var active=allActive.filter(function(p){return byName[String(p.name||'').trim().toLocaleLowerCase('fr')]===p;});
   if(!active.length){box.innerHTML='<span class="hint">Aucun portail actif. Ajoute-le d’abord dans l’onglet Portails.</span>';return;}
   box.innerHTML=active.map(function(p){
     return '<label style="display:flex;align-items:center;gap:7px;color:var(--t2);font-size:13px;cursor:pointer;padding:7px 10px;border:1px solid rgba(123,92,255,.18);border-radius:10px;background:rgba(15,28,63,.35)">'
-      +'<input type="checkbox" class="'+className+'" value="'+dgEsc(p.id)+'" '+(chosen.indexOf(p.id)>=0?'checked':'')+'> '+dgEsc(p.name)+'</label>';
+      +'<input type="checkbox" class="'+className+'" value="'+dgEsc(p.id)+'" '+(chosen.indexOf(p.id)>=0?'checked':'')+'> '+dgEsc(p.name)+' <small style="opacity:.65">('+dgEsc(p.id)+')</small></label>';
   }).join('');
 }
 function dgChecked(className){
@@ -88,6 +97,7 @@ function dgResetCampaign(){
   document.getElementById('dg-available-until').value='';
   document.getElementById('dg-price').value='';
   document.getElementById('dg-currency').value='CAD';
+  document.getElementById('dg-registration-url').value='';
   document.getElementById('dg-checkout-url').value='';
   document.getElementById('dg-after-type').value='offer';
   document.getElementById('dg-after-url').value='';
@@ -118,6 +128,7 @@ function dgCampaignBody(){
     availableUntil:dgIsoFromInput('dg-available-until'),
     price:document.getElementById('dg-price').value===''?null:Number(document.getElementById('dg-price').value),
     currency:document.getElementById('dg-currency').value,
+    registrationUrl:document.getElementById('dg-registration-url').value.trim(),
     checkoutUrl:document.getElementById('dg-checkout-url').value.trim(),
     afterExpiry:{type:document.getElementById('dg-after-type').value,url:document.getElementById('dg-after-url').value.trim()},
     continuation:continuation
@@ -153,6 +164,7 @@ function dgEditCampaign(id){
   document.getElementById('dg-available-until').value=dgLocalDate(c.availableUntil);
   document.getElementById('dg-price').value=c.price==null?'':c.price;
   document.getElementById('dg-currency').value=c.currency||'CAD';
+  document.getElementById('dg-registration-url').value=c.registrationUrl||'';
   document.getElementById('dg-checkout-url').value=c.checkoutUrl||'';
   document.getElementById('dg-after-type').value=(c.afterExpiry&&c.afterExpiry.type)||'offer';
   document.getElementById('dg-after-url').value=(c.afterExpiry&&c.afterExpiry.url)||'';
@@ -172,6 +184,18 @@ function dgCopyWebhook(id){
   var url=location.origin+'/api/access/activate?campaign='+encodeURIComponent(c.id)+'&key='+encodeURIComponent(c.webhookKey||'');
   navigator.clipboard.writeText(url).then(function(){alert('Webhook copié.');}).catch(function(){prompt('Copie ce webhook :',url);});
 }
+function dgOpenRegistration(id){
+  var c=DG_STATE.campaigns.find(function(x){return x.id===id;});
+  if(!c||!c.registrationUrl)return;
+  var u;try{u=new URL(c.registrationUrl);}catch(e){return;}
+  if(u.protocol!=='https:'&&u.protocol!=='http:')return;
+  window.open(u.href,'_blank','noopener,noreferrer');
+}
+function dgCopyRegistration(id){
+  var c=DG_STATE.campaigns.find(function(x){return x.id===id;});
+  if(!c||!c.registrationUrl)return;
+  navigator.clipboard.writeText(c.registrationUrl).then(function(){alert('Lien d’inscription copié.');}).catch(function(){prompt('Copie le lien d’inscription :',c.registrationUrl);});
+}
 function dgRenderCampaigns(){
   var box=document.getElementById('dg-campaigns-list');if(!box)return;
   if(!DG_STATE.campaigns.length){box.innerHTML='<p class="hint">Aucune dégustation créée pour l’instant.</p>';return;}
@@ -179,7 +203,7 @@ function dgRenderCampaigns(){
     +DG_STATE.campaigns.map(function(c){
       var portals=(c.portalIds||[]).map(dgPortalName).join(', ');
       var availability=(c.availableFrom?new Date(c.availableFrom).toLocaleDateString('fr-CA'):'—')+' → '+(c.availableUntil?new Date(c.availableUntil).toLocaleDateString('fr-CA'):'—');
-      return '<tr><td><strong>'+dgEsc(c.name)+'</strong><div class="hint">'+dgEsc(c.startMode==='first_login'?'Départ à la première entrée':'Départ à l’activation')+'</div></td><td>'+dgEsc(portals)+'</td><td>'+dgEsc(c.durationHours)+' h</td><td>'+dgEsc(availability)+'</td><td>'+dgEsc(dgMoney(c))+'</td><td>'+dgEsc(c.status||'draft')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="dgEditCampaign(\''+dgEsc(c.id)+'\')">Modifier</button> <button class="btn btn-ghost" type="button" onclick="dgCopyWebhook(\''+dgEsc(c.id)+'\')">Webhook</button> <button class="btn btn-danger" type="button" onclick="dgDeleteCampaign(\''+dgEsc(c.id)+'\')">Supprimer</button></td></tr>';
+      return '<tr><td><strong>'+dgEsc(c.name)+'</strong><div class="hint">'+dgEsc(c.startMode==='first_login'?'Départ à la première entrée':'Départ à l’activation')+'</div></td><td>'+dgEsc(portals)+'</td><td>'+dgEsc(c.durationHours)+' h</td><td>'+dgEsc(availability)+'</td><td>'+dgEsc(dgMoney(c))+'</td><td>'+dgEsc(c.status||'draft')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="dgEditCampaign(\''+dgEsc(c.id)+'\')">Modifier</button>' + (c.registrationUrl ? ' <button class="btn btn-ghost" type="button" onclick="dgOpenRegistration(\''+dgEsc(c.id)+'\')">Inscription</button> <button class="btn btn-ghost" type="button" onclick="dgCopyRegistration(\''+dgEsc(c.id)+'\')">Copier le lien</button>' : '') + ' <button class="btn btn-ghost" type="button" onclick="dgCopyWebhook(\''+dgEsc(c.id)+'\')">Webhook</button> <button class="btn btn-danger" type="button" onclick="dgDeleteCampaign(\''+dgEsc(c.id)+'\')">Supprimer</button></td></tr>';
     }).join('')+'</tbody></table></div>';
 }
 

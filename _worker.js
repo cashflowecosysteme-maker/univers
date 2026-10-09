@@ -1078,6 +1078,8 @@ async function dgNormalizeCampaign(env, body, existing) {
   const availableFrom = body.availableFrom && Number.isFinite(Date.parse(body.availableFrom)) ? new Date(body.availableFrom).toISOString() : '';
   const availableUntil = body.availableUntil && Number.isFinite(Date.parse(body.availableUntil)) ? new Date(body.availableUntil).toISOString() : '';
   if (availableFrom && availableUntil && Date.parse(availableUntil) < Date.parse(availableFrom)) throw new Error('La fin de disponibilité doit être après le début.');
+  const registrationRaw = dgText(body.registrationUrl, 2000); const registrationUrl = registrationRaw ? dgUrl(registrationRaw) : '';
+  if (registrationRaw && !registrationUrl) throw new Error('Le lien d’inscription Systeme.io est invalide.');
   const checkoutRaw = dgText(body.checkoutUrl, 2000); const checkoutUrl = checkoutRaw ? dgUrl(checkoutRaw) : '';
   if (checkoutRaw && !checkoutUrl) throw new Error('Le lien de paiement est invalide.');
   const afterIn = body.afterExpiry || {};
@@ -1095,7 +1097,7 @@ async function dgNormalizeCampaign(env, body, existing) {
     name, status, portalIds, durationHours, startMode,
     availableFrom, availableUntil,
     price: dgNumber(body.price, null), currency: ['CAD','EUR','USD'].includes(body.currency) ? body.currency : 'CAD',
-    checkoutUrl, afterExpiry: { type: afterType, url: afterUrl }, continuation,
+    registrationUrl, checkoutUrl, afterExpiry: { type: afterType, url: afterUrl }, continuation,
     webhookKey: (existing && existing.webhookKey) || crypto.randomUUID().replace(/-/g, ''),
     createdAt: (existing && existing.createdAt) || dgNow(), updatedAt: dgNow()
   };
