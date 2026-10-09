@@ -344,6 +344,8 @@ td strong{color:#fff}
         <h3>Portails inscrits</h3>
         <p class="hint" style="margin-bottom:12px">Tu peux retirer un portail de la liste. Les clients déjà inscrits gardent leur historique.</p>
         <div id="portal-list">—</div>
+        <button class="btn btn-ghost" type="button" onclick="cleanLenaDuplicates()" style="margin-top:12px">Vérifier et retirer les doublons Léna</button>
+        <div class="msg" id="portal-clean-msg"></div>
       </div>
     </div>
 
@@ -978,6 +980,17 @@ async function removePortal(id){
   if(!confirm('Retirer ce portail de la liste ?')) return;
   await api('/api/portals/remove','POST',{id:id});
   loadPortals();
+}
+async function cleanLenaDuplicates(){
+  if(!confirm('Vérifier les entrées Léna en double ? Seules les entrées sans lien avec des campagnes ou des clients pourront être retirées. Le portail lena sera conservé.'))return;
+  try{
+    var out=await api('/api/portals/cleanup-lena','POST',{});
+    if(!out.res.ok)throw new Error(out.data.error||'Nettoyage impossible.');
+    var d=out.data;
+    showMsg('portal-clean-msg',(d.removed.length?d.removed.length+' doublon(s) Léna retiré(s). ':'Aucun doublon supprimé. ')+(d.protected.length?'Entrées conservées car utilisées : '+d.protected.join(', ')+'.':'') ,true);
+    await loadPortals();
+    if(typeof degustationsLoad==='function')await degustationsLoad();
+  }catch(e){showMsg('portal-clean-msg',e.message||String(e),false);}
 }
 async function loadPortalClients(){
   var box=document.getElementById('cl-list'); if(!box) return;

@@ -43,7 +43,11 @@ function dgPortalChecks(containerId,selected,className){
     var canonical=key.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'');
     if(!byName[key] || (String(p.id||'')===canonical && String(byName[key].id||'')!==canonical))byName[key]=p;
   });
-  var active=allActive.filter(function(p){return byName[String(p.name||'').trim().toLocaleLowerCase('fr')]===p;});
+  var active=allActive.filter(function(p){
+    var n=String(p.name||'').trim();
+    if(/^(portail[\s_-]*)?l[ée]na([\s_-]*portail)?$/i.test(n))return p.id==='lena';
+    return byName[n.toLocaleLowerCase('fr')]===p;
+  });
   if(!active.length){box.innerHTML='<span class="hint">Aucun portail actif. Ajoute-le d’abord dans l’onglet Portails.</span>';return;}
   box.innerHTML=active.map(function(p){
     return '<label style="display:flex;align-items:center;gap:7px;color:var(--t2);font-size:13px;cursor:pointer;padding:7px 10px;border:1px solid rgba(123,92,255,.18);border-radius:10px;background:rgba(15,28,63,.35)">'

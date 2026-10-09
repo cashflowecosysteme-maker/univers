@@ -881,6 +881,31 @@ async function handleRemovePortal(request, env) {
   return json({ success: true, portals });
 }
 
+// Nettoyage ciblé et protégé des entrées Léna du registre de portails.
+// Ne touche ni aux fiches clients, ni aux campagnes, ni aux grants.
+async function handleCleanupLenaPortals(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error:'Non autorisé.' },401);
+  const raw=await env.CASHFLOW_KV.get('univers:portals');
+  if(!raw)return json({error:'Registre des portails absent.'},404);
+  let portals;try{portals=JSON.parse(raw);}catch(_){return json({error:'Registre illisible.'},400);}
+  if(!Array.isArray(portals))return json({error:'Format de registre invalide.'},400);
+  const lenaName=p=>/^(portail[\s_-]*)?l[ée]na([\s_-]*portail)?$/i.test(String(p.name||'').trim());
+  const candidates=portals.filter(p=>lenaName(p)&&p.id!=='lena');
+  if(!portals.some(p=>p.id==='lena'))return json({error:'L’identifiant officiel lena est absent. Aucune suppression effectuée.'},409);
+  const campaigns=await dgReadCampaigns(env);
+  const inCampaign=new Set(campaigns.flatMap(c=>c.portalIds||[]));
+  // Si la pagination KV est incomplète, on ne fait aucune suppression.
+  let grantKeys=[],cursor;do{const page=await env.CASHFLOW_KV.list({prefix:DG_GRANT_PREFIX,cursor});grantKeys.push(...(page.keys||[]));cursor=page.list_complete?null:page.cursor;if(!page.list_complete&&!cursor)return json({error:'Impossible de vérifier tous les accès temporaires.'},409);}while(cursor);
+  const inGrants=new Set();for(const k of grantKeys){try{const g=JSON.parse(await env.CASHFLOW_KV.get(k.name)||'{}');if(g.portalId)inGrants.add(g.portalId);}catch(_){return json({error:'Accès temporaire illisible : nettoyage annulé.'},409);}}
+  let clientKeys=[];cursor=undefined;do{const page=await env.CASHFLOW_KV.list({prefix:'client:',cursor});clientKeys.push(...(page.keys||[]));cursor=page.list_complete?null:page.cursor;if(!page.list_complete&&!cursor)return json({error:'Impossible de vérifier tous les clients.'},409);}while(cursor);
+  const inClients=new Set();for(const k of clientKeys){try{const c=JSON.parse(await env.CASHFLOW_KV.get(k.name)||'{}');for(const id of c.products||[])inClients.add(String(id));}catch(_){return json({error:'Fiche client illisible : nettoyage annulé.'},409);}}
+  const permanent=await dgReadPermanent(env),inPermanent=new Set(permanent.flatMap(p=>p.portalIds||[]));
+  const protectedIds=candidates.filter(p=>inCampaign.has(p.id)||inGrants.has(p.id)||inClients.has(p.id)||inPermanent.has(p.id)).map(p=>p.id);
+  const removable=candidates.filter(p=>!protectedIds.includes(p.id)).map(p=>p.id);
+  if(removable.length){portals=portals.filter(p=>!removable.includes(p.id));await env.CASHFLOW_KV.put('univers:portals',JSON.stringify(portals));}
+  return json({success:true,removed:removable,protected:protectedIds,remaining:portals.filter(lenaName).map(p=>({id:p.id,name:p.name}))});
+}
+
 // Clients portails (même format KV que Studio : client:email)
 async function handleListPortalClients(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
@@ -1753,6 +1778,7 @@ export default {
       if (path === '/api/portals' && request.method === 'POST') return await handleSavePortals(request, env);
       if (path === '/api/portals/add' && request.method === 'POST') return await handleAddPortal(request, env);
       if (path === '/api/portals/remove' && request.method === 'POST') return await handleRemovePortal(request, env);
+      if (path === '/api/portals/cleanup-lena' && request.method === 'POST') return await handleCleanupLenaPortals(request, env);
       if (path === '/api/portal-clients' && request.method === 'GET') return await handleListPortalClients(request, env);
       if (path === '/api/portal-clients' && request.method === 'POST') return await handleCreatePortalClient(request, env);
       if (path === '/api/portal-clients/delete' && request.method === 'POST') return await handleDeletePortalClient(request, env);
