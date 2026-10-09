@@ -1338,18 +1338,19 @@ async function dgSendPasswordInvitation(env, email, campaign) {
   const contacts=Array.isArray(data)?data:(data['hydra:member']||data.items||data.contacts||[]);
   const contact=contacts.find(c=>String(c.email||'').trim().toLowerCase()===email);
   if(!contact?.id) throw new Error('Contact introuvable dans Systeme.io.');
+  let existingAccount=false;
   const existing=await env.CASHFLOW_KV.get('client:'+email);
   if(existing) {
     // Un compte avec un vrai mot de passe reste intact ; ne pas le réinitialiser.
     let account={};try{account=JSON.parse(existing)}catch(_){}
-    if(account.passwordHash||account.password) return {existingAccount:true,invitationSent:false};
+    if(account.passwordHash||account.password) existingAccount=true;
     // Une fiche incomplète ne doit pas bloquer la première création du mot de passe.
   }
   const tokenBytes=new Uint8Array(32);crypto.getRandomValues(tokenBytes);
   const token=[...tokenBytes].map(x=>x.toString(16).padStart(2,'0')).join('');
   const key='password-reset:studio-prompt:'+await dgInvitationHash(token);
-  const destination='https://portail-prompts.nyxia.top/premiere-connexion?token='+encodeURIComponent(token);
-  await env.CASHFLOW_KV.put(key,JSON.stringify({email,studioFirstAccess:true,createdAt:new Date().toISOString()}),{expirationTtl:1200});
+  const destination=existingAccount ? 'https://portail-prompts.nyxia.top/login.html' : 'https://portail-prompts.nyxia.top/premiere-connexion?token='+encodeURIComponent(token);
+  if (!existingAccount) await env.CASHFLOW_KV.put(key,JSON.stringify({email,studioFirstAccess:true,createdAt:new Date().toISOString()}),{expirationTtl:172800});
   try {
     const cId=encodeURIComponent(String(contact.id));
     const saved=await fetch(root+'/contacts/'+cId,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:destination}]})});
@@ -1363,7 +1364,7 @@ async function dgSendPasswordInvitation(env, email, campaign) {
     }
     const tagged=await fetch(root+'/contacts/'+cId+'/tags',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tagId})});
     if(!tagged.ok) throw new Error('Tag activation Systeme.io : HTTP '+tagged.status);
-    return {existingAccount:false,invitationSent:true};
+    return {existingAccount,invitationSent:true};
   }catch(error) {
     await env.CASHFLOW_KV.delete(key);
     throw error;
@@ -2053,3 +2054,4 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
+
