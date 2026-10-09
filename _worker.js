@@ -1098,9 +1098,14 @@ async function dgNormalizeCampaign(env, body, existing) {
   const portalIds = Array.isArray(body.portalIds) ? body.portalIds.map(dgId).filter((id) => validIds.has(id)) : [];
   const name = dgText(body.name, 180);
   const durationHours = Math.max(1, Math.round(dgNumber(body.durationHours, 72) || 72));
+  const fixedStartRaw = dgText(body.fixedStartAt, 60);
+  const fixedStartAt = fixedStartRaw && Number.isFinite(Date.parse(fixedStartRaw)) ? new Date(fixedStartRaw).toISOString() : '';
+  if (fixedStartRaw && !fixedStartAt) throw new Error('La date de début des accès est invalide.');
   const fixedEndRaw = dgText(body.fixedEndAt, 60);
   const fixedEndAt = fixedEndRaw && Number.isFinite(Date.parse(fixedEndRaw)) ? new Date(fixedEndRaw).toISOString() : '';
-  if (fixedEndRaw && !fixedEndAt) throw new Error('La date de fin commune est invalide.');
+  if (fixedEndRaw && !fixedEndAt) throw new Error('La date de fin des accès est invalide.');
+  if (fixedStartAt && !fixedEndAt) throw new Error('Indique également la fin des accès.');
+  if (fixedStartAt && fixedEndAt && Date.parse(fixedStartAt) >= Date.parse(fixedEndAt)) throw new Error('La fin des accès doit être après le début.');
   // Fin commune : l’accès commence à l’activation, et non à la première connexion.
   const startMode = fixedEndAt ? 'activation' : (body.startMode === 'activation' ? 'activation' : 'first_login');
   const status = ['draft','active','ended'].includes(body.status) ? body.status : 'draft';
@@ -1124,7 +1129,7 @@ async function dgNormalizeCampaign(env, body, existing) {
   }).filter((x) => x.label || x.price != null || x.url);
   return {
     id: dgId(body.id) || (existing && existing.id) || crypto.randomUUID(),
-    name, status, portalIds, durationHours, startMode, fixedEndAt,
+    name, status, portalIds, durationHours, startMode, fixedStartAt, fixedEndAt,
     availableFrom, availableUntil,
     price: dgNumber(body.price, null), currency: ['CAD','EUR','USD'].includes(body.currency) ? body.currency : 'CAD',
     registrationUrl, checkoutUrl, afterExpiry: { type: afterType, url: afterUrl }, continuation,
@@ -1138,6 +1143,7 @@ function dgCampaignObtainable(c) {
   if (c.availableFrom && Date.parse(c.availableFrom) > now) return false;
   if (c.availableUntil && Date.parse(c.availableUntil) < now) return false;
   if (c.fixedEndAt && Date.parse(c.fixedEndAt) <= now) return false;
+  // L'inscription peut précéder le début des accès ; le contrôle d'accès fixe l'ouverture. 
   return true;
 }
 
@@ -1237,8 +1243,11 @@ async function dgCheckAccess(env, email, portalId) {
   }
   const campaignsForExpiry = await dgReadCampaigns(env);
   const grantEffectiveExpiry = (g) => { const c = campaignsForExpiry.find(x => x.id === g.campaignId); return c && c.fixedEndAt ? Math.min(Date.parse(g.expiresAt || c.fixedEndAt), Date.parse(c.fixedEndAt)) : Date.parse(g.expiresAt || ''); };
-  const active = grants.find((g) => g.expiresAt && grantEffectiveExpiry(g) > Date.now());
+  const grantStarted = (g) => { const c = campaignsForExpiry.find(x => x.id === g.campaignId); return !c || !c.fixedStartAt || Date.parse(c.fixedStartAt) <= Date.now(); };
+  const active = grants.find((g) => g.expiresAt && grantStarted(g) && grantEffectiveExpiry(g) > Date.now());
   if (active) return { allowed:true, accessType:'temporary', campaignId:active.campaignId, campaignName:active.campaignName, startedAt:active.startedAt, expiresAt:active.expiresAt };
+  const awaiting = grants.find((g) => g.expiresAt && !grantStarted(g) && grantEffectiveExpiry(g) > Date.now());
+  if (awaiting) return { allowed:false, reason:'not_started', campaignId:awaiting.campaignId, startsAt:(campaignsForExpiry.find(x=>x.id===awaiting.campaignId)||{}).fixedStartAt };
   const expired = grants.find((g) => g.expiresAt && grantEffectiveExpiry(g) <= Date.now());
   if (expired) {
     const campaigns = await dgReadCampaigns(env); const c = campaigns.find((x)=>x.id===expired.campaignId) || {};
