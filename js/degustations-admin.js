@@ -80,7 +80,7 @@ async function degustationsLoad(){
 function dgDurationPresetChanged(){
   var preset=document.getElementById('dg-duration-preset').value;
   var wrap=document.getElementById('dg-duration-custom-wrap');
-  if(wrap)wrap.style.display=preset==='custom'?'block':'none';
+  if(wrap)wrap.style.display='block';
   if(preset!=='custom')document.getElementById('dg-duration-hours').value=preset;
 }
 function dgAfterTypeChanged(){
@@ -95,7 +95,7 @@ function dgResetCampaign(){
   document.getElementById('dg-c-status').value='draft';
   document.getElementById('dg-duration-preset').value='72';
   document.getElementById('dg-duration-hours').value='72';
-  document.getElementById('dg-duration-custom-wrap').style.display='none';
+  document.getElementById('dg-duration-custom-wrap').style.display='block';
   document.getElementById('dg-start-mode').value='first_login';
   document.getElementById('dg-access-start').value='';
   document.getElementById('dg-access-end').value='';
@@ -146,6 +146,7 @@ async function dgSaveCampaign(){
   if(!body.portalIds.length){dgMsg('dg-c-msg','Choisis au moins un portail.',false);return;}
   if(!body.fixedStartAt||!body.fixedEndAt){dgMsg('dg-c-msg','Choisis la date de début ET la date de fin des accès.',false);return;}
   if(Date.parse(body.fixedEndAt)<=Date.parse(body.fixedStartAt)){dgMsg('dg-c-msg','La fin doit être après le début.',false);return;}
+  body.durationHours=(Date.parse(body.fixedEndAt)-Date.parse(body.fixedStartAt))/3600000;
   try{
     var r=await api('/api/degustations','POST',body);
     if(!r.res.ok)throw new Error(r.data.error||'Enregistrement impossible.');
@@ -160,11 +161,11 @@ function dgEditCampaign(id){
   document.getElementById('dg-c-id').value=c.id||'';
   document.getElementById('dg-c-name').value=c.name||'';
   document.getElementById('dg-c-status').value=c.status||'draft';
-  var h=Number(c.durationHours)||72;
-  var preset=[72,168,720].indexOf(h)>=0?String(h):'custom';
+  var h=c.fixedStartAt&&c.fixedEndAt?(Date.parse(c.fixedEndAt)-Date.parse(c.fixedStartAt))/3600000:(Number(c.durationHours)||72);
+  var preset=[72,144,168,720].indexOf(h)>=0?String(h):'custom';
   document.getElementById('dg-duration-preset').value=preset;
   document.getElementById('dg-duration-hours').value=h;
-  document.getElementById('dg-duration-custom-wrap').style.display=preset==='custom'?'block':'none';
+  document.getElementById('dg-duration-custom-wrap').style.display='block';
   document.getElementById('dg-start-mode').value=c.startMode||'first_login';
   document.getElementById('dg-access-start').value=dgLocalDate(c.fixedStartAt);
   document.getElementById('dg-access-end').value=dgLocalDate(c.fixedEndAt);
@@ -220,7 +221,7 @@ function dgRenderCampaigns(){
     +DG_STATE.campaigns.map(function(c){
       var portals=(c.portalIds||[]).map(dgPortalName).join(', ');
       var availability=c.fixedStartAt&&c.fixedEndAt?(new Date(c.fixedStartAt).toLocaleString('fr-CA')+' → '+new Date(c.fixedEndAt).toLocaleString('fr-CA')):((c.availableFrom?new Date(c.availableFrom).toLocaleDateString('fr-CA'):'—')+' → '+(c.availableUntil?new Date(c.availableUntil).toLocaleDateString('fr-CA'):'—'));
-      return '<tr><td><strong>'+dgEsc(c.name)+'</strong><div class="hint">'+dgEsc(c.fixedStartAt?'Dates fixes des accès':(c.startMode==='first_login'?'Départ à la première entrée':'Départ à l’activation'))+'</div></td><td>'+dgEsc(portals)+'</td><td>'+dgEsc(c.durationHours)+' h</td><td>'+dgEsc(availability)+'</td><td>'+dgEsc(dgMoney(c))+'</td><td>'+dgEsc(c.status||'draft')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="dgEditCampaign(\''+dgEsc(c.id)+'\')">Modifier</button>' + (c.registrationUrl ? ' <button class="btn btn-ghost" type="button" onclick="dgOpenRegistration(\''+dgEsc(c.id)+'\')">Inscription</button> <button class="btn btn-ghost" type="button" onclick="dgCopyRegistration(\''+dgEsc(c.id)+'\')">Copier le lien</button>' : '') + ' <button class="btn btn-ghost" type="button" onclick="dgUseForRegistration(\''+dgEsc(c.id)+'\')">Utiliser pour l’inscription</button>' + ' <button class="btn btn-ghost" type="button" onclick="dgCopyWebhook(\''+dgEsc(c.id)+'\')">Webhook</button> <button class="btn btn-danger" type="button" onclick="dgDeleteCampaign(\''+dgEsc(c.id)+'\')">Supprimer</button></td></tr>';
+      return '<tr><td><strong>'+dgEsc(c.name)+'</strong><div class="hint">'+dgEsc(c.fixedStartAt?'Dates fixes des accès':(c.startMode==='first_login'?'Départ à la première entrée':'Départ à l’activation'))+'</div></td><td>'+dgEsc(portals)+'</td><td>'+dgEsc(c.fixedStartAt&&c.fixedEndAt?(Date.parse(c.fixedEndAt)-Date.parse(c.fixedStartAt))/3600000:c.durationHours)+' h</td><td>'+dgEsc(availability)+'</td><td>'+dgEsc(dgMoney(c))+'</td><td>'+dgEsc(c.status||'draft')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="dgEditCampaign(\''+dgEsc(c.id)+'\')">Modifier</button>' + (c.registrationUrl ? ' <button class="btn btn-ghost" type="button" onclick="dgOpenRegistration(\''+dgEsc(c.id)+'\')">Inscription</button> <button class="btn btn-ghost" type="button" onclick="dgCopyRegistration(\''+dgEsc(c.id)+'\')">Copier le lien</button>' : '') + ' <button class="btn btn-ghost" type="button" onclick="dgUseForRegistration(\''+dgEsc(c.id)+'\')">Utiliser pour l’inscription</button>' + ' <button class="btn btn-ghost" type="button" onclick="dgCopyWebhook(\''+dgEsc(c.id)+'\')">Webhook</button> <button class="btn btn-danger" type="button" onclick="dgDeleteCampaign(\''+dgEsc(c.id)+'\')">Supprimer</button></td></tr>';
     }).join('')+'</tbody></table></div>';
 }
 
@@ -297,5 +298,6 @@ window.dgDeletePermanent=dgDeletePermanent;
 window.dgGrantManual=dgGrantManual;
 window.dgDeleteGrant=dgDeleteGrant;
 })();
+
 
 

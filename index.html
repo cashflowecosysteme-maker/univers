@@ -428,11 +428,11 @@ td strong{color:#fff}
           <div style="grid-column:1/-1"><h3 style="margin:7px 0">Dates des accès à la dégustation</h3><p class="hint">Tu choisis les deux dates. Les portails ouvrent à la première et ferment à la deuxième, même si une personne s’inscrit ou se connecte plus tard. Heure locale du Québec sur un appareil réglé au Québec.</p></div>
           <div><label class="f">Début des accès *</label><input class="f" type="datetime-local" id="dg-access-start"></div>
           <div><label class="f">Fin des accès *</label><input class="f" type="datetime-local" id="dg-access-end"></div>
-          <div style="grid-column:1/-1"><details id="dg-legacy-options" style="margin-top:5px"><summary style="color:var(--t2);cursor:pointer">Ancien fonctionnement (uniquement pour les campagnes existantes)</summary><div class="grid2" style="margin-top:12px">
-          <div><label class="f">Durée</label><select class="f" id="dg-duration-preset" onchange="dgDurationPresetChanged()"><option value="72">3 jours</option><option value="168">7 jours</option><option value="720">30 jours</option><option value="custom">Personnalisée</option></select></div>
-          <div id="dg-duration-custom-wrap" style="display:none"><label class="f">Durée personnalisée (heures)</label><input class="f" type="number" id="dg-duration-hours" min="1" step="1" value="72"></div>
-          <div><label class="f">Départ du compteur (ancien mode)</label><select class="f" id="dg-start-mode"><option value="first_login">À la première entrée</option><option value="activation">À l’activation</option></select></div>
-          </div></details></div>
+          <div style="grid-column:1/-1"><div id="dg-legacy-options" style="margin-top:5px"><div class="grid2" style="margin-top:12px">
+          <div><label class="f">Durée</label><select class="f" id="dg-duration-preset" onchange="dgDurationPresetChanged()"><option value="72">3 jours</option><option value="144">6 jours</option><option value="168">7 jours</option><option value="720">30 jours</option><option value="custom">Personnalisée</option></select></div>
+          <div id="dg-duration-custom-wrap"><label class="f">Durée (heures)</label><input class="f" type="number" id="dg-duration-hours" onchange="document.getElementById('dg-duration-preset').value='custom'" min="1" step="1" value="72"></div>
+          <div><label class="f">Départ du compteur sans dates fixes</label><select class="f" id="dg-start-mode"><option value="first_login">À la première entrée</option><option value="activation">À l’activation</option></select></div>
+          </div></div></div>
           <div><label class="f">Prix de la porte d’entrée</label><div style="display:grid;grid-template-columns:1fr 100px;gap:8px"><input class="f" type="number" id="dg-price" min="0" step="0.01" placeholder="19"><select class="f" id="dg-currency"><option value="CAD">CAD</option><option value="EUR">EUR</option><option value="USD">USD</option></select></div></div>
 
           <div style="grid-column:1/-1"><label class="f">Lien de paiement / déclencheur Systeme.io</label><input class="f" id="dg-checkout-url" placeholder="https://..."></div>
@@ -1871,9 +1871,10 @@ document.addEventListener('input',function(e){
 })();
 document.getElementById('login-password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 </script>
-<script src="/js/degustations-admin.js?v=outils-proteges-2" defer></script>
+<script src="/js/degustations-admin.js?v=reglages-visibles-3" defer></script>
 </body>
 </html>
+
 
 
 
