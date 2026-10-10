@@ -832,6 +832,12 @@ function portalInvitationSettings(input,previous={}) {
  return out;
 }
 async function dgReadJson(env,key,fallback){const raw=await env.CASHFLOW_KV.get(key);if(!raw)return fallback;try{return JSON.parse(raw)}catch(_){return fallback}}
+function dgExistingPortalHost(portal,id){
+ const byId={systemeprompt:'portail-prompts.nyxia.top',studio:'portail-prompts.nyxia.top','studio-prompt':'portail-prompts.nyxia.top',lena:'portaillena.nyxia.top',portaillena:'portaillena.nyxia.top','lena-decouvrir-dons':'portaillena.nyxia.top',selena:'portailselena.nyxia.top',portailselena:'portailselena.nyxia.top',alex:'portailalex.nyxia.top',portail_alex:'portailalex.nyxia.top','portail-alex':'portailalex.nyxia.top','alex-devenir-ecrivain':'portailalex.nyxia.top','portail-dylan-reiki':'portaildylanreiki.nyxia.top',portaildylanreiki:'portaildylanreiki.nyxia.top'};
+ if(byId[String(id||'').toLowerCase()])return byId[String(id||'').toLowerCase()];
+ const name=String(portal.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+ return ({'portail lena':'portaillena.nyxia.top','portail selena':'portailselena.nyxia.top','portail alex':'portailalex.nyxia.top','portail dylan':'portaildylanreiki.nyxia.top','portail dylan reiki':'portaildylanreiki.nyxia.top','portail dylan reiki chirurgie astral':'portaildylanreiki.nyxia.top'})[name]||'';
+}
 async function dgInvitationPortals(env,campaign,email) {
  const registry=await getPortalsList(env),out=[],now=Date.now();
  for(const id of campaign.portalIds||[]) {
@@ -841,8 +847,9 @@ async function dgInvitationPortals(env,campaign,email) {
   const end=grant.pending?hardEnd:Math.min(Date.parse(grant.expiresAt||''),hardEnd);
   if(Number.isNaN(end)||end<=now)continue;
   const portal=registry.find(p=>p.id===id)||{};
-  const host=portal.host||(['systemeprompt','studio','studio-prompt'].includes(id)?'portail-prompts.nyxia.top':'');
-  if(!/^[a-z0-9.-]+\.nyxia\.top$/.test(host))throw Error('Sous-domaine à enregistrer pour '+(portal.name||id)+' dans Super Admin 4.');
+  const host=portal.host||dgExistingPortalHost(portal,id);
+  if(!portal.host&&host&&registry.some(p=>p.id===id)){const fresh=await getPortalsList(env),p=fresh.find(p=>p.id===id);if(p&&!p.host){p.host=host;await env.CASHFLOW_KV.put('univers:portals',JSON.stringify(fresh));portal.host=host}}
+  if(!/^[a-z0-9.-]+\.nyxia\.top$/.test(host))throw Error('Sous-domaine à enregistrer pour '+(portal.name||id)+' : ouvre Outils → Raccorder les portails dans ton Super Admin.');
   out.push({id,name:portal.name||id,loginUrl:'https://'+host+'/login.html',startsAt:campaign.fixedStartAt||'',expiresAt:Number.isFinite(end)?new Date(end).toISOString():null});
  }
  return out;
@@ -1888,6 +1895,25 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    // Outils Super Admin : protéger le fichier HTML et son URL sans extension.
+    let toolPath='';
+    try{toolPath=decodeURIComponent(path).replace(/\/+$/,'').toLowerCase()}catch(_){}
+    const adminTool=toolPath==='/raccorder-portails'||toolPath==='/raccorder-portails.html'?'raccorder-portails':toolPath==='/diagnostic-webhook'||toolPath==='/diagnostic-webhook.html'?'diagnostic-webhook':'';
+    if(adminTool){
+      const privateHeaders={'Cache-Control':'private, no-store, max-age=0','Vary':'Cookie, X-Univers-Token'};
+      let authorized=false;
+      try{authorized=await requireAdmin(request,env)}catch(_){return new Response('Vérification de la session indisponible.',{status:503,headers:privateHeaders})}
+      if(!authorized)return new Response(null,{status:302,headers:{...privateHeaders,'Location':'/'}});
+      if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Méthode non autorisée.',{status:405,headers:{...privateHeaders,'Allow':'GET, HEAD'}});
+      if(!env.ASSETS)return new Response('Outil indisponible.',{status:503,headers:privateHeaders});
+      const target=new URL('/'+adminTool+'.html',request.url);target.search=url.search;
+      const asset=await env.ASSETS.fetch(new Request(target,request));
+      const response=new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers:asset.headers});
+      for(const [name,value] of Object.entries(privateHeaders))response.headers.set(name,value);
+      return response;
+    }
+
+
     // Super Admin 2 reste dans son propre fichier.
     // Le Worker principal fait uniquement l'aiguillage de ses routes API.
     if (path === '/api/superadmin2' || path.startsWith('/api/superadmin2/')) {
@@ -2148,5 +2174,6 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
+
 
 
