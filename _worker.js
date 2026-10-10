@@ -1906,7 +1906,7 @@ export default {
       if(!authorized)return new Response(null,{status:302,headers:{...privateHeaders,'Location':'/'}});
       if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Méthode non autorisée.',{status:405,headers:{...privateHeaders,'Allow':'GET, HEAD'}});
       if(!env.ASSETS)return new Response('Outil indisponible.',{status:503,headers:privateHeaders});
-      const target=new URL('/'+adminTool+'.html',request.url);target.search=url.search;
+      const target=new URL('/'+adminTool,request.url);target.search=url.search;
       const asset=await env.ASSETS.fetch(new Request(target,request));
       const response=new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers:asset.headers});
       for(const [name,value] of Object.entries(privateHeaders))response.headers.set(name,value);
@@ -2011,8 +2011,8 @@ export default {
       return json({ error: 'Erreur serveur.', detail: String(e.message || e) }, 500);
     }
     if (env.ASSETS) {
-      if (path === '/premiere-connexion') return env.ASSETS.fetch(new URL('/premiere-connexion.html', request.url));
-      if (path === '/' || path === '') return env.ASSETS.fetch(new URL('/index.html', request.url));
+      if (path === '/premiere-connexion') return env.ASSETS.fetch(request);
+      if (path === '/' || path === '') return env.ASSETS.fetch(request);
       return env.ASSETS.fetch(request);
     }
     return new Response('Not found', { status: 404 });
@@ -2174,6 +2174,7 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
+
 
 
 
