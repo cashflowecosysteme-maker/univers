@@ -1288,11 +1288,11 @@ async function dgCreateOrReuseActivation(env, campaign, email, source, forceAdmi
       const old = JSON.parse(oldRaw);
       if (old && old.campaignId) {
         // Nouvelle inscription : ajouter les portails manquants avec le compteur original.
-        // Ne jamais recréer un accès déjà suivi puis retiré.
+        // Une nouvelle inscription recrée les accès supprimés, sans réinitialiser les dates.
         const known = Array.isArray(old.portalIds) ? old.portalIds : [];
         for (const portalId of campaign.portalIds || []) {
           const grantKey = dgGrantKey(email, campaign.id, portalId);
-          if (await env.CASHFLOW_KV.get(grantKey) || known.includes(portalId)) continue;
+          if (await env.CASHFLOW_KV.get(grantKey)) continue;
           await env.CASHFLOW_KV.put(grantKey, JSON.stringify({
             key: grantKey, email, campaignId: campaign.id, campaignName: campaign.name,
             portalId, pending: !!old.pending, startedAt: old.startedAt || '',
@@ -2261,6 +2261,7 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
+
 
 
 
