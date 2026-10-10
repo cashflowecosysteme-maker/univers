@@ -1495,33 +1495,6 @@ async function dgRegisterCampaigns(env,campaigns,email) {
  return {success:true,activation:activations[0],activations,invitation};
 }
 
-
-// Réinitialisation du compte partagé : ne crée ni ne prolonge aucun accès.
-async function handleAccountPasswordForgot(request,env){
- const b=await request.json().catch(()=>({})),email=dgEmail(b.email);
- if(!email||!email.includes('@'))return dgCors(json({error:'Adresse courriel requise.'},400));
- const rateKey='password-reset:rate:'+await dgInvitationHash(email);
- if(await env.CASHFLOW_KV.get(rateKey))return dgCors(json({ok:true}));
- await env.CASHFLOW_KV.put(rateKey,'1',{expirationTtl:60});
- const client=await dgReadJson(env,'client:'+email,null);
- if(client&&client.active!==false&&(client.passwordHash||client.password)){
-  try{const portals=await getPortalsList(env),host=String(b.portalHost||'').toLowerCase();const resetHost=portals.some(p=>p.host===host)?host:'';await dgSendAccountPasswordReset(env,email,[],true,resetHost);}catch(e){await env.CASHFLOW_KV.delete(rateKey);console.error('Envoi réinitialisation NyXia',e);return dgCors(json({error:'Envoi indisponible pour le moment. Réessaie dans quelques instants.'},503));}
- }
- return dgCors(json({ok:true}));
-}
-async function handleAccountPasswordReset(request,env){
- const b=await request.json().catch(()=>({})),token=String(b.token||''),password=String(b.password||'');
- if(!token)return dgCors(json({error:'Lien absent ou invalide.'},400));
- if(password.length<8||password!==b.confirm)return dgCors(json({error:'Choisis au moins 8 caractères et confirme le même mot de passe.'},400));
- const key='password-reset:account:'+await dgInvitationHash(token),record=await dgReadJson(env,key,null);
- if(!record||record.purpose!=='account-password-reset')return dgCors(json({error:'Ce lien est invalide ou expiré. Demande un nouveau lien.'},410));
- const client=await dgReadJson(env,'client:'+record.email,null);
- if(!client||client.active===false||(client.authVersion||'')!==(record.authVersion||''))return dgCors(json({error:'Ce lien est invalide ou expiré.'},410));
- client.salt=randomSalt();client.passwordHash=await hashPassword(password,client.salt);client.authVersion=randomToken();delete client.password;
- await env.CASHFLOW_KV.put('client:'+record.email,JSON.stringify(client));await env.CASHFLOW_KV.delete(key);
- return dgCors(json({ok:true}));
-}
-
 async function dgSendPasswordInvitation(env, email, campaign) {
   const invitationCampaigns=Array.isArray(campaign)?campaign:[campaign];
   if (!env.SYSTEME_API_KEY || !env.SYSTEME_ACTIVATION_FIELD || !env.SYSTEME_ACTIVATION_TAG_ID) {
@@ -1552,55 +1525,6 @@ async function dgSendPasswordInvitation(env, email, campaign) {
   if(!portals.length)throw Error('Aucun Accès Gratuit au portail actif pour ce courriel.');
   const destination='https://univers.nyxia.top/premiere-connexion.html?token='+encodeURIComponent(token);
   await env.CASHFLOW_KV.put(key,JSON.stringify({email,campaignId:invitationCampaigns[0].id,campaignIds:invitationCampaigns.map(c=>c.id),existingAccount,createdAt:new Date().toISOString()}),{expirationTtl:172800});
-  try {
-    const cId=encodeURIComponent(String(contact.id));
-    const saved=await fetch(root+'/contacts/'+cId,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:destination.replace(/^https:\/\//, '')}]})});
-    if(!saved.ok) throw new Error('Champ activation Systeme.io : HTTP '+saved.status);
-    // Réarmement ciblé : un tag déjà présent ne déclenche pas de nouvel e-mail.
-    // Il s'agit uniquement du tag dédié à la première activation NyXia.
-    const alreadyTagged=Array.isArray(contact.tags)&&contact.tags.some(t=>Number(t?.id||t)===tagId);
-    if(alreadyTagged){
-      const removed=await fetch(root+'/contacts/'+cId+'/tags/'+tagId,{method:'DELETE',headers});
-      if(!removed.ok && removed.status!==404) throw new Error('Réarmement du tag Systeme.io : HTTP '+removed.status);
-    }
-    const tagged=await fetch(root+'/contacts/'+cId+'/tags',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tagId})});
-    if(!tagged.ok) throw new Error('Tag activation Systeme.io : HTTP '+tagged.status);
-    return {existingAccount,invitationSent:true};
-  }catch(error) {
-    await env.CASHFLOW_KV.delete(key);
-    throw error;
-  }
-}
-async function dgSendAccountPasswordReset(env, email, campaign, passwordReset=false, resetHost='') {
-  const invitationCampaigns=Array.isArray(campaign)?campaign:[campaign];
-  if (!env.SYSTEME_API_KEY || !env.SYSTEME_ACTIVATION_FIELD || !env.SYSTEME_ACTIVATION_TAG_ID) {
-    throw new Error('Variables Systeme.io manquantes dans le Worker Super Admin 1.');
-  }
-  const field=String(env.SYSTEME_ACTIVATION_FIELD).trim(), tagId=Number(env.SYSTEME_ACTIVATION_TAG_ID);
-  if (!/^[\w-]+$/.test(field) || !Number.isSafeInteger(tagId) || tagId<=0) throw new Error('Configuration Systeme.io invalide.');
-  const headers={'X-API-Key':String(env.SYSTEME_API_KEY),'Accept':'application/json'};
-  const root='https://api.systeme.io/api';
-  const lookup=await fetch(root+'/contacts?email='+encodeURIComponent(email),{headers});
-  if(!lookup.ok) throw new Error('Recherche contact Systeme.io : HTTP '+lookup.status);
-  const data=await lookup.json();
-  const contacts=Array.isArray(data)?data:(data['hydra:member']||data.items||data.contacts||[]);
-  const contact=contacts.find(c=>String(c.email||'').trim().toLowerCase()===email);
-  if(!contact?.id) throw new Error('Contact introuvable dans Systeme.io.');
-  let existingAccount=false;
-  const existing=await env.CASHFLOW_KV.get('client:'+email);
-  if(existing) {
-    // Un compte avec un vrai mot de passe reste intact ; ne pas le réinitialiser.
-    let account={};try{account=JSON.parse(existing)}catch(_){}
-    if(account.passwordHash||account.password) existingAccount=true;
-    // Une fiche incomplète ne doit pas bloquer la première création du mot de passe.
-  }
-  const tokenBytes=new Uint8Array(32);crypto.getRandomValues(tokenBytes);
-  const token=[...tokenBytes].map(x=>x.toString(16).padStart(2,'0')).join('');
-  const key=(passwordReset?'password-reset:account:':'password-reset:univers:')+await dgInvitationHash(token);
-  const portals=passwordReset?[]:await dgCombinedPortals(env,invitationCampaigns,email);
-  if(!passwordReset&&!portals.length)throw Error('Aucun Accès Gratuit au portail actif pour ce courriel.');
-  const destination='https://'+(passwordReset&&resetHost?resetHost:'univers.nyxia.top')+'/'+(passwordReset?'reinitialiser-mot-de-passe.html':'premiere-connexion.html')+'?token='+encodeURIComponent(token);
-  await env.CASHFLOW_KV.put(key,JSON.stringify(passwordReset?{email,purpose:'account-password-reset',authVersion:((await dgReadJson(env,'client:'+email,{})).authVersion||''),createdAt:dgNow()}:{email,campaignId:invitationCampaigns[0].id,campaignIds:invitationCampaigns.map(c=>c.id),existingAccount,createdAt:new Date().toISOString()}),{expirationTtl:passwordReset?1200:172800});
   try {
     const cId=encodeURIComponent(String(contact.id));
     const saved=await fetch(root+'/contacts/'+cId,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:destination.replace(/^https:\/\//, '')}]})});
@@ -2052,6 +1976,64 @@ async function handleMessagerieCleanup(request, env) {
   return json({ success: true, deleted, kept, days });
 }
 
+// Récupération universelle des comptes clients NyXia — sans modification des accès.
+const NYX_RESET_PREFIX='password-reset:nyxia-universal:';
+function nyxResetResponse(data,status=200){return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type'}})}
+async function nyxResetRead(env,key){try{return JSON.parse(await env.CASHFLOW_KV.get(key)||'null')}catch(_){return null}}
+async function nyxResetDigest(value){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function nyxResetHash(password,salt){const e=new TextEncoder(),key=await crypto.subtle.importKey('raw',e.encode(password),'PBKDF2',false,['deriveBits']);return [...new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:e.encode(salt),iterations:100000,hash:'SHA-256'},key,256))].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function nyxResetHost(env,value){
+ const host=String(value||'').toLowerCase();if(!/^[a-z0-9-]+\.nyxia\.top$/.test(host))return '';
+ const registry=await nyxResetRead(env,'univers:portals')||[];
+ const known=['portaillena.nyxia.top','portailselena.nyxia.top','portailalex.nyxia.top','portail-prompts.nyxia.top','portaildylanreiki.nyxia.top'];
+ return known.includes(host)||registry.some(p=>String(p.host||'').toLowerCase()===host)?host:'';
+}
+function nyxResetConfiguration(env){
+ const field=String(env.SYSTEME_RESET_FIELD||'').trim(),tag=Number(env.SYSTEME_RESET_TAG_ID);
+ if(!env.SYSTEME_API_KEY||!/^[\w-]+$/.test(field)||!Number.isSafeInteger(tag)||tag<=0)throw Error('Le courriel universel de récupération doit être configuré.');
+ if(field===String(env.SYSTEME_ACTIVATION_FIELD||'').trim()||tag===Number(env.SYSTEME_ACTIVATION_TAG_ID))throw Error('La récupération doit utiliser un champ et un tag distincts de la Dégustation.');
+ return{field,tag};
+}
+async function nyxResetSend(env,email,url){
+ const {field,tag}=nyxResetConfiguration(env),root='https://api.systeme.io/api',headers={'X-API-Key':String(env.SYSTEME_API_KEY),'Accept':'application/json'};
+ const lookup=await fetch(root+'/contacts?email='+encodeURIComponent(email),{headers});if(!lookup.ok)throw Error('Recherche contact : HTTP '+lookup.status);
+ const payload=await lookup.json(),list=Array.isArray(payload)?payload:(payload['hydra:member']||payload.items||payload.contacts||[]),contact=list.find(c=>String(c.email||'').trim().toLowerCase()===email);
+ if(!contact?.id)throw Error('Contact introuvable dans Systeme.io.');const id=encodeURIComponent(String(contact.id));
+ const saved=await fetch(root+'/contacts/'+id,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:url}]})});if(!saved.ok)throw Error('Enregistrement lien : HTTP '+saved.status);
+ // Réarmer uniquement le tag de récupération, pour permettre une nouvelle demande.
+ const removed=await fetch(root+'/contacts/'+id+'/tags/'+tag,{method:'DELETE',headers});if(!removed.ok&&removed.status!==404)throw Error('Réarmement tag : HTTP '+removed.status);
+ const assigned=await fetch(root+'/contacts/'+id+'/tags',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tagId:tag})});if(!assigned.ok)throw Error('Déclenchement courriel : HTTP '+assigned.status);
+}
+async function nyxResetRevoke(env,email){
+ for(const prefix of ['session:','portal:session:']){let cursor;do{const page=await env.CASHFLOW_KV.list({prefix,cursor});for(const k of page.keys||[]){const s=await nyxResetRead(env,k.name);if(String(s?.email||'').toLowerCase()===email)await env.CASHFLOW_KV.delete(k.name);}cursor=page.list_complete?null:page.cursor;}while(cursor);}
+}
+async function nyxResetForgot(request,env){
+ const b=await request.json().catch(()=>({})),email=String(b.email||'').trim().toLowerCase(),host=await nyxResetHost(env,b.portalHost);
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!host)return nyxResetResponse({error:'Courriel ou portail invalide.'},400);
+ try{nyxResetConfiguration(env);}catch(e){return nyxResetResponse({error:e.message},503);}
+ const rate=NYX_RESET_PREFIX+'rate:'+await nyxResetDigest(email);if(await env.CASHFLOW_KV.get(rate))return nyxResetResponse({ok:true,message:'Si un compte existe, tu recevras un lien de récupération.'});
+ await env.CASHFLOW_KV.put(rate,'1',{expirationTtl:60});const client=await nyxResetRead(env,'client:'+email);
+ if(client&&client.active!==false&&(client.passwordHash||client.password)){
+  const token=[...crypto.getRandomValues(new Uint8Array(32))].map(x=>x.toString(16).padStart(2,'0')).join(''),key=NYX_RESET_PREFIX+await nyxResetDigest(token);
+  const record={email,host,purpose:'nyxia-universal-reset',authVersion:client.authVersion||'',credentialVersion:client.passwordHash||client.password,expiresAt:Date.now()+1200000};
+  await env.CASHFLOW_KV.put(key,JSON.stringify(record),{expirationTtl:1200});
+  try{await nyxResetSend(env,email,'https://univers.nyxia.top/reinitialiser-mot-de-passe.html?token='+encodeURIComponent(token));}
+  catch(e){await env.CASHFLOW_KV.delete(key);await env.CASHFLOW_KV.delete(rate);console.error('Récupération NyXia',e);return nyxResetResponse({error:'Le courriel ne peut pas être envoyé pour le moment.'},502);}
+ }
+ return nyxResetResponse({ok:true,message:'Si un compte existe, tu recevras un lien de récupération.'});
+}
+async function nyxResetFinish(request,env){
+ const b=await request.json().catch(()=>({})),token=String(b.token||''),password=String(b.password||'');
+ if(!token||password.length<8||password!==b.confirm)return nyxResetResponse({error:'Lien invalide ou mots de passe non conformes (8 caractères minimum).'},400);
+ const key=NYX_RESET_PREFIX+await nyxResetDigest(token),record=await nyxResetRead(env,key);
+ if(!record||record.purpose!=='nyxia-universal-reset'||record.expiresAt<=Date.now())return nyxResetResponse({error:'Ce lien est invalide ou expiré. Demande un nouveau lien.'},410);
+ const client=await nyxResetRead(env,'client:'+record.email);
+ if(!client||client.active===false||(client.authVersion||'')!==record.authVersion||(client.passwordHash||client.password)!==record.credentialVersion)return nyxResetResponse({error:'Ce lien est invalide ou expiré.'},410);
+ client.salt=crypto.randomUUID();client.passwordHash=await nyxResetHash(password,client.salt);client.authVersion=crypto.randomUUID();delete client.password;
+ await env.CASHFLOW_KV.put('client:'+record.email,JSON.stringify(client));await env.CASHFLOW_KV.delete(key);await nyxResetRevoke(env,record.email);
+ const host=await nyxResetHost(env,record.host);return nyxResetResponse({ok:true,message:'Ton mot de passe est modifié. Reconnecte-toi à ton portail.',loginUrl:host?'https://'+host+'/login.html':'https://nyxia.top/'});
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -2096,6 +2078,9 @@ export default {
     }
 
     try {
+      if(['/api/access/password-forgot-universal','/api/access/password-reset-universal'].includes(path)&&request.method==='OPTIONS')return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type'}});
+      if(path==='/api/access/password-forgot-universal'&&request.method==='POST')return await nyxResetForgot(request,env);
+      if(path==='/api/access/password-reset-universal'&&request.method==='POST')return await nyxResetFinish(request,env);
       if (path === '/api/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/logout' && request.method === 'POST') return await handleLogout(request, env);
       if (path === '/api/check-auth' && request.method === 'POST') return await handleCheckAuth(request, env);
@@ -2141,9 +2126,6 @@ export default {
       if (path === '/api/access/grants' && request.method === 'GET') return await handleDgGrants(request, env);
       if (path === '/api/access/grant' && request.method === 'POST') return await handleDgGrantManual(request, env);
       if (path === '/api/access/grants/delete' && request.method === 'POST') return await handleDgDeleteGrant(request, env);
-      if(['/api/access/password-forgot','/api/access/password-reset','/api/password/forgot','/api/password/reset'].includes(path)&&request.method==='OPTIONS')return dgCors(new Response(null,{status:204}));
-      if(['/api/access/password-forgot','/api/password/forgot'].includes(path)&&request.method==='POST')return await handleAccountPasswordForgot(request,env);
-      if(['/api/access/password-reset','/api/password/reset'].includes(path)&&request.method==='POST')return await handleAccountPasswordReset(request,env);
       if ((path === '/api/access/invitation' || path === '/api/access/password') && request.method === 'OPTIONS') return dgCors(new Response(null,{status:204}));
       if (path === '/api/access/webhook-status' && request.method === 'GET') return await handleDgWebhookStatus(request,env);
       if (path === '/api/access/registration' && (request.method === 'GET' || request.method === 'POST')) return await handleDgRegistration(request,env);
