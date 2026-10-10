@@ -1999,7 +1999,7 @@ async function nyxResetSend(env,email,url){
  const lookup=await fetch(root+'/contacts?email='+encodeURIComponent(email),{headers});if(!lookup.ok)throw Error('Recherche contact : HTTP '+lookup.status);
  const payload=await lookup.json(),list=Array.isArray(payload)?payload:(payload['hydra:member']||payload.items||payload.contacts||[]),contact=list.find(c=>String(c.email||'').trim().toLowerCase()===email);
  if(!contact?.id)throw Error('Contact introuvable dans Systeme.io.');const id=encodeURIComponent(String(contact.id));
- const saved=await fetch(root+'/contacts/'+id,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:url}]})});if(!saved.ok)throw Error('Enregistrement lien : HTTP '+saved.status);
+ const saved=await fetch(root+'/contacts/'+id,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:url.replace(/^https:\/\//,'')}]})});if(!saved.ok)throw Error('Enregistrement lien : HTTP '+saved.status);
  // Réarmer uniquement le tag de récupération, pour permettre une nouvelle demande.
  const removed=await fetch(root+'/contacts/'+id+'/tags/'+tag,{method:'DELETE',headers});if(!removed.ok&&removed.status!==404)throw Error('Réarmement tag : HTTP '+removed.status);
  const assigned=await fetch(root+'/contacts/'+id+'/tags',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({tagId:tag})});if(!assigned.ok)throw Error('Déclenchement courriel : HTTP '+assigned.status);
