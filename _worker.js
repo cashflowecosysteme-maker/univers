@@ -1353,7 +1353,7 @@ async function dgSendPasswordInvitation(env, email, campaign) {
   if (!existingAccount) await env.CASHFLOW_KV.put(key,JSON.stringify({email,studioFirstAccess:true,createdAt:new Date().toISOString()}),{expirationTtl:172800});
   try {
     const cId=encodeURIComponent(String(contact.id));
-    const saved=await fetch(root+'/contacts/'+cId,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:destination}]})});
+    const saved=await fetch(root+'/contacts/'+cId,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:destination.replace(/^https:\/\//, '')}]})});
     if(!saved.ok) throw new Error('Champ activation Systeme.io : HTTP '+saved.status);
     // Réarmement ciblé : un tag déjà présent ne déclenche pas de nouvel e-mail.
     // Il s'agit uniquement du tag dédié à la première activation NyXia.
