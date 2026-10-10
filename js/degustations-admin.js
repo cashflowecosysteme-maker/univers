@@ -1,3 +1,9 @@
+function dgReadableDuration(hours){
+  var minutes=Math.round(Number(hours)*60);
+  if(!Number.isFinite(minutes)||minutes<0)return '—';
+  var h=Math.floor(minutes/60),m=minutes%60;
+  return h+' h'+(m?' '+m+' min':'');
+}
 /* NyXia — Super Admin — Gestionnaire de Dégustations & Accès
    Ce fichier est chargé PAR le vrai index.html du Super Admin.
    Il n'installe aucun second admin et lit les portails dynamiquement via /api/degustations/meta.
@@ -164,7 +170,7 @@ function dgEditCampaign(id){
   var h=c.fixedStartAt&&c.fixedEndAt?(Date.parse(c.fixedEndAt)-Date.parse(c.fixedStartAt))/3600000:(Number(c.durationHours)||72);
   var preset=[72,144,168,720].indexOf(h)>=0?String(h):'custom';
   document.getElementById('dg-duration-preset').value=preset;
-  document.getElementById('dg-duration-hours').value=h;
+  document.getElementById('dg-duration-hours').value=Number(h.toFixed(2));
   document.getElementById('dg-duration-custom-wrap').style.display='block';
   document.getElementById('dg-start-mode').value=c.startMode||'first_login';
   document.getElementById('dg-access-start').value=dgLocalDate(c.fixedStartAt);
@@ -221,7 +227,7 @@ function dgRenderCampaigns(){
     +DG_STATE.campaigns.map(function(c){
       var portals=(c.portalIds||[]).map(dgPortalName).join(', ');
       var availability=c.fixedStartAt&&c.fixedEndAt?(new Date(c.fixedStartAt).toLocaleString('fr-CA')+' → '+new Date(c.fixedEndAt).toLocaleString('fr-CA')):((c.availableFrom?new Date(c.availableFrom).toLocaleDateString('fr-CA'):'—')+' → '+(c.availableUntil?new Date(c.availableUntil).toLocaleDateString('fr-CA'):'—'));
-      return '<tr><td><strong>'+dgEsc(c.name)+'</strong><div class="hint">'+dgEsc(c.fixedStartAt?'Dates fixes des accès':(c.startMode==='first_login'?'Départ à la première entrée':'Départ à l’activation'))+'</div></td><td>'+dgEsc(portals)+'</td><td>'+dgEsc(c.fixedStartAt&&c.fixedEndAt?(Date.parse(c.fixedEndAt)-Date.parse(c.fixedStartAt))/3600000:c.durationHours)+' h</td><td>'+dgEsc(availability)+'</td><td>'+dgEsc(dgMoney(c))+'</td><td>'+dgEsc(c.status||'draft')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="dgEditCampaign(\''+dgEsc(c.id)+'\')">Modifier</button>' + (c.registrationUrl ? ' <button class="btn btn-ghost" type="button" onclick="dgOpenRegistration(\''+dgEsc(c.id)+'\')">Inscription</button> <button class="btn btn-ghost" type="button" onclick="dgCopyRegistration(\''+dgEsc(c.id)+'\')">Copier le lien</button>' : '') + ' <button class="btn btn-ghost" type="button" onclick="dgUseForRegistration(\''+dgEsc(c.id)+'\')">Utiliser pour l’inscription</button>' + ' <button class="btn btn-ghost" type="button" onclick="dgCopyWebhook(\''+dgEsc(c.id)+'\')">Webhook</button> <button class="btn btn-danger" type="button" onclick="dgDeleteCampaign(\''+dgEsc(c.id)+'\')">Supprimer</button></td></tr>';
+      return '<tr><td><strong>'+dgEsc(c.name)+'</strong><div class="hint">'+dgEsc(c.fixedStartAt?'Dates fixes des accès':(c.startMode==='first_login'?'Départ à la première entrée':'Départ à l’activation'))+'</div></td><td>'+dgEsc(portals)+'</td><td>'+dgEsc(dgReadableDuration(c.fixedStartAt&&c.fixedEndAt?(Date.parse(c.fixedEndAt)-Date.parse(c.fixedStartAt))/3600000:c.durationHours))+'</td><td>'+dgEsc(availability)+'</td><td>'+dgEsc(dgMoney(c))+'</td><td>'+dgEsc(c.status||'draft')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="dgEditCampaign(\''+dgEsc(c.id)+'\')">Modifier</button>' + (c.registrationUrl ? ' <button class="btn btn-ghost" type="button" onclick="dgOpenRegistration(\''+dgEsc(c.id)+'\')">Inscription</button> <button class="btn btn-ghost" type="button" onclick="dgCopyRegistration(\''+dgEsc(c.id)+'\')">Copier le lien</button>' : '') + ' <button class="btn btn-ghost" type="button" onclick="dgUseForRegistration(\''+dgEsc(c.id)+'\')">Utiliser pour l’inscription</button>' + ' <button class="btn btn-ghost" type="button" onclick="dgCopyWebhook(\''+dgEsc(c.id)+'\')">Webhook</button> <button class="btn btn-danger" type="button" onclick="dgDeleteCampaign(\''+dgEsc(c.id)+'\')">Supprimer</button></td></tr>';
     }).join('')+'</tbody></table></div>';
 }
 
@@ -298,6 +304,7 @@ window.dgDeletePermanent=dgDeletePermanent;
 window.dgGrantManual=dgGrantManual;
 window.dgDeleteGrant=dgDeleteGrant;
 })();
+
 
 
 
