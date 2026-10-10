@@ -1249,12 +1249,31 @@ async function dgCreateOrReuseActivation(env, campaign, email, source, forceAdmi
   const aKey = dgActivationKey(email, campaign.id);
   const oldRaw = await env.CASHFLOW_KV.get(aKey);
   if (oldRaw) {
-    try { const old = JSON.parse(oldRaw); if (old && old.campaignId) return old; } catch (_) {}
+    try {
+      const old = JSON.parse(oldRaw);
+      if (old && old.campaignId) {
+        // Nouvelle inscription : ajouter les portails manquants avec le compteur original.
+        // Ne jamais recréer un accès déjà suivi puis retiré.
+        const known = Array.isArray(old.portalIds) ? old.portalIds : [];
+        for (const portalId of campaign.portalIds || []) {
+          const grantKey = dgGrantKey(email, campaign.id, portalId);
+          if (await env.CASHFLOW_KV.get(grantKey) || known.includes(portalId)) continue;
+          await env.CASHFLOW_KV.put(grantKey, JSON.stringify({
+            key: grantKey, email, campaignId: campaign.id, campaignName: campaign.name,
+            portalId, pending: !!old.pending, startedAt: old.startedAt || '',
+            expiresAt: old.expiresAt || '', createdAt: dgNow(), source: source || 'manual'
+          }));
+        }
+        old.portalIds = [...new Set(known.concat(campaign.portalIds || []))];
+        await env.CASHFLOW_KV.put(aKey, JSON.stringify(old));
+        return old;
+      }
+    } catch (e) { if (!(e instanceof SyntaxError)) throw e; }
   }
   const pending = !campaign.fixedEndAt && campaign.startMode === 'first_login';
   const startedAt = pending ? '' : dgNow();
   const expiresAt = pending ? '' : (campaign.fixedEndAt || new Date(Date.parse(startedAt) + Number(campaign.durationHours) * 3600000).toISOString());
-  const activation = { email, campaignId: campaign.id, campaignName: campaign.name, source: source || 'manual', pending, startedAt, expiresAt, createdAt: dgNow() };
+  const activation = { email, campaignId: campaign.id, campaignName: campaign.name, portalIds: [...(campaign.portalIds || [])], source: source || 'manual', pending, startedAt, expiresAt, createdAt: dgNow() };
   await env.CASHFLOW_KV.put(aKey, JSON.stringify(activation));
   for (const portalId of campaign.portalIds || []) {
     const key = dgGrantKey(email, campaign.id, portalId);
@@ -2174,6 +2193,7 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
+
 
 
 
