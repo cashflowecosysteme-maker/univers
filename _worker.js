@@ -1377,7 +1377,7 @@ async function dgCheckAccess(env, email, portalId) {
 }
 
 function dgExtractEmail(body) {
-  return dgEmail(body && (body.email || body.contact_email || body.contactEmail || (body.contact && body.contact.email) || (body.customer && body.customer.email) || (body.data && body.data.email) || (body.fields && body.fields.email)));
+  return dgEmail(body && ((body.data && body.data.contact && body.data.contact.email) || (body.data && body.data.customer && body.data.customer.email) || body.email || body.contact_email || body.contactEmail || (body.contact && body.contact.email) || (body.customer && body.customer.email) || (body.data && body.data.email) || (body.fields && body.fields.email)));
 }
 async function dgAccessCallerAllowed(request, env) {
   if (await requireAdmin(request, env)) return true;
@@ -2232,6 +2232,7 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
+
 
 
 
