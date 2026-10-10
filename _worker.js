@@ -901,6 +901,34 @@ async function handleDgRegistration(request,env) {
  const webhookUrl='https://univers.nyxia.top/api/access/register?key='+encodeURIComponent(key)+(page?'&page='+encodeURIComponent(dgRegistrationPage(page)):'');
  return json({success:true,webhookUrl});
 }
+// Trace protégée : distingue une inscription Systeme.io du test manuel.
+async function dgTraceWebhook(request,env,handler) {
+ const u=new URL(request.url),supplied=u.searchParams.get('key');
+ let expected;
+ if(u.pathname==='/api/access/register')expected=await env.CASHFLOW_KV.get(DG_REGISTRATION_KEY);
+ else {const campaign=(await dgReadCampaigns(env)).find(c=>c.id===dgId(u.searchParams.get('campaign')));expected=campaign&&campaign.webhookKey;}
+ // Ne pas laisser des appels non autorisés remplacer le diagnostic.
+ if(!expected||!supplied||supplied!==expected)return handler(request,env);
+ const body=await request.clone().json().catch(()=>({}));
+ const automatic=body.type==='contact.optin.completed'||body.type==='customer.sale.completed';
+ const key='univers:access:webhook:last:'+ (automatic?'automatic':'manual');
+ const receipt={receivedAt:new Date().toISOString(),source:automatic?'systeme.io':'test ou autre format',event:String(body.type||''),email:dgExtractEmail(body),state:'received'};
+ async function save(){try{await env.CASHFLOW_KV.put(key,JSON.stringify(receipt),{expirationTtl:604800});}catch(e){console.error('Trace webhook NyXia indisponible');}}
+ await save();
+ try {
+  const response=await handler(request,env),result=await response.clone().json().catch(()=>({}));
+  receipt.finishedAt=new Date().toISOString();receipt.status=response.status;receipt.state=response.ok?'completed':'failed';
+  receipt.message=result.error||(result.invitation&&result.invitation.invitationSent?'Lien enregistré et tag d’envoi accepté par Systeme.io. La livraison du courriel dépend de Systeme.io.':'Traitement terminé.');
+  await save();return response;
+ }catch(e){receipt.finishedAt=new Date().toISOString();receipt.status=500;receipt.state='failed';receipt.message='Erreur pendant le traitement du webhook.';await save();throw e;}
+}
+async function handleDgWebhookStatus(request,env) {
+ if(!(await requireAdmin(request,env)))return json({error:'Non autorisé.'},401);
+ const automatic=await dgReadJson(env,'univers:access:webhook:last:automatic',null);
+ const manual=await dgReadJson(env,'univers:access:webhook:last:manual',null);
+ const response=json({success:true,automatic,manual});response.headers.set('Cache-Control','private, no-store');return response;
+}
+
 async function handleDgRegister(request,env) {
  const url=new URL(request.url),expected=await env.CASHFLOW_KV.get(DG_REGISTRATION_KEY),supplied=url.searchParams.get('key');
  if(!expected||!supplied||supplied!==expected)return dgCors(json({error:'Webhook d’inscription invalide.'},403));
@@ -2038,12 +2066,13 @@ export default {
       if (path === '/api/access/grant' && request.method === 'POST') return await handleDgGrantManual(request, env);
       if (path === '/api/access/grants/delete' && request.method === 'POST') return await handleDgDeleteGrant(request, env);
       if ((path === '/api/access/invitation' || path === '/api/access/password') && request.method === 'OPTIONS') return dgCors(new Response(null,{status:204}));
+      if (path === '/api/access/webhook-status' && request.method === 'GET') return await handleDgWebhookStatus(request,env);
       if (path === '/api/access/registration' && (request.method === 'GET' || request.method === 'POST')) return await handleDgRegistration(request,env);
       if (path === '/api/access/register' && request.method === 'OPTIONS') return dgCors(new Response(null,{status:204}));
-      if (path === '/api/access/register' && request.method === 'POST') return await handleDgRegister(request,env);
+      if (path === '/api/access/register' && request.method === 'POST') return await dgTraceWebhook(request,env,handleDgRegister);
       if (path === '/api/access/invitation' && request.method === 'POST') return await handleDgInvitationInfo(request, env);
       if (path === '/api/access/password' && request.method === 'POST') return await handleDgFirstPassword(request, env);
-      if (path === '/api/access/activate' && request.method === 'POST') return await handleDgActivate(request, env);
+      if (path === '/api/access/activate' && request.method === 'POST') return await dgTraceWebhook(request,env,handleDgActivate);
       if (path === '/api/access/activate' && request.method === 'OPTIONS') return dgCors(new Response(null, { status: 204 }));
       if (path === '/api/access/check' && (request.method === 'GET' || request.method === 'POST')) return await handleDgAccessCheck(request, env);
       if (path === '/api/access/check' && request.method === 'OPTIONS') return dgCors(new Response(null, { status: 204 }));
@@ -2232,6 +2261,7 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
+
 
 
 
