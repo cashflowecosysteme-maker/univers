@@ -45,8 +45,8 @@
       form.classList.add('hidden');links.replaceChildren();
       if(!Array.isArray(portals)||!portals.length){show('Aucun portail disponible pour cet accès.',false);return;}
       if(portals.length===1){show('Redirection vers la connexion à '+portals[0].name+'…',true);setTimeout(function(){location.href=portals[0].loginUrl;},1500);return;}
-      show('Choisis le portail auquel tu veux te connecter. Ton mot de passe est le même pour ces portails.',true);
-      portals.forEach(function(portal){var a=document.createElement('a');a.href=portal.loginUrl;a.textContent='Se connecter à '+portal.name;a.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #7B5CFF;border-radius:12px';links.appendChild(a);(portal.accessWindows||[]).forEach(function(w){var note=document.createElement('div');note.style.cssText='font-size:12px;color:#D6D9F0;margin-bottom:12px';function date(v){return v?new Date(v).toLocaleString('fr-CA',{timeZone:'America/Toronto'}):'';}note.textContent=(w.startsAt?'Du '+date(w.startsAt):'')+(w.expiresAt?' au '+date(w.expiresAt):'');if(note.textContent)links.appendChild(note);});});
+      show('Chaque portail s’ouvre dans un nouvel onglet. Cette page reste ouverte pour choisir les autres. Ton mot de passe est le même pour ces portails.',true);
+      portals.forEach(function(portal){var a=document.createElement('a');a.href=portal.loginUrl;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Se connecter à '+portal.name;a.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #7B5CFF;border-radius:12px';links.appendChild(a);(portal.accessWindows||[]).forEach(function(w){var note=document.createElement('div');note.style.cssText='font-size:12px;color:#D6D9F0;margin-bottom:12px';function date(v){return v?new Date(v).toLocaleString('fr-CA',{timeZone:'America/Toronto'}):'';}note.textContent=(w.startsAt?'Du '+date(w.startsAt):'')+(w.expiresAt?' au '+date(w.expiresAt):'');if(note.textContent)links.appendChild(note);});});
     }
     async function post(path,body){var r=await fetch(api+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});var d=await r.json();if(!r.ok||!d.ok){var e=Error(d.error||'Opération impossible.');e.data=d;throw e;}return d;}
     if(!token){show('Ce lien personnel est absent ou invalide. Utilise le lien reçu dans ton courriel NyXia.',false);return;}
@@ -64,5 +64,6 @@
   </script>
 </body>
 </html>
+
 
 
