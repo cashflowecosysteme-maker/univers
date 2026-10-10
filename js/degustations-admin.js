@@ -186,6 +186,16 @@ async function dgDeleteCampaign(id){
   if(!confirm('Supprimer cette campagne du gestionnaire ? Les accès déjà accordés ne seront pas effacés automatiquement.'))return;
   try{var r=await api('/api/degustations/delete','POST',{id:id});if(!r.res.ok)throw new Error(r.data.error||'Erreur');DG_STATE.campaigns=r.data.campaigns||[];dgRenderCampaigns();dgRenderCampaignSelect();}catch(e){alert(e.message||e);}
 }
+async function dgUseForRegistration(id){
+  var c=DG_STATE.campaigns.find(function(x){return x.id===id;});if(!c)return;
+  if(c.status!=='active'){alert('Passe cette campagne en Active avant de la proposer à l’inscription.');return;}
+  if(!confirm('Proposer « '+c.name+' » aux prochaines inscriptions de ta page Systeme.io ?'))return;
+  try{var r=await api('/api/access/registration','POST',{campaignId:id});if(!r.res.ok)throw Error(r.data.error||'Erreur');
+    var url=r.data.webhookUrl;
+    try{await navigator.clipboard.writeText(url);alert('Campagne choisie pour les prochaines inscriptions. Le webhook permanent est copié. Colle-le une seule fois dans ta règle Systeme.io. Il restera identique pour les prochaines campagnes.');}
+    catch(_){prompt('Campagne choisie. Copie ce webhook permanent dans ta règle Systeme.io :',url);}
+  }catch(e){alert(e.message||e);}
+}
 function dgCopyWebhook(id){
   var c=DG_STATE.campaigns.find(function(x){return x.id===id;});if(!c)return;
   var url=location.origin+'/api/access/activate?campaign='+encodeURIComponent(c.id)+'&key='+encodeURIComponent(c.webhookKey||'');
@@ -210,7 +220,7 @@ function dgRenderCampaigns(){
     +DG_STATE.campaigns.map(function(c){
       var portals=(c.portalIds||[]).map(dgPortalName).join(', ');
       var availability=c.fixedStartAt&&c.fixedEndAt?(new Date(c.fixedStartAt).toLocaleString('fr-CA')+' → '+new Date(c.fixedEndAt).toLocaleString('fr-CA')):((c.availableFrom?new Date(c.availableFrom).toLocaleDateString('fr-CA'):'—')+' → '+(c.availableUntil?new Date(c.availableUntil).toLocaleDateString('fr-CA'):'—'));
-      return '<tr><td><strong>'+dgEsc(c.name)+'</strong><div class="hint">'+dgEsc(c.fixedStartAt?'Dates fixes des accès':(c.startMode==='first_login'?'Départ à la première entrée':'Départ à l’activation'))+'</div></td><td>'+dgEsc(portals)+'</td><td>'+dgEsc(c.durationHours)+' h</td><td>'+dgEsc(availability)+'</td><td>'+dgEsc(dgMoney(c))+'</td><td>'+dgEsc(c.status||'draft')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="dgEditCampaign(\''+dgEsc(c.id)+'\')">Modifier</button>' + (c.registrationUrl ? ' <button class="btn btn-ghost" type="button" onclick="dgOpenRegistration(\''+dgEsc(c.id)+'\')">Inscription</button> <button class="btn btn-ghost" type="button" onclick="dgCopyRegistration(\''+dgEsc(c.id)+'\')">Copier le lien</button>' : '') + ' <button class="btn btn-ghost" type="button" onclick="dgCopyWebhook(\''+dgEsc(c.id)+'\')">Webhook</button> <button class="btn btn-danger" type="button" onclick="dgDeleteCampaign(\''+dgEsc(c.id)+'\')">Supprimer</button></td></tr>';
+      return '<tr><td><strong>'+dgEsc(c.name)+'</strong><div class="hint">'+dgEsc(c.fixedStartAt?'Dates fixes des accès':(c.startMode==='first_login'?'Départ à la première entrée':'Départ à l’activation'))+'</div></td><td>'+dgEsc(portals)+'</td><td>'+dgEsc(c.durationHours)+' h</td><td>'+dgEsc(availability)+'</td><td>'+dgEsc(dgMoney(c))+'</td><td>'+dgEsc(c.status||'draft')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="dgEditCampaign(\''+dgEsc(c.id)+'\')">Modifier</button>' + (c.registrationUrl ? ' <button class="btn btn-ghost" type="button" onclick="dgOpenRegistration(\''+dgEsc(c.id)+'\')">Inscription</button> <button class="btn btn-ghost" type="button" onclick="dgCopyRegistration(\''+dgEsc(c.id)+'\')">Copier le lien</button>' : '') + ' <button class="btn btn-ghost" type="button" onclick="dgUseForRegistration(\''+dgEsc(c.id)+'\')">Utiliser pour l’inscription</button>' + ' <button class="btn btn-ghost" type="button" onclick="dgCopyWebhook(\''+dgEsc(c.id)+'\')">Webhook</button> <button class="btn btn-danger" type="button" onclick="dgDeleteCampaign(\''+dgEsc(c.id)+'\')">Supprimer</button></td></tr>';
     }).join('')+'</tbody></table></div>';
 }
 
@@ -279,6 +289,7 @@ window.dgSaveCampaign=dgSaveCampaign;
 window.dgEditCampaign=dgEditCampaign;
 window.dgDeleteCampaign=dgDeleteCampaign;
 window.dgCopyWebhook=dgCopyWebhook;
+window.dgUseForRegistration=dgUseForRegistration;
 window.dgPermanentAllChanged=dgPermanentAllChanged;
 window.dgSavePermanent=dgSavePermanent;
 window.dgEditPermanent=dgEditPermanent;
@@ -286,3 +297,4 @@ window.dgDeletePermanent=dgDeletePermanent;
 window.dgGrantManual=dgGrantManual;
 window.dgDeleteGrant=dgDeleteGrant;
 })();
+
