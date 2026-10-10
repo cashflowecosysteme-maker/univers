@@ -857,12 +857,12 @@ async function dgInvitationPortals(env,campaign,email) {
 async function dgReadInvitation(env,token) {
  if(!token)return{error:'Ce lien personnel est absent ou invalide.',status:400};
  const key='password-reset:univers:'+await dgInvitationHash(token),record=await dgReadJson(env,key,null);
- if(!record||!record.email||!record.campaignId)return{error:'Ce lien est invalide ou expiré. Demande un nouveau lien.',status:410};
- const campaign=(await dgReadCampaigns(env)).find(c=>c.id===record.campaignId);
- if(!campaign||campaign.status!=='active')return{error:'Cet Accès Gratuit au portail n’est plus actif.',status:403};
- const portals=await dgInvitationPortals(env,campaign,record.email);
+ if(!record||!record.email||(!record.campaignId&&!Array.isArray(record.campaignIds)))return{error:'Ce lien est invalide ou expiré. Demande un nouveau lien.',status:410};
+ const ids=Array.isArray(record.campaignIds)?record.campaignIds:[record.campaignId];
+ const campaigns=(await dgReadCampaigns(env)).filter(c=>ids.includes(c.id)&&c.status==='active');
+ const portals=await dgCombinedPortals(env,campaigns,record.email);
  if(!portals.length)return{error:'Cet Accès Gratuit au portail est terminé ou a été retiré.',status:403};
- return{key,record,campaign,portals};
+ return{key,record,campaign:campaigns[0],campaigns,portals};
 }
 async function handleDgInvitationInfo(request,env) {
  const body=await request.json().catch(()=>({})),invitation=await dgReadInvitation(env,String(body.token||'').trim());
@@ -888,26 +888,33 @@ async function handleDgFirstPassword(request,env) {
 // Point d'entrée stable pour la page d'inscription Systeme.io existante.
 const DG_REGISTRATION_CAMPAIGN='univers:access:registration-campaign';
 const DG_REGISTRATION_KEY='univers:access:registration-key';
-async function handleDgRegistration(request,env){
+async function handleDgRegistration(request,env) {
  if(!(await requireAdmin(request,env)))return json({error:'Non autorisé.'},401);
- let campaignId=await env.CASHFLOW_KV.get(DG_REGISTRATION_CAMPAIGN)||'';
+ let page=new URL(request.url).searchParams.get('page')||'';
  if(request.method==='POST'){
-  const b=await request.json().catch(()=>({})),c=(await dgReadCampaigns(env)).find(c=>c.id===dgId(b.campaignId));
-  if(!c)return json({error:'Campagne introuvable.'},404);
-  if(c.status!=='active')return json({error:'Publie cette campagne (statut Active) avant de la proposer à l’inscription.'},400);
-  campaignId=c.id;await env.CASHFLOW_KV.put(DG_REGISTRATION_CAMPAIGN,campaignId);
+  const b=await request.json().catch(()=>({}));
+  page=b.registrationUrl||((await dgReadCampaigns(env)).find(c=>c.id===dgId(b.campaignId))||{}).registrationUrl||page;
  }
+ if(page&&!dgRegistrationPage(page))return json({error:'URL d’inscription invalide.'},400);
  let key=await env.CASHFLOW_KV.get(DG_REGISTRATION_KEY);
  if(!key){key=crypto.randomUUID().replace(/-/g,'')+crypto.randomUUID().replace(/-/g,'');await env.CASHFLOW_KV.put(DG_REGISTRATION_KEY,key);}
- return json({success:true,campaignId,webhookUrl:'https://univers.nyxia.top/api/access/register?key='+encodeURIComponent(key)});
+ const webhookUrl='https://univers.nyxia.top/api/access/register?key='+encodeURIComponent(key)+(page?'&page='+encodeURIComponent(dgRegistrationPage(page)):'');
+ return json({success:true,webhookUrl});
 }
-async function handleDgRegister(request,env){
- const expected=await env.CASHFLOW_KV.get(DG_REGISTRATION_KEY),supplied=new URL(request.url).searchParams.get('key');
+async function handleDgRegister(request,env) {
+ const url=new URL(request.url),expected=await env.CASHFLOW_KV.get(DG_REGISTRATION_KEY),supplied=url.searchParams.get('key');
  if(!expected||!supplied||supplied!==expected)return dgCors(json({error:'Webhook d’inscription invalide.'},403));
- const id=await env.CASHFLOW_KV.get(DG_REGISTRATION_CAMPAIGN),c=(await dgReadCampaigns(env)).find(c=>c.id===id);
- if(!c)return dgCors(json({error:'Choisis la campagne à proposer avec « Utiliser pour l’inscription » dans Super Admin 1.'},503));
- const url=new URL(request.url);url.pathname='/api/access/activate';url.search='';url.searchParams.set('campaign',c.id);url.searchParams.set('key',c.webhookKey);
- return handleDgActivate(new Request(url,request),env);
+ const body=await request.json().catch(()=>({})),email=dgExtractEmail(body);
+ if(!email)return dgCors(json({error:'Courriel introuvable dans le webhook.'},400));
+ try {
+  let page=url.searchParams.get('page')||'';
+  if(!page){
+   const pages=[...new Set((await dgReadCampaigns(env)).filter(dgCampaignObtainable).map(c=>dgRegistrationPage(c.registrationUrl)).filter(Boolean))];
+   if(pages.length!==1)throw Error('Copie le webhook de la page concernée dans Dégustation : aucune sélection de campagne n’est nécessaire.');
+   page=pages[0];
+  }
+  return dgCors(json(await dgRegisterCampaigns(env,await dgPageCampaigns(env,page),email)));
+ }catch(e){console.error('Inscription NyXia',e);return dgCors(json({error:e.message},502));}
 }
 
 // Portails configurables (KV univers:portals)
@@ -1435,7 +1442,33 @@ async function dgInvitationHash(value) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
+function dgRegistrationPage(value) {
+ try { const u=new URL(String(value||'').trim());if(!['https:','http:'].includes(u.protocol))return '';u.hash='';u.pathname=u.pathname.replace(/\/+$/,'')||'/';u.searchParams.sort();return u.href; } catch(_){return '';}
+}
+async function dgPageCampaigns(env,page) {
+ const normalized=dgRegistrationPage(page);
+ if(!normalized)throw Error('Renseigne l’URL de la page d’inscription Systeme.io dans la campagne.');
+ return (await dgReadCampaigns(env)).filter(c=>dgCampaignObtainable(c)&&dgRegistrationPage(c.registrationUrl)===normalized);
+}
+async function dgCombinedPortals(env,campaigns,email) {
+ const out=[],byId=new Map();
+ for(const campaign of campaigns)for(const portal of await dgInvitationPortals(env,campaign,email)){
+  let p=byId.get(portal.id);
+  if(!p){p={...portal,accessWindows:[]};byId.set(portal.id,p);out.push(p);}
+  p.accessWindows.push({campaignId:campaign.id,campaignName:campaign.name,startsAt:portal.startsAt,expiresAt:portal.expiresAt});
+ }
+ return out;
+}
+async function dgRegisterCampaigns(env,campaigns,email) {
+ if(!campaigns.length)throw Error('Aucune campagne active disponible pour cette page d’inscription.');
+ const activations=[];
+ for(const campaign of campaigns)activations.push(await dgCreateOrReuseActivation(env,campaign,email,'systeme.io',false));
+ const invitation=await dgSendPasswordInvitation(env,email,campaigns);
+ return {success:true,activation:activations[0],activations,invitation};
+}
+
 async function dgSendPasswordInvitation(env, email, campaign) {
+  const invitationCampaigns=Array.isArray(campaign)?campaign:[campaign];
   if (!env.SYSTEME_API_KEY || !env.SYSTEME_ACTIVATION_FIELD || !env.SYSTEME_ACTIVATION_TAG_ID) {
     throw new Error('Variables Systeme.io manquantes dans le Worker Super Admin 1.');
   }
@@ -1460,10 +1493,10 @@ async function dgSendPasswordInvitation(env, email, campaign) {
   const tokenBytes=new Uint8Array(32);crypto.getRandomValues(tokenBytes);
   const token=[...tokenBytes].map(x=>x.toString(16).padStart(2,'0')).join('');
   const key='password-reset:univers:'+await dgInvitationHash(token);
-  const portals=await dgInvitationPortals(env,campaign,email);
+  const portals=await dgCombinedPortals(env,invitationCampaigns,email);
   if(!portals.length)throw Error('Aucun Accès Gratuit au portail actif pour ce courriel.');
   const destination='https://univers.nyxia.top/premiere-connexion.html?token='+encodeURIComponent(token);
-  await env.CASHFLOW_KV.put(key,JSON.stringify({email,campaignId:campaign.id,existingAccount,createdAt:new Date().toISOString()}),{expirationTtl:172800});
+  await env.CASHFLOW_KV.put(key,JSON.stringify({email,campaignId:invitationCampaigns[0].id,campaignIds:invitationCampaigns.map(c=>c.id),existingAccount,createdAt:new Date().toISOString()}),{expirationTtl:172800});
   try {
     const cId=encodeURIComponent(String(contact.id));
     const saved=await fetch(root+'/contacts/'+cId,{method:'PATCH',headers:{...headers,'Content-Type':'application/merge-patch+json'},body:JSON.stringify({fields:[{slug:field,value:destination.replace(/^https:\/\//, '')}]})});
@@ -1483,11 +1516,17 @@ async function dgSendPasswordInvitation(env, email, campaign) {
     throw error;
   }
 }
-async function handleDgActivate(request, env) {
-  const url=new URL(request.url);const campaignId=dgId(url.searchParams.get('campaign'));const key=String(url.searchParams.get('key')||'');const campaigns=await dgReadCampaigns(env);const c=campaigns.find((x)=>x.id===campaignId);
-  if(!c||!key||key!==c.webhookKey)return dgCors(json({error:'Webhook invalide.'},403));
-  const b=await request.json().catch(()=>({}));const email=dgExtractEmail(b);if(!email)return dgCors(json({error:'Courriel introuvable dans le webhook.'},400));
-  try{const activation=await dgCreateOrReuseActivation(env,c,email,'systeme.io',false);const invitation=await dgSendPasswordInvitation(env,email,c);return dgCors(json({success:true,activation,invitation}));}catch(e){console.error('degustation webhook invitation',e);return dgCors(json({error:e.message},502));}
+async function handleDgActivate(request,env) {
+ const url=new URL(request.url),campaignId=dgId(url.searchParams.get('campaign')),key=String(url.searchParams.get('key')||'');
+ const c=(await dgReadCampaigns(env)).find(x=>x.id===campaignId);
+ if(!c||!key||key!==c.webhookKey)return dgCors(json({error:'Webhook invalide.'},403));
+ const b=await request.json().catch(()=>({})),email=dgExtractEmail(b);
+ if(!email)return dgCors(json({error:'Courriel introuvable dans le webhook.'},400));
+ try {
+  // Compatibilité : le webhook existant inscrit aussi aux campagnes de la même page.
+  const campaigns=dgRegistrationPage(c.registrationUrl)?await dgPageCampaigns(env,c.registrationUrl):(dgCampaignObtainable(c)?[c]:[]);
+  return dgCors(json(await dgRegisterCampaigns(env,campaigns,email)));
+ }catch(e){console.error('Inscription NyXia',e);return dgCors(json({error:e.message},502));}
 }
 async function handleDgAccessCheck(request, env) {
   if (!(await dgAccessCallerAllowed(request,env))) return dgCors(json({error:'Non autorisé.'},401));
@@ -2193,6 +2232,7 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
+
 
 
 

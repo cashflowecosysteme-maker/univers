@@ -423,7 +423,7 @@ td strong{color:#fff}
         <div class="grid2">
           <div><label class="f">Nom de la campagne *</label><input class="f" id="dg-c-name" placeholder="Ex. VIP — Événement septembre 2026"></div>
           <div><label class="f">État</label><select class="f" id="dg-c-status"><option value="draft">Brouillon</option><option value="active">Active</option><option value="ended">Terminée</option></select></div>
-          <div style="grid-column:1/-1"><label class="f">URL de la page d’inscription Systeme.io</label><input class="f" id="dg-registration-url" type="url" placeholder="https://..."><p class="hint">Lien public de ton formulaire gratuit ou payant. L’activation reste assurée par le webhook de la campagne.</p></div>
+          <div style="grid-column:1/-1"><label class="f">URL de la page d’inscription Systeme.io</label><input class="f" id="dg-registration-url" type="url" placeholder="https://..."><p class="hint">Les campagnes actives ayant la même URL d’inscription sont proposées ensemble. Une inscription donne accès à leurs portails, chacun aux dates prévues.</p></div>
           <div style="grid-column:1/-1"><label class="f">Portail(s) à faire goûter *</label><div id="dg-campaign-portals" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div></div>
           <div style="grid-column:1/-1"><h3 style="margin:7px 0">Dates des accès à la dégustation</h3><p class="hint">Tu choisis les deux dates. Les portails ouvrent à la première et ferment à la deuxième, même si une personne s’inscrit ou se connecte plus tard. Heure locale du Québec sur un appareil réglé au Québec.</p></div>
           <div><label class="f">Début des accès *</label><input class="f" type="datetime-local" id="dg-access-start"></div>
@@ -1871,9 +1871,10 @@ document.addEventListener('input',function(e){
 })();
 document.getElementById('login-password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 </script>
-<script src="/js/degustations-admin.js?v=reglages-visibles-3" defer></script>
+<script src="/js/degustations-admin.js?v=campagnes-simultanees-4" defer></script>
 </body>
 </html>
+
 
 
 
