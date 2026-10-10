@@ -423,6 +423,7 @@ td strong{color:#fff}
         <div class="grid2">
           <div><label class="f">Nom de la campagne *</label><input class="f" id="dg-c-name" placeholder="Ex. VIP — Événement septembre 2026"></div>
           <div><label class="f">État</label><select class="f" id="dg-c-status"><option value="draft">Brouillon</option><option value="active">Active</option><option value="ended">Terminée</option></select></div>
+          <div style="grid-column:1/-1"><label class="f">URL de la page d’inscription Systeme.io</label><input class="f" id="dg-registration-url" type="url" placeholder="https://..."><p class="hint">Lien public de ton formulaire gratuit ou payant. L’activation reste assurée par le webhook de la campagne.</p></div>
           <div style="grid-column:1/-1"><label class="f">Portail(s) à faire goûter *</label><div id="dg-campaign-portals" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div></div>
           <div style="grid-column:1/-1"><h3 style="margin:7px 0">Dates des accès à la dégustation</h3><p class="hint">Tu choisis les deux dates. Les portails ouvrent à la première et ferment à la deuxième, même si une personne s’inscrit ou se connecte plus tard. Heure locale du Québec sur un appareil réglé au Québec.</p></div>
           <div><label class="f">Début des accès *</label><input class="f" type="datetime-local" id="dg-access-start"></div>
@@ -433,7 +434,7 @@ td strong{color:#fff}
           <div><label class="f">Départ du compteur (ancien mode)</label><select class="f" id="dg-start-mode"><option value="first_login">À la première entrée</option><option value="activation">À l’activation</option></select></div>
           </div></details></div>
           <div><label class="f">Prix de la porte d’entrée</label><div style="display:grid;grid-template-columns:1fr 100px;gap:8px"><input class="f" type="number" id="dg-price" min="0" step="0.01" placeholder="19"><select class="f" id="dg-currency"><option value="CAD">CAD</option><option value="EUR">EUR</option><option value="USD">USD</option></select></div></div>
-          <div style="grid-column:1/-1"><label class="f">URL de la page d’inscription Systeme.io</label><input class="f" id="dg-registration-url" type="url" placeholder="https://..."><p class="hint">Lien public de ton formulaire gratuit ou payant. L’activation reste assurée par le webhook de la campagne.</p></div>
+
           <div style="grid-column:1/-1"><label class="f">Lien de paiement / déclencheur Systeme.io</label><input class="f" id="dg-checkout-url" placeholder="https://..."></div>
           <div><label class="f">Après expiration</label><select class="f" id="dg-after-type" onchange="dgAfterTypeChanged()"><option value="offer">Page d’offre</option><option value="checkout">Page de paiement</option><option value="boutique">Boutique NyXia</option><option value="appointment">Prise de rendez-vous</option><option value="custom">URL personnalisée</option></select></div>
           <div><label class="f">URL après expiration</label><input class="f" id="dg-after-url" placeholder="https://..."><p class="hint" id="dg-after-url-hint">Page affichée quand l’accès temporaire est terminé.</p></div>
@@ -1873,5 +1874,6 @@ document.getElementById('login-password').addEventListener('keydown',function(e)
 <script src="/js/degustations-admin.js?v=outils-proteges-2" defer></script>
 </body>
 </html>
+
 
 
