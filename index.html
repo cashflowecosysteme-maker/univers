@@ -204,8 +204,7 @@ td strong{color:#fff}
           </div>
           <div id="pr-price-wrap"><label class="f">Prix unique ($)</label><input class="f" type="number" id="pr-price" step="0.01"></div>
           <div id="pr-price-month-wrap"><label class="f">Abonnement mensuel ($)</label><input class="f" type="number" id="pr-price-month" step="0.01"></div>
-          <div style="grid-column:1/-1"><label class="f">Description courte</label><input class="f" id="pr-desc"></div>
-          <div style="grid-column:1/-1"><label class="f">Description complète</label><textarea class="f" id="pr-desc-long" rows="5"></textarea></div>
+          <div style="grid-column:1/-1"><label class="f" for="pr-desc">Description</label><textarea class="f" id="pr-desc" rows="8" placeholder="Écris toute la description du produit ici."></textarea></div>
           <div id="pr-status-wrap" hidden><label class="f">Statut</label><select class="f" id="pr-status"><option value="active">Actif</option><option value="published">Publié</option><option value="draft">Brouillon</option><option value="inactive">Inactif</option><option value="archived">Archivé</option></select></div>
           <div><label class="f" id="pr-link-label">Lien d’offre</label><input class="f" id="pr-link" placeholder="https://..."><p class="hint" id="pr-link-hint">Page de vente ou lien principal de l’offre.</p></div>
           <div><label class="f">Image (URL)</label><input class="f" id="pr-img"></div>
@@ -1198,7 +1197,7 @@ var PR_PRODUCTS=[];
 var PR_EDIT_ID=null;
 function cancelProductEdit(){
   PR_EDIT_ID=null;
-  ['title','desc','desc-long','price','price-month','link','img','promo-guide','join-url','n1','n2','n3'].forEach(function(k){document.getElementById('pr-'+k).value='';});
+  ['title','desc','price','price-month','link','img','promo-guide','join-url','n1','n2','n3'].forEach(function(k){document.getElementById('pr-'+k).value='';});
   document.getElementById('pr-billing').value='one_time';
   document.getElementById('pr-join-type').value='free';
   document.getElementById('pr-status').value='active';
@@ -1215,7 +1214,7 @@ function editProduct(id){
   PR_EDIT_ID=p.id;
   document.getElementById('pr-billing').value=p.billing_type||'one_time';
   prBillingChanged();
-  var fields={title:'title',desc:'description_short','desc-long':'description_long',price:'price','price-month':'price_monthly',link:'affiliate_link',img:'image_url','promo-guide':'promo_guide','join-type':'join_type','join-url':'join_url',n1:'commission_n1',n2:'commission_n2',n3:'commission_n3'};
+  var fields={title:'title',desc:'description_short',price:'price','price-month':'price_monthly',link:'affiliate_link',img:'image_url','promo-guide':'promo_guide','join-type':'join_type','join-url':'join_url',n1:'commission_n1',n2:'commission_n2',n3:'commission_n3'};
   Object.keys(fields).forEach(function(k){var value=p[fields[k]];document.getElementById('pr-'+k).value=value==null?'':value;});
   var status=document.getElementById('pr-status');
   var current=p.status||'draft';
@@ -1235,7 +1234,6 @@ async function createProduct(){
   var body={
     title:document.getElementById('pr-title').value.trim(),
     description:document.getElementById('pr-desc').value.trim(),
-    descriptionLong:document.getElementById('pr-desc-long').value.trim(),
     price:isAppointment?0:document.getElementById('pr-price').value,
     price_monthly:isAppointment?0:((document.getElementById('pr-price-month')&&document.getElementById('pr-price-month').value)||0),
     billing_type:billingUi,
@@ -1926,6 +1924,7 @@ document.getElementById('login-password').addEventListener('keydown',function(e)
 <script src="/js/degustations-admin.js?v=campagnes-simultanees-4" defer></script>
 </body>
 </html>
+
 
 
 

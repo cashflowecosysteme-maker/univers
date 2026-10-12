@@ -374,8 +374,28 @@ async function handleStats(request, env) {
   });
 }
 
+
+// Réunir les descriptions existantes sans perdre leurs textes d’origine.
+async function ensureUnifiedProductDescriptions(env){
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS marketplace_description_archive (
+      product_id TEXT PRIMARY KEY, description_short TEXT, description_long TEXT,
+      archived_at TEXT DEFAULT (datetime('now')))`),
+    env.DB.prepare(`INSERT OR IGNORE INTO marketplace_description_archive (product_id, description_short, description_long)
+      SELECT id, description_short, description_long FROM marketplace_products
+      WHERE trim(COALESCE(description_long, '')) <> ''`),
+    env.DB.prepare(`UPDATE marketplace_products SET description_short = CASE
+      WHEN trim(COALESCE(description_short, '')) = '' THEN description_long
+      WHEN instr(description_long, description_short) > 0 THEN description_long
+      ELSE description_short || char(10) || char(10) || description_long END,
+      description_long = NULL, updated_at = datetime('now')
+      WHERE trim(COALESCE(description_long, '')) <> ''`)
+  ]);
+}
+
 async function handleListProducts(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  await ensureUnifiedProductDescriptions(env);
   const rows = await env.DB.prepare(
     `SELECT p.*, u.full_name as seller_name, u.role as seller_role
      FROM marketplace_products p
@@ -448,7 +468,9 @@ async function handleCreateProduct(request, env) {
 
 async function handleUpdateProduct(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  await ensureUnifiedProductDescriptions(env);
   const body = await request.json();
+  if (body.description !== undefined) body.descriptionLong = ''; // Compatibilité avec les anciens lecteurs : aucun texte obsolète.
   if (!body.id) return json({ error: 'Id requis.' }, 400);
   const fields = {
     title: 'title', description: 'description_short', descriptionLong: 'description_long',
@@ -2329,6 +2351,7 @@ async function handleVectorizeWipe(request, env) {
   for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (_) {} }
   return json({ success: true, deleted: ids.length });
 }
+
 
 
 
