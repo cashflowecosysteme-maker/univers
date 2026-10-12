@@ -190,7 +190,7 @@ td strong{color:#fff}
     </div>
     <div class="module-panel" id="module-produits">
       <div class="panel">
-        <h3>Créer un produit SuperAdmin</h3>
+        <h3 id="pr-editor-title">Créer un produit SuperAdmin</h3>
         <div class="grid2">
           <div><label class="f">Titre *</label><input class="f" id="pr-title"></div>
           <div><label class="f">Type de tarif / action</label>
@@ -205,6 +205,8 @@ td strong{color:#fff}
           <div id="pr-price-wrap"><label class="f">Prix unique ($)</label><input class="f" type="number" id="pr-price" step="0.01"></div>
           <div id="pr-price-month-wrap"><label class="f">Abonnement mensuel ($)</label><input class="f" type="number" id="pr-price-month" step="0.01"></div>
           <div style="grid-column:1/-1"><label class="f">Description courte</label><input class="f" id="pr-desc"></div>
+          <div style="grid-column:1/-1"><label class="f">Description complète</label><textarea class="f" id="pr-desc-long" rows="5"></textarea></div>
+          <div id="pr-status-wrap" hidden><label class="f">Statut</label><select class="f" id="pr-status"><option value="active">Actif</option><option value="published">Publié</option><option value="draft">Brouillon</option><option value="inactive">Inactif</option><option value="archived">Archivé</option></select></div>
           <div><label class="f" id="pr-link-label">Lien d’offre</label><input class="f" id="pr-link" placeholder="https://..."><p class="hint" id="pr-link-hint">Page de vente ou lien principal de l’offre.</p></div>
           <div><label class="f">Image (URL)</label><input class="f" id="pr-img"></div>
           <div style="grid-column:1/-1"><label class="f">Guide de promotion</label><textarea class="f" id="pr-promo-guide" rows="3" placeholder="Publications, angles, message type…"></textarea></div>
@@ -216,7 +218,8 @@ td strong{color:#fff}
           <div><label class="f">% cercle 2</label><input class="f" type="number" id="pr-n2"></div>
           <div><label class="f">% cercle 3</label><input class="f" type="number" id="pr-n3"></div>
         </div>
-        <button class="btn" style="margin-top:12px" onclick="createProduct()">Publier le produit</button>
+        <button class="btn" id="pr-save" type="button" style="margin-top:12px" onclick="createProduct()">Publier le produit</button>
+        <button class="btn btn-ghost" id="pr-cancel" type="button" style="margin-top:12px" hidden onclick="cancelProductEdit()">Annuler la modification</button>
         <div class="msg" id="pr-msg"></div>
       </div>
       <div class="panel">
@@ -1180,7 +1183,7 @@ function prBillingChanged(){
   if(appointment){
     if(price)price.value='';
     if(monthly)monthly.value='';
-    if(joinType)joinType.value='free';
+    if(joinType&&!PR_EDIT_ID)joinType.value='free';
     if(hint)hint.textContent='Rencontre gratuite : aucun prix n’est affiché dans le Répertoire.';
     if(linkLabel)linkLabel.textContent='Lien de prise de rendez-vous';
     if(linkHint)linkHint.textContent='Colle ici ton lien Systeme.io, Calendly ou autre page de réservation.';
@@ -1191,29 +1194,76 @@ function prBillingChanged(){
   }
 }
 
+var PR_PRODUCTS=[];
+var PR_EDIT_ID=null;
+function cancelProductEdit(){
+  PR_EDIT_ID=null;
+  ['title','desc','desc-long','price','price-month','link','img','promo-guide','join-url','n1','n2','n3'].forEach(function(k){document.getElementById('pr-'+k).value='';});
+  document.getElementById('pr-billing').value='one_time';
+  document.getElementById('pr-join-type').value='free';
+  document.getElementById('pr-status').value='active';
+  document.getElementById('pr-status-wrap').hidden=true;
+  document.getElementById('pr-cancel').hidden=true;
+  document.getElementById('pr-editor-title').textContent='Créer un produit SuperAdmin';
+  document.getElementById('pr-save').textContent='Publier le produit';
+  document.getElementById('pr-msg').style.display='none';
+  prBillingChanged();
+}
+function editProduct(id){
+  var p=PR_PRODUCTS.find(function(row){return String(row.id)===String(id);});
+  if(!p)return;
+  PR_EDIT_ID=p.id;
+  document.getElementById('pr-billing').value=p.billing_type||'one_time';
+  prBillingChanged();
+  var fields={title:'title',desc:'description_short','desc-long':'description_long',price:'price','price-month':'price_monthly',link:'affiliate_link',img:'image_url','promo-guide':'promo_guide','join-type':'join_type','join-url':'join_url',n1:'commission_n1',n2:'commission_n2',n3:'commission_n3'};
+  Object.keys(fields).forEach(function(k){var value=p[fields[k]];document.getElementById('pr-'+k).value=value==null?'':value;});
+  var status=document.getElementById('pr-status');
+  var current=p.status||'draft';
+  if(!Array.from(status.options).some(function(o){return o.value===current;})){var option=document.createElement('option');option.value=current;option.textContent=current;status.appendChild(option);}
+  status.value=current;
+  document.getElementById('pr-status-wrap').hidden=false;
+  document.getElementById('pr-cancel').hidden=false;
+  document.getElementById('pr-editor-title').textContent='Modifier le produit';
+  document.getElementById('pr-save').textContent='Enregistrer les modifications';
+  document.getElementById('pr-msg').style.display='none';
+  document.getElementById('pr-editor-title').scrollIntoView({behavior:'smooth',block:'start'});
+  document.getElementById('pr-title').focus({preventScroll:true});
+}
 async function createProduct(){
   var billingUi=(document.getElementById('pr-billing')&&document.getElementById('pr-billing').value)||'one_time';
   var isAppointment=billingUi==='appointment_free';
   var body={
     title:document.getElementById('pr-title').value.trim(),
     description:document.getElementById('pr-desc').value.trim(),
+    descriptionLong:document.getElementById('pr-desc-long').value.trim(),
     price:isAppointment?0:document.getElementById('pr-price').value,
     price_monthly:isAppointment?0:((document.getElementById('pr-price-month')&&document.getElementById('pr-price-month').value)||0),
     billing_type:billingUi,
     affiliateLink:document.getElementById('pr-link').value.trim(),
     imageUrl:document.getElementById('pr-img').value.trim(),
     promo_guide:(document.getElementById('pr-promo-guide')&&document.getElementById('pr-promo-guide').value||'').trim(),
-    join_type:isAppointment?'free':((document.getElementById('pr-join-type')&&document.getElementById('pr-join-type').value)||'free'),
+    join_type:(isAppointment&&!PR_EDIT_ID)?'free':((document.getElementById('pr-join-type')&&document.getElementById('pr-join-type').value)||'free'),
     join_url:(document.getElementById('pr-join-url')&&document.getElementById('pr-join-url').value||'').trim(),
-    status:'active'
+    status:PR_EDIT_ID?document.getElementById('pr-status').value:'active'
   };
+  if(PR_EDIT_ID)body.id=PR_EDIT_ID;
+  if(!body.title){showMsg('pr-msg','Titre requis.',false);return;}
+  var numeric=[body.price,body.price_monthly];
+  if(numeric.some(function(v){return !Number.isFinite(Number(v))||Number(v)<0;})){showMsg('pr-msg','Les prix doivent être des nombres positifs ou nuls.',false);return;}
   var n1=document.getElementById('pr-n1').value,n2=document.getElementById('pr-n2').value,n3=document.getElementById('pr-n3').value;
   if(n1!=='')body.n1=Number(n1);if(n2!=='')body.n2=Number(n2);if(n3!=='')body.n3=Number(n3);
+  if([n1,n2,n3].some(function(v){return v!==''&&(!Number.isFinite(Number(v))||Number(v)<0||Number(v)>100);})){showMsg('pr-msg','Chaque pourcentage doit être compris entre 0 et 100.',false);return;}
+  var button=document.getElementById('pr-save');button.disabled=true;
+  document.getElementById('pr-cancel').disabled=true;
   try{
-    var out=await api('/api/products','POST',body);
-    showMsg('pr-msg',out.data.success?'Produit publié.':(out.data.error||'Erreur'),!!out.data.success);
-    if(out.data.success)loadProducts();
+    var editing=!!PR_EDIT_ID;
+    var out=await api(editing?'/api/products/update':'/api/products','POST',body);
+    if(!out.res.ok||!out.data.success)throw new Error(out.data.error||'Enregistrement impossible.');
+    if(editing)cancelProductEdit();
+    showMsg('pr-msg',editing?'Modifications enregistrées.':'Produit publié.',true);
+    await loadProducts();
   }catch(e){showMsg('pr-msg',e.message,false);}
+  finally{button.disabled=false;document.getElementById('pr-cancel').disabled=false;}
 }
 function moneyCAD(n){return Number(n||0).toLocaleString('fr-CA',{minimumFractionDigits:2,maximumFractionDigits:2})+' $';}
 async function loadAPayer(){
@@ -1301,6 +1351,7 @@ async function loadProducts(){
   try{
     var out=await api('/api/products','GET');
     var list=out.data.products||[];
+    PR_PRODUCTS=list;
     if(!list.length){box.textContent='Aucun produit.';return;}
     box.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th align="left">Titre</th><th>Prix</th><th>%</th><th>Statut</th><th>Origine</th><th></th></tr>'+list.map(function(p){
       var st=p.status||'';
@@ -1313,8 +1364,9 @@ async function loadProducts(){
         ? '<button class="btn btn-ghost" type="button" onclick="setJoinType(\''+esc(p.id)+'\',\'free\')">→ Gratuit</button> '
         : '<button class="btn btn-ghost" type="button" onclick="setJoinType(\''+esc(p.id)+'\',\'paid\')">→ Payant</button> ';
       var priceDisplay=p.billing_type==='appointment_free'?'Rendez-vous gratuit':p.price;
-      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(priceDisplay)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+(st==='draft'?' (attente)':'')+'</td><td>'+esc(origin)+'</td><td style="white-space:nowrap">'+btnJoin+btnSt+'<button class="btn btn-danger" type="button" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
+      return '<tr><td><strong>'+esc(p.title)+'</strong></td><td>'+esc(priceDisplay)+'</td><td>'+esc(p.commission_n1)+'/'+esc(p.commission_n2)+'/'+esc(p.commission_n3)+'</td><td>'+esc(st)+(st==='draft'?' (attente)':'')+'</td><td>'+esc(origin)+'</td><td style="white-space:nowrap">'+'<button class="btn btn-ghost pr-edit" type="button" data-product-id="'+esc(p.id)+'">Modifier</button> '+btnJoin+btnSt+'<button class="btn btn-danger" type="button" onclick="delProduct(\''+esc(p.id)+'\')">Supprimer</button></td></tr>';
     }).join('')+'</table>';
+    box.querySelectorAll('.pr-edit').forEach(function(button){button.addEventListener('click',function(){editProduct(button.getAttribute('data-product-id'));});});
   }catch(e){box.textContent=e.message;}
 }
 async function setProductStatus(id,status){try{await api('/api/products/update','POST',{id:id,status:status});loadProducts();}catch(e){alert(e.message||e);}}

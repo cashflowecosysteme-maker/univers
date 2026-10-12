@@ -450,37 +450,44 @@ async function handleUpdateProduct(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const body = await request.json();
   if (!body.id) return json({ error: 'Id requis.' }, 400);
+  const fields = {
+    title: 'title', description: 'description_short', descriptionLong: 'description_long',
+    price: 'price', price_monthly: 'price_monthly', billing_type: 'billing_type',
+    n1: 'commission_n1', n2: 'commission_n2', n3: 'commission_n3',
+    affiliateLink: 'affiliate_link', imageUrl: 'image_url', promo_guide: 'promo_guide',
+    join_url: 'join_url', join_type: 'join_type', status: 'status'
+  };
+  const aliases = {promoGuide:'promo_guide', joinUrl:'join_url', joinType:'join_type'};
+  for (const [alias, key] of Object.entries(aliases)) {
+    if (body[key] === undefined && body[alias] !== undefined) body[key] = body[alias];
+  }
+  const updates = [], values = [];
+  for (const [key, column] of Object.entries(fields)) {
+    if (body[key] === undefined) continue;
+    let value = body[key];
+    if (['price','price_monthly','n1','n2','n3'].includes(key)) {
+      value = Number(value);
+      if (!Number.isFinite(value) || value < 0 || (key.startsWith('n') && value > 100)) {
+        return json({error:'Prix ou pourcentage invalide.'}, 400);
+      }
+    } else {
+      value = String(value == null ? '' : value).trim();
+      if (key === 'title' && !value) return json({error:'Titre requis.'}, 400);
+      if (key === 'billing_type' && !['one_time','subscription','both','appointment_free'].includes(value)) return json({error:'Type de tarif invalide.'}, 400);
+      if (key === 'join_type' && !['free','paid'].includes(value)) return json({error:'Type de cercle invalide.'}, 400);
+      if (key === 'status' && !value) return json({error:'Statut requis.'}, 400);
+      if (key === 'join_url' && !value) value = 'https://repertoire.nyxia.top/?product=' + encodeURIComponent(body.id) + '&ref=NYXIA';
+    }
+    updates.push(column + ' = ?');
+    values.push(value);
+  }
+  if (!updates.length) return json({error:'Aucune modification fournie.'}, 400);
+  const existing = await env.DB.prepare('SELECT id FROM marketplace_products WHERE id = ?').bind(body.id).first();
+  if (!existing) return json({error:'Produit introuvable.'}, 404);
+  await ensureMarketplaceBillingColumns(env);
   await env.DB.prepare(
-    `UPDATE marketplace_products SET
-      title = COALESCE(?, title),
-      description_short = COALESCE(?, description_short),
-      price = COALESCE(?, price),
-      commission_n1 = COALESCE(?, commission_n1),
-      commission_n2 = COALESCE(?, commission_n2),
-      commission_n3 = COALESCE(?, commission_n3),
-      affiliate_link = COALESCE(?, affiliate_link),
-      image_url = COALESCE(?, image_url),
-      promo_guide = COALESCE(?, promo_guide),
-      join_url = COALESCE(?, join_url),
-      join_type = COALESCE(?, join_type),
-      status = COALESCE(?, status),
-      updated_at = datetime('now')
-     WHERE id = ?`
-  ).bind(
-    body.title || null,
-    body.description || null,
-    body.price != null ? Number(body.price) : null,
-    body.n1 != null ? Number(body.n1) : null,
-    body.n2 != null ? Number(body.n2) : null,
-    body.n3 != null ? Number(body.n3) : null,
-    body.affiliateLink || null,
-    body.imageUrl || null,
-    (body.promo_guide || body.promoGuide || '').trim() || null,
-    (body.join_url || body.joinUrl || '').trim() || null,
-    (body.join_type || body.joinType) || null,
-    body.status || null,
-    body.id
-  ).run();
+    'UPDATE marketplace_products SET ' + updates.join(', ') + ", updated_at = datetime('now') WHERE id = ?"
+  ).bind(...values, body.id).run();
   return json({ success: true });
 }
 
