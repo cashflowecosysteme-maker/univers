@@ -42,4 +42,29 @@ async function mediaApiKeys(req,env){
   return json({error:'Méthode inconnue.'},405)
 }
 
-export default{async fetch(request,env){if(!(await admin(request,env)))return json({error:'Non autorisé.'},401);const u=new URL(request.url);try{if(request.method==='GET'&&u.pathname==='/superadmin4/portail-shell-template.zip'){const r=await env.ASSETS.fetch(new Request(new URL('/superadmin4/portail-shell-template.zip',request.url),request));if(!r.ok)return json({error:'Coque Portail locale absente.'},502);return new Response(r.body,{headers:{'Content-Type':'application/zip','Cache-Control':'private, no-store'}})}if(u.pathname.startsWith('/api/superadmin4/projects'))return projects(request,env,u);if(u.pathname==='/api/superadmin4/personnages/profile')return profiles(request,env,u);if(u.pathname==='/api/superadmin4/personnages/history'&&request.method==='GET')return json({history:await listHistory(env,u.searchParams.get('code'))});if(u.pathname==='/api/superadmin4/personnages/history/restore'&&request.method==='POST'){try{const b=await request.json();return json({ok:true,profile:await restoreHistory(env,b.code,b.key)})}catch(e){return json({error:e.message},400)}}if(u.pathname==='/api/superadmin4/personnages/formations'&&request.method==='GET')return json({formations:await listFormations(env,u.searchParams.get('code'))});if(u.pathname==='/api/superadmin4/personnages/tts'&&request.method==='POST')return tts(request,env);if(u.pathname==='/api/superadmin4/media-keys')return mediaApiKeys(request,env);if(u.pathname==='/api/superadmin4/health')return json({ok:true,kv:!!env.CASHFLOW_KV,version:'18.0-personnages-premium-integres'});return json({error:'Route Super Admin 4 inconnue.'},404)}catch(e){return json({error:String(e?.message||e)},500)}}};
+
+// Pages HTML indépendantes : ne modifie pas les projets de portails.
+const PAGE_PREFIX='superadmin4:html-page:';
+async function htmlPages(req,env,u){
+ const id=String(u.searchParams.get('id')||'');
+ if(id&&!/^[a-zA-Z0-9_-]{1,120}$/.test(id))return json({error:'Identifiant invalide.'},400);
+ if(req.method==='GET'){
+  if(id){const raw=await env.CASHFLOW_KV.get(PAGE_PREFIX+id);return raw?json({page:JSON.parse(raw)}):json({error:'Page introuvable.'},404)}
+  let cursor;const pages=[];
+  do{const list=await env.CASHFLOW_KV.list({prefix:PAGE_PREFIX,cursor});for(const key of list.keys||[]){const raw=await env.CASHFLOW_KV.get(key.name);if(!raw)continue;try{const p=JSON.parse(raw);pages.push({id:p.id,title:p.data?.title||'',filename:p.data?.filename||'',updatedAt:p.updatedAt})}catch(_){}}cursor=list.list_complete?null:list.cursor}while(cursor);
+  return json({pages:pages.sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)))})
+ }
+ if(req.method==='POST'){
+  const body=await req.json(),data=body.data;
+  if(!data||!Array.isArray(data.sections)||!data.sections.length||data.sections.length>100)return json({error:'Page invalide (1 à 100 sections).'},400);
+  if(!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.html$/i.test(String(data.filename||''))||String(data.filename).includes('..'))return json({error:'Nom HTML invalide.'},400);
+  if(JSON.stringify(data).length>2000000)return json({error:'Page trop volumineuse.'},400);
+  const key=body.id||crypto.randomUUID();if(!/^[a-zA-Z0-9_-]{1,120}$/.test(key))return json({error:'Identifiant invalide.'},400);
+  const old=await env.CASHFLOW_KV.get(PAGE_PREFIX+key);let previous=null;try{previous=old?JSON.parse(old):null}catch(_){}
+  const now=new Date().toISOString(),page={id:key,data,createdAt:previous?.createdAt||now,updatedAt:now};
+  await env.CASHFLOW_KV.put(PAGE_PREFIX+key,JSON.stringify(page));return json({ok:true,page})
+ }
+ return json({error:'Méthode non autorisée.'},405)
+}
+
+export default{async fetch(request,env){if(!(await admin(request,env)))return json({error:'Non autorisé.'},401);const u=new URL(request.url);try{if(u.pathname==='/api/superadmin4/pages')return htmlPages(request,env,u);if(request.method==='GET'&&u.pathname==='/superadmin4/portail-shell-template.zip'){const r=await env.ASSETS.fetch(new Request(new URL('/superadmin4/portail-shell-template.zip',request.url),request));if(!r.ok)return json({error:'Coque Portail locale absente.'},502);return new Response(r.body,{headers:{'Content-Type':'application/zip','Cache-Control':'private, no-store'}})}if(u.pathname.startsWith('/api/superadmin4/projects'))return projects(request,env,u);if(u.pathname==='/api/superadmin4/personnages/profile')return profiles(request,env,u);if(u.pathname==='/api/superadmin4/personnages/history'&&request.method==='GET')return json({history:await listHistory(env,u.searchParams.get('code'))});if(u.pathname==='/api/superadmin4/personnages/history/restore'&&request.method==='POST'){try{const b=await request.json();return json({ok:true,profile:await restoreHistory(env,b.code,b.key)})}catch(e){return json({error:e.message},400)}}if(u.pathname==='/api/superadmin4/personnages/formations'&&request.method==='GET')return json({formations:await listFormations(env,u.searchParams.get('code'))});if(u.pathname==='/api/superadmin4/personnages/tts'&&request.method==='POST')return tts(request,env);if(u.pathname==='/api/superadmin4/media-keys')return mediaApiKeys(request,env);if(u.pathname==='/api/superadmin4/health')return json({ok:true,kv:!!env.CASHFLOW_KV,version:'18.0-personnages-premium-integres'});return json({error:'Route Super Admin 4 inconnue.'},404)}catch(e){return json({error:String(e?.message||e)},500)}}};
