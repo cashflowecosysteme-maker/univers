@@ -1145,7 +1145,7 @@ async function loadMembers(role,listId){
       var lienCell=code
         ? ('<button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" onclick="navigator.clipboard.writeText(\''+esc(lien)+'\')">Copier lien</button>')
         : '—';
-      return '<tr><td><strong>'+esc(m.prenom)+'</strong></td><td>'+esc(m.email)+'</td><td>'+codeCell+'</td><td>'+lienCell+'</td><td>'+esc(m.paypal||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="regenCode(\''+esc(m.id)+'\',\''+role+'\',\''+esc(listId)+'\')">Nouveau code</button> <button class="btn btn-danger" type="button" onclick="delMember(\''+esc(m.id)+'\',\''+role+'\')">Supprimer</button></td></tr>';
+      return '<tr><td><strong>'+esc(m.prenom)+'</strong></td><td>'+esc(m.email)+'</td><td>'+codeCell+'</td><td>'+lienCell+'</td><td>'+esc(m.paypal||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="editCommissionMember(\''+esc(m.id)+'\',\''+role+'\')">Modifier</button> <button class="btn btn-ghost" type="button" onclick="regenCode(\''+esc(m.id)+'\',\''+role+'\',\''+esc(listId)+'\')">Nouveau code</button> <button class="btn btn-danger" type="button" onclick="delMember(\''+esc(m.id)+'\',\''+role+'\')">Supprimer</button></td></tr>';
     }).join('')+'</table>';
   }catch(e){box.textContent=e.message;}
 }
@@ -1922,6 +1922,8 @@ document.addEventListener('input',function(e){
 document.getElementById('login-password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 </script>
 <script src="/js/degustations-admin.js?v=campagnes-simultanees-4" defer></script>
+
+<script src="/js/member-editor.js"></script>
 </body>
 </html>
 
