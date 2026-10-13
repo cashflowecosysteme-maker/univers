@@ -1,3 +1,4 @@
+import closerTool from './closer/worker.js';
 import superAdmin2 from './superadmin2/_worker.js';
 import superAdmin3 from './superadmin3/_worker.js';
 import superAdmin4 from './superadmin4/_worker.js';
@@ -2052,7 +2053,7 @@ export default {
     // Outils Super Admin : protéger le fichier HTML et son URL sans extension.
     let toolPath='';
     try{toolPath=decodeURIComponent(path).replace(/\/+$/,'').toLowerCase()}catch(_){}
-    const adminTool=toolPath==='/raccorder-portails'||toolPath==='/raccorder-portails.html'?'raccorder-portails':toolPath==='/diagnostic-webhook'||toolPath==='/diagnostic-webhook.html'?'diagnostic-webhook':'';
+    const adminTool=['/outil-closer','/outil-closer.html'].includes(toolPath)?'outil-closer':toolPath==='/raccorder-portails'||toolPath==='/raccorder-portails.html'?'raccorder-portails':toolPath==='/diagnostic-webhook'||toolPath==='/diagnostic-webhook.html'?'diagnostic-webhook':'';
     if(adminTool){
       const privateHeaders={'Cache-Control':'private, no-store, max-age=0','Vary':'Cookie, X-Univers-Token'};
       let authorized=false;
@@ -2067,6 +2068,8 @@ export default {
       return response;
     }
 
+
+    if(path.startsWith('/api/closer/') || /^\/closer\/payer\/[a-f0-9]{64}$/.test(path)) return closerTool.fetch(request,env,{requireAdmin,ensureCommissionsTable});
 
     // Super Admin 2 reste dans son propre fichier.
     // Le Worker principal fait uniquement l'aiguillage de ses routes API.
