@@ -46,7 +46,7 @@
   }
   window.editCommissionMember=async function(id,role){
     try{
-      var d=await call('/api/members?role='+encodeURIComponent(role),'GET');
+      var d=await call('/api/members?role='+encodeURIComponent(role)+'&id='+encodeURIComponent(id),'GET');
       member=(d.members||[]).find(function(m){return m.id===id});
       if(!member)throw new Error('Compte introuvable.');
       el('member-name').textContent=member.prenom+' — '+member.email+(member.closer?(member.closer_active?' · Closer actif — tous les portails':' · Closer désactivé'):'');
@@ -85,7 +85,7 @@ function memberRatesHtml(m){
   }else html+='<div class="nyxia-rate-note">Aucun produit configuré</div>';
   return html;
 }
-window.loadMembers=async function(role,listId){
+async function loadMembersTable(role,listId){
   var box=document.getElementById(listId);if(!box)return;
   box.textContent='Chargement…';
   try{
@@ -104,5 +104,38 @@ window.loadMembers=async function(role,listId){
       return '<tr><td><strong>'+esc(m.prenom)+'</strong>'+(m.closer?'<br><span style="color:#f2c66d;font-size:12px">'+(m.closer_active?'Direction du développement commercial · tous les portails':'Direction du développement commercial désactivée')+'</span>':'')+'</td>'+(role==='affiliate'?'<td class="nyxia-commission-cell">'+memberRatesHtml(m)+'</td>':'')+'<td>'+esc(m.email)+'</td><td>'+codeCell+'</td><td>'+lienCell+'</td><td>'+esc(m.paypal||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="editCommissionMember(\''+esc(m.id)+'\',\''+role+'\')">Modifier</button> <button class="btn btn-ghost" type="button" onclick="regenCode(\''+esc(m.id)+'\',\''+role+'\',\''+esc(listId)+'\')">Nouveau code</button> <button class="btn btn-danger" type="button" onclick="delMember(\''+esc(m.id)+'\',\''+role+'\')">Supprimer</button></td></tr>';
     }).join('')+'</table>';
   }catch(e){box.textContent=e.message;}
+}
+
+
+var pickerState=new Map();
+function selectedMemberHtml(m){
+ var code=String(m.code||m.affiliate_code||'').trim().toUpperCase();var link=code?'https://nyxia.top/r/'+code:'';
+ return '<div class="nyxia-selected-member"><h3>'+esc(m.full_name||m.prenom)+'</h3>'+(m.closer?'<p class="nyxia-rate-note">'+(m.closer_active?'Closer actif':'Closer désactivé')+'</p>':'')+'<div class="nyxia-member-info"><div><span>Courriel</span><p>'+esc(m.email)+'</p></div><div><span>Code Promoteur</span><p>'+esc(code||'Sans code')+'</p></div><div><span>PayPal</span><p>'+esc(m.paypal||'Non renseigné')+'</p></div></div><h4>Commissions accordées</h4>'+memberRatesHtml(m)+'<div class="nyxia-member-controls">'+(link?'<button type="button" class="btn btn-ghost" data-member-copy="'+esc(link)+'">Copier son lien Promoteur</button>':'')+'<button type="button" class="btn btn-ghost" data-member-edit="'+esc(m.id)+'">Modifier</button><button type="button" class="btn btn-ghost" data-member-code="'+esc(m.id)+'">Nouveau code</button><button type="button" class="btn btn-danger" data-member-delete="'+esc(m.id)+'">Supprimer</button></div></div>';
+}
+window.loadMembers=async function(role,listId){
+ if(role!=='affiliate')return loadMembersTable(role,listId);
+ var box=document.getElementById(listId);if(!box)return;
+ var previous=pickerState.get(listId);if(previous)clearTimeout(previous.timer);
+ var state={search:previous?.search||'',closer:previous?.closer||'',offset:previous?.offset||0,id:previous?.id||'',seq:0,timer:null};pickerState.set(listId,state);
+ box.innerHTML='<div class="nyxia-member-picker"><div class="nyxia-picker-grid"><label>Rechercher une personne<input type="search" data-picker-search placeholder="Nom, courriel ou code Promoteur"></label><label>Comptes à afficher<select data-picker-closer><option value="">Tous les promoteurs</option><option value="active">Closers actifs</option></select></label></div><label>Choisir la personne à afficher<select data-picker-person><option value="">Choisir une personne…</option></select></label><div class="nyxia-picker-navigation"><button class="btn btn-ghost" type="button" data-picker-prev>Précédent</button><span data-picker-count role="status"></span><button class="btn btn-ghost" type="button" data-picker-next>Suivant</button></div><div data-picker-detail aria-live="polite">Choisis une personne pour voir ses commissions.</div></div>';
+ var search=box.querySelector('[data-picker-search]'),closer=box.querySelector('[data-picker-closer]'),select=box.querySelector('[data-picker-person]'),detail=box.querySelector('[data-picker-detail]'),count=box.querySelector('[data-picker-count]'),prev=box.querySelector('[data-picker-prev]'),next=box.querySelector('[data-picker-next]');
+ search.value=state.search;closer.value=state.closer;
+ function current(){return pickerState.get(listId)===state}
+ async function showPerson(id){state.id=id;var seq=++state.seq;if(!id){detail.textContent='Choisis une personne pour voir ses commissions.';return}detail.textContent='Chargement de la personne…';try{var d=await call('/api/members?role=affiliate&id='+encodeURIComponent(id),'GET');if(!current()||seq!==state.seq)return;var member=(d.members||[])[0];if(!member){state.id='';select.value='';detail.textContent='Ce compte n’est plus disponible.';return}detail.innerHTML=selectedMemberHtml(member)}catch(e){if(current()&&seq===state.seq)detail.textContent=e.message}}
+ async function searchPeople(restore){var seq=++state.seq;count.textContent='Recherche…';prev.disabled=true;next.disabled=true;select.disabled=true;try{
+   var d=await call('/api/members?role=affiliate&summary=1&limit=50&offset='+state.offset+'&search='+encodeURIComponent(state.search)+(state.closer?'&closer=active':''),'GET');if(!current()||seq!==state.seq)return;
+   var rows=d.members||[],total=Number(d.total||0);select.replaceChildren();var placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=rows.length?'Choisir une personne…':'Aucun compte trouvé';select.appendChild(placeholder);
+   rows.forEach(function(m){var opt=document.createElement('option');opt.value=m.id;opt.textContent=(m.full_name||m.prenom)+' · '+m.email+' · '+(m.code||'Sans code')+(m.closer_active?' · Closer':'');select.appendChild(opt)});
+   count.textContent=total?(state.offset+1)+'–'+(state.offset+rows.length)+' sur '+total+' personne'+(total>1?'s':''):'Aucun résultat';prev.disabled=state.offset===0;next.disabled=state.offset+rows.length>=total;select.disabled=!rows.length;
+   if(restore&&state.id){var existing=rows.find(function(m){return m.id===state.id});if(!existing){var info=await call('/api/members?role=affiliate&summary=1&id='+encodeURIComponent(state.id),'GET');if(!current()||seq!==state.seq)return;existing=(info.members||[])[0];if(existing){var opt=document.createElement('option');opt.value=existing.id;opt.textContent=(existing.full_name||existing.prenom)+' · '+existing.email+' · '+(existing.code||'Sans code');select.appendChild(opt)}}if(existing){select.value=state.id;await showPerson(state.id)}else await showPerson('')}
+ }catch(e){if(current()&&seq===state.seq){count.textContent=e.message;select.disabled=true;detail.textContent='La recherche n’a pas pu être chargée.'}}}
+ search.oninput=function(){clearTimeout(state.timer);state.search=search.value;state.offset=0;state.id='';++state.seq;select.disabled=true;detail.textContent='Choisis une personne pour voir ses commissions.';state.timer=setTimeout(function(){searchPeople(false)},300)};
+ closer.onchange=function(){clearTimeout(state.timer);state.closer=closer.value;state.offset=0;state.id='';detail.textContent='Choisis une personne pour voir ses commissions.';searchPeople(false)};
+ select.onchange=function(){showPerson(select.value)};
+ prev.onclick=function(){state.offset=Math.max(0,state.offset-50);state.id='';detail.textContent='Choisis une personne pour voir ses commissions.';searchPeople(false)};
+ next.onclick=function(){state.offset+=50;state.id='';detail.textContent='Choisis une personne pour voir ses commissions.';searchPeople(false)};
+ detail.onclick=async function(e){var b=e.target.closest('button');if(!b)return;try{if(b.dataset.memberCopy)await navigator.clipboard.writeText(b.dataset.memberCopy);if(b.dataset.memberEdit)await editCommissionMember(b.dataset.memberEdit,'affiliate');if(b.dataset.memberCode)await regenCode(b.dataset.memberCode,'affiliate',listId);if(b.dataset.memberDelete)await delMember(b.dataset.memberDelete,'affiliate')}catch(err){alert(err.message)}};
+ await searchPeople(true);
 };
+style.textContent+=`.nyxia-member-picker{padding:6px 0}.nyxia-picker-grid{display:grid;grid-template-columns:2fr 1fr;gap:18px}.nyxia-member-picker label{display:block;color:#d7cfea;font-size:14px;margin-bottom:16px}.nyxia-member-picker input,.nyxia-member-picker select{display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:13px 15px;border:1px solid #a78bfa55;border-radius:13px;background:#0b1429;color:#fff;font-family:inherit;font-size:14px;font-weight:400}.nyxia-picker-navigation{display:flex;align-items:center;justify-content:space-between;gap:15px;margin:14px 0 22px}.nyxia-picker-navigation span{color:#c4b5fd;font-size:13px}.nyxia-picker-navigation button:disabled{opacity:.4;cursor:default}.nyxia-selected-member{padding:24px;border:1px solid #f2c66d55;border-radius:22px;background:linear-gradient(145deg,#111d38,#0A1628)}.nyxia-selected-member h3{margin:0;color:#ffe48a;font-size:22px;font-weight:400}.nyxia-selected-member h4{color:#ffe48a;font-size:16px;font-weight:400;margin:22px 0 8px}.nyxia-member-info{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:20px}.nyxia-member-info span{color:#aeb6d4;font-size:12px}.nyxia-member-info p{color:#fff;font-size:14px;overflow-wrap:anywhere;margin:6px 0}.nyxia-member-controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}@media(max-width:650px){.nyxia-picker-grid,.nyxia-member-info{grid-template-columns:1fr}.nyxia-picker-navigation{flex-wrap:wrap}.nyxia-selected-member{padding:18px}}`;
 })();

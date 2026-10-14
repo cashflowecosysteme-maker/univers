@@ -222,22 +222,26 @@ async function handleListMembers(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const url = new URL(request.url);
   const role = url.searchParams.get('role'); // admin | affiliate | all
-  let q = `SELECT id, email, full_name, role, affiliate_code, parent_id, paypal_email, created_at FROM users`;
-  const binds = [];
-  if (role === 'admin' || role === 'affiliate') {
-    q += ` WHERE role = ?`;
-    binds.push(role);
-  }
-  q += ` ORDER BY created_at DESC LIMIT 300`;
-  const rows = binds.length
-    ? await env.DB.prepare(q).bind(...binds).all()
-    : await env.DB.prepare(q).all();
   const closerTable = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='closer_accounts'").first();
+  const where=[],binds=[];
+  if(role==='admin'||role==='affiliate'){where.push('role = ?');binds.push(role)}
+  const memberId=(url.searchParams.get('id')||'').trim().slice(0,100);
+  const search=(url.searchParams.get('search')||'').trim().slice(0,200);
+  if(memberId){where.push('id = ?');binds.push(memberId)}
+  if(search){const pattern='%'+search.replace(/[\\%_]/g,'\\$&')+'%';where.push("(full_name LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\' OR affiliate_code LIKE ? ESCAPE '\\')");binds.push(pattern,pattern,pattern)}
+  if(url.searchParams.get('closer')==='active')where.push(closerTable?"EXISTS(SELECT 1 FROM closer_accounts c WHERE c.user_id=users.id AND c.active=1)":'0');
+  const paginated=url.searchParams.has('limit')||url.searchParams.has('search');
+  const requested=Number(url.searchParams.get('limit')||50),limit=memberId?1:paginated?(Number.isFinite(requested)?Math.min(100,Math.max(1,Math.floor(requested))):50):300;
+  const requestedOffset=Number(url.searchParams.get('offset')||0),offset=Number.isFinite(requestedOffset)?Math.max(0,Math.floor(requestedOffset)):0;
+  const filter=where.length?' WHERE '+where.join(' AND '):'';
+  const count=await env.DB.prepare('SELECT COUNT(*) AS total FROM users'+filter).bind(...binds).first();
+  const rows=await env.DB.prepare('SELECT id,email,full_name,role,affiliate_code,parent_id,paypal_email,created_at FROM users'+filter+' ORDER BY created_at DESC,id LIMIT ? OFFSET ?').bind(...binds,limit,offset).all();
+  const summary=url.searchParams.get('summary')==='1';
   const closerRows = closerTable ? await env.DB.prepare('SELECT user_id,active FROM closer_accounts').all() : {results:[]};
   const closerStates = new Map((closerRows.results || []).map(c => [c.user_id,Number(c.active)]));
-  const productsForRates = await env.DB.prepare('SELECT id,title,commission_n1,commission_n2,commission_n3 FROM marketplace_products ORDER BY title').all();
+  const productsForRates = summary?{results:[]}:await env.DB.prepare('SELECT id,title,commission_n1,commission_n2,commission_n3 FROM marketplace_products ORDER BY title').all();
   const overridesTable = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='commission_overrides'").first();
-  const overridesForRates = overridesTable ? await env.DB.prepare('SELECT product_id,beneficiary_id,commission_n1,commission_n2,commission_n3 FROM commission_overrides').all() : {results:[]};
+  const overridesForRates = !summary&&overridesTable ? await env.DB.prepare('SELECT product_id,beneficiary_id,commission_n1,commission_n2,commission_n3 FROM commission_overrides'+(memberId?' WHERE beneficiary_id=?':'')).bind(...(memberId?[memberId]:[])).all() : {results:[]};
   const overrideMap = new Map((overridesForRates.results || []).map(o => [JSON.stringify([o.beneficiary_id,o.product_id]),o]));
   const members = (rows.results || []).map(u => ({
     commission_rates: u.role === 'affiliate' ? (productsForRates.results || []).map(p => {
@@ -249,6 +253,7 @@ async function handleListMembers(request, env) {
     closer_active: closerStates.get(u.id) === 1,
     id: u.id,
     email: u.email,
+    full_name: u.full_name || '',
     prenom: (u.full_name || '').trim().split(/\s+/)[0] || '—',
     role: u.role,
     code: u.affiliate_code,
@@ -256,7 +261,7 @@ async function handleListMembers(request, env) {
     parentId: u.parent_id,
     depuis: u.created_at
   }));
-  return json({ members });
+  return json({members,total:Number(count?.total||0),limit,offset});
 }
 
 async function handleCreateMember(request, env) {
@@ -2196,7 +2201,7 @@ export default {
         const updated = new HTMLRewriter().on('script[src]', {
           element(element) {
             const src = element.getAttribute('src') || '';
-            if (src.split('?')[0] === '/js/member-editor.js') element.setAttribute('src', '/js/member-editor-v35.js');
+            if (src.split('?')[0] === '/js/member-editor.js') element.setAttribute('src', '/js/member-editor-v36.js');
           }
         }).transform(page);
         const headers = new Headers(updated.headers);
