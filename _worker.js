@@ -2053,6 +2053,7 @@ export default {
     // Outils Super Admin : protéger le fichier HTML et son URL sans extension.
     let toolPath='';
     try{toolPath=decodeURIComponent(path).replace(/\/+$/,'').toLowerCase()}catch(_){}
+    if(['/closer-rendez-vous','/closer-rendez-vous.html'].includes(toolPath))return new Response('Parcours retiré. Utilise la page du portail.',{status:410,headers:{'Cache-Control':'no-store'}});
     const adminTool=['/outil-closer','/outil-closer.html'].includes(toolPath)?'outil-closer':toolPath==='/raccorder-portails'||toolPath==='/raccorder-portails.html'?'raccorder-portails':toolPath==='/diagnostic-webhook'||toolPath==='/diagnostic-webhook.html'?'diagnostic-webhook':'';
     if(adminTool){
       const privateHeaders={'Cache-Control':'private, no-store, max-age=0','Vary':'Cookie, X-Univers-Token'};
