@@ -16,11 +16,72 @@ const INDEX_GROUPS=[
  {id:'cta',icon:'◎',title:'Rendez-vous / CTA',keys:['ctaKicker','ctaTitle','ctaText','ctaLabel','ctaUrl','ctaVariant','ctaButtonStyle']},
  {id:'footer',icon:'⌄',title:'Footer',keys:['footerContactLabel','footerContactUrl','footerLegalLabel','footerLegalUrl','footerPrivacyLabel','footerPrivacyUrl','footerCguLabel','footerCguUrl','footerSign','footerSocials','marquee'],advanced:['footerSocials','marquee']}
 ];
+const INDEX_ELEMENT_FIELDS=new Map(INDEX_GROUPS.map(g=>[g.id,g.keys.filter(key=>/Media$|Title$|Subtitle$|Eyebrow$|Kicker$|Text$|Note$|Sign$|CtaLabel$/.test(key)||['s2','s45','s67','s89','s1011','s1213','s1415','socialProof','faq','journeyItems','proofItems','ctaLabel','footerContactLabel','footerLegalLabel','footerPrivacyLabel','footerCguLabel'].includes(key))]));
+function indexElementKind(key){if(/Media$/.test(key))return 'Image';if(/CtaLabel$/.test(key)||key==='ctaLabel'||/^footer.*Label$/.test(key))return 'Bouton';if(/Subtitle$|Eyebrow$|Kicker$/.test(key))return 'Sous-titre';if(/Title$/.test(key))return 'Titre';return 'Texte'}
+function indexPrimaryCaption(id,key){return indexElementKind(key)+' '+((INDEX_ELEMENT_FIELDS.get(id)||[]).indexOf(key)+1)}
+function indexPrimaryTextEntries(id){return (INDEX_ELEMENT_FIELDS.get(id)||[]).filter(key=>['Texte','Titre','Sous-titre'].includes(indexElementKind(key))).map(key=>({key,value:'primary:'+key,label:indexPrimaryCaption(id,key)}))}
+function indexMainTextCaption(id){const keys=INDEX_ELEMENT_FIELDS.get(id)||[];const key=keys.find(k=>indexElementKind(k)==='Texte');return key?indexPrimaryCaption(id,key):'Texte principal'}
+function indexNumberedTargetOptions(target,id,blocks,selected){
+ target.innerHTML='';const main=document.createElement('option');main.value='';main.textContent=indexMainTextCaption(id);target.appendChild(main);
+ for(const entry of indexPrimaryTextEntries(id)){if(entry.label===main.textContent)continue;const option=document.createElement('option');option.value=entry.value;option.textContent=entry.label;target.appendChild(option)}
+ blocks.forEach((block,n)=>{if(['text','title'].includes(block.kind)){const option=document.createElement('option');option.value=block.id;option.textContent=indexBlockCaption(block,n,id);target.appendChild(option)}});target.value=selected||'';
+}
+function markIndexPrimaryElements(html,id){
+ const doc=document.createElement('template');doc.innerHTML=html;
+ for(const entry of indexPrimaryTextEntries(id)){
+  const key=entry.key;let selector;
+  if(key==='heroTitle')selector='h1';else if(key==='heroSubtitle')selector='h2';else if(key==='heroEyebrow')selector='.hero-eyebrow';else if(key==='heroNote')selector='.hero-note';else if(key==='heroText')selector='.hero-lead';else if(key==='footerSign')selector='.footer-sign';else if(key==='faq')selector='.faq-container';else if(key==='journeyItems')selector='.parcours-list';else if(key==='proofItems')selector='.auteurs-grid';else if(/Kicker$/.test(key))selector='.kicker';else if(/Title$/.test(key))selector=id==='cta'?'.cercle-inner>h2':'.section-head>h2';else selector='.text-block';
+  const node=doc.content.querySelector(selector);if(node)node.setAttribute('data-nx-block-id',entry.value);
+ }
+ for(const key of INDEX_ELEMENT_FIELDS.get(id)||[]){
+  const kind=indexElementKind(key);if(!['Image','Bouton'].includes(kind))continue;let node;
+  if(kind==='Image'){const keys=(INDEX_ELEMENT_FIELDS.get(id)||[]).filter(k=>indexElementKind(k)==='Image');node=doc.content.querySelectorAll('.img-frame')[keys.indexOf(key)]}
+  else if(id==='footer'){const keys=(INDEX_ELEMENT_FIELDS.get(id)||[]).filter(k=>indexElementKind(k)==='Bouton');node=doc.content.querySelectorAll('.footer-links>a')[keys.indexOf(key)]}
+  else node=doc.content.querySelector(id==='header'?'.cta-glass-wrap':id==='cta'?'.cercle-cta':'.hero-cta');
+  if(node)node.setAttribute('data-nx-block-id','primary:'+key);
+ }
+ return indexFragmentHtml(doc.content);
+}
+for(const [id,keys]of INDEX_ELEMENT_FIELDS)for(const key of keys)sections.push([key+'Target','Élément associé'],[key+'Placement','Position']);
+function indexElementEntries(id,blocks=indexTextBlocks(id)){
+ return [...(INDEX_ELEMENT_FIELDS.get(id)||[]).map(key=>({value:'primary:'+key,label:indexPrimaryCaption(id,key)})),...blocks.map((block,n)=>({value:block.id,label:indexBlockCaption(block,n,id)}))];
+}
+function indexRelativeOptions(select,id,blocks,selected,exclude){
+ select.innerHTML='<option value="">Position actuelle</option>';
+ for(const entry of indexElementEntries(id,blocks)){if(entry.value===exclude)continue;const option=document.createElement('option');option.value=entry.value;option.textContent=entry.label;select.appendChild(option)}select.value=selected||'';
+}
+function indexPlacementSelect(){return '<option value="right">À droite</option><option value="left">À gauche</option><option value="above">En haut</option><option value="below">En bas</option>'}
+function addIndexRelativeControls(row,block,n,blocks,persist,id){
+ const label=document.createElement('label');label.textContent='Placer '+indexBlockCaption(block,n,id)+' par rapport à';const target=document.createElement('select');target.dataset.relativeTarget='1';indexRelativeOptions(target,id,blocks,block.targetKey,block.id);
+ const positionLabel=document.createElement('label');positionLabel.textContent='Position';const position=document.createElement('select');position.dataset.relativePosition='1';position.innerHTML=indexPlacementSelect();position.value=block.relativePosition||'right';
+ target.onchange=()=>{block.targetKey=target.value;persist()};position.onchange=()=>{block.relativePosition=position.value;persist()};
+ const firstPosition=row.querySelector('[data-button-position],[data-image-position]')||(block.kind==='text'||block.kind==='title'?row.querySelector('select'):null);const anchor=firstPosition?.previousElementSibling||row.querySelector('.idx-faq-actions');if(anchor)anchor.before(label,target,positionLabel,position);else row.append(label,target,positionLabel,position);
+ // Existing placements remain available only for already configured legacy positions.
+ if(firstPosition){firstPosition.hidden=true;if(firstPosition.previousElementSibling)firstPosition.previousElementSibling.hidden=true}const paragraph=row.querySelector('input[type=number]');if(paragraph){paragraph.hidden=true;paragraph.previousElementSibling.hidden=true}
+}
+function indexPrimaryPlacementControls(id,key){return '<div class="field"><label>Placer '+indexPrimaryCaption(id,key)+' par rapport à</label><select data-primary-target id="idx-'+key+'Target"></select></div><div class="field"><label>Position</label><select id="idx-'+key+'Placement">'+indexPlacementSelect()+'</select></div>'}
+function refreshIndexRelativeTargets(id,blocks=indexTextBlocks(id)){
+ for(const key of INDEX_ELEMENT_FIELDS.get(id)||[]){const select=$('idx-'+key+'Target');if(select)indexRelativeOptions(select,id,blocks,select.value,'primary:'+key)}
+}
+function placeRelativeIndexElements(html,i,id){
+ const doc=document.createElement('template');doc.innerHTML=html;const root=doc.content;
+ const configs=[...(INDEX_ELEMENT_FIELDS.get(id)||[]).map(key=>({id:'primary:'+key,target:i[key+'Target'],position:i[key+'Placement']})),...safeJsonArray(i[id+'TextBlocks']).map(b=>({id:b.id,target:b.targetKey,position:b.relativePosition}))];
+ const find=key=>[...root.querySelectorAll('[data-nx-block-id]')].find(el=>el.getAttribute('data-nx-block-id')===key);
+ for(const cfg of configs){if(!cfg.target)continue;const source=find(cfg.id),target=find(cfg.target);if(!source||!target||source===target||source.contains(target)||target.contains(source))continue;
+  const position=cfg.position||'right';const previous=source.parentElement;source.remove();if(previous?.classList.contains('nx-relative-cell')&&!previous.children.length)previous.remove();
+  if(position==='above')target.before(source);else if(position==='below')target.after(source);else{
+   let layout=target.parentElement?.classList.contains('nx-relative-cell')?target.parentElement.parentElement:null;
+   if(!layout){layout=document.createElement('div');layout.className='nx-image-layout nx-relative-layout';target.before(layout);const cell=document.createElement('div');cell.className='nx-relative-cell';layout.appendChild(cell);cell.appendChild(target)}
+   const targetCell=target.parentElement,cell=document.createElement('div');cell.className='nx-relative-cell';cell.appendChild(source);if(position==='left')targetCell.before(cell);else targetCell.after(cell);if(layout.children.length>2)layout.classList.add('nx-multi-side');
+  }
+ }
+ return indexFragmentHtml(root);
+}
 const INDEX_BUTTON_GROUPS=INDEX_GROUPS.filter(g=>!['header','hero','cta','footer'].includes(g.id));
 for(const g of INDEX_BUTTON_GROUPS){
  const prefix=g.id+'Cta';
  g.keys.push(prefix+'Label',prefix+'Url',prefix+'Style');
- sections.push([prefix+'Label','Texte du bouton de rendez-vous'],[prefix+'Url','Lien du rendez-vous'],[prefix+'Style','Style du bouton']);
+ sections.push([prefix+'Label','Texte du bouton de rendez-vous'],[prefix+'Url','Lien du rendez-vous'],[prefix+'Style','Style du bouton']);INDEX_ELEMENT_FIELDS.get(g.id).push(prefix+'Label');sections.push([prefix+'LabelTarget','Élément associé'],[prefix+'LabelPlacement','Position']);
 }
 const INDEX_BUTTON_POSITION_GROUPS=INDEX_GROUPS.filter(g=>!['header','footer'].includes(g.id));
 for(const g of INDEX_BUTTON_POSITION_GROUPS){
@@ -60,55 +121,55 @@ function moveIndexTextBlock(blocks,index,step){
  const target=index+step;if(target<0||target>=blocks.length)return false;
  [blocks[index],blocks[target]]=[blocks[target],blocks[index]];return true;
 }
-function indexBlockCaption(block,n){
- const plain=String(block.text||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
- return (block.kind==='title'?'Titre ':'Bloc texte ')+(n+1)+(plain?' — '+plain.slice(0,70):' — vide');
+function indexBlockCaption(block,n,id){
+ return (block.kind==='title'&&block.level&&block.level!=='h2'?'Sous-titre':({title:'Titre',text:'Texte',image:'Image / vidéo',button:'Bouton'}[block.kind]||'Texte'))+' '+((INDEX_ELEMENT_FIELDS.get(id)||[]).length+n+1);
 }
 function indexNewBlock(blocks,kind){
  for(const block of blocks)if(!block.id)block.id=crypto.randomUUID();
  const previousText=[...blocks].reverse().find(b=>b.kind==='text');
- return {kind,id:crypto.randomUUID(),text:'',imageUrl:'',position:kind==='image'?'right-text':'bottom',textKey:kind==='image'?(previousText?.id||''):'',paragraph:1,level:'h2'};
+ return {kind,id:crypto.randomUUID(),text:'',imageUrl:'',position:kind==='image'?'right-text':'bottom',textKey:'',targetKey:'',relativePosition:'right',paragraph:1,level:'h2'};
 }
 function renderIndexButtonBlock(block,n,blocks,persist,id){
  const row=document.createElement('div');row.className='idx-faq-row';
- row.innerHTML='<label>Bouton '+(n+1)+'</label><label>Texte du bouton</label><input data-button-label><label>Lien du bouton</label><input data-button-url placeholder="https://… ou #section"><label>Couleur du bouton</label><select data-button-style><option value="glass">Normal</option><option value="gold">Or</option></select><label>Emplacement du bouton</label><select data-button-position><option value="top">En haut de la section</option><option value="before-text">Au-dessus du texte</option><option value="after-text">En dessous du texte</option><option value="before-image">Avant l’image</option><option value="after-image">Après l’image</option><option value="paragraph">Entre les paragraphes</option><option value="bottom">En bas de la section</option></select><label>Après le paragraphe numéro</label><input data-button-paragraph type="number" min="1"><label>Alignement</label><select data-button-align><option value="">Habituel</option><option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option></select><div class="idx-faq-actions"><button class="btn secondary" data-action="up" type="button">↑ Monter</button><button class="btn secondary" data-action="down" type="button">↓ Descendre</button><button class="btn danger" data-action="remove" type="button">Retirer ce bouton</button></div>';
+ row.innerHTML='<label>'+indexBlockCaption(block,n,id)+'</label><label>Texte du bouton</label><input data-button-label><label>Lien du bouton</label><input data-button-url placeholder="https://… ou #section"><label>Couleur du bouton</label><select data-button-style><option value="glass">Normal</option><option value="gold">Or</option></select><label>Emplacement du bouton</label><select data-button-position><option value="top">En haut de la section</option><option value="before-text">Au-dessus du texte</option><option value="after-text">En dessous du texte</option><option value="before-image">Avant l’image</option><option value="after-image">Après l’image</option><option value="paragraph">Entre les paragraphes</option><option value="bottom">En bas de la section</option></select><label>Après le paragraphe numéro</label><input data-button-paragraph type="number" min="1"><label>Alignement</label><select data-button-align><option value="">Habituel</option><option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option></select><div class="idx-faq-actions"><button class="btn secondary" data-action="up" type="button">↑ Monter</button><button class="btn secondary" data-action="down" type="button">↓ Descendre</button><button class="btn danger" data-action="remove" type="button">Retirer ce bouton</button></div>';
  for(const key of ['label','url','style','position','paragraph','align']){const el=row.querySelector('[data-button-'+key+']');el.value=block[key]||({style:'glass',position:'bottom',paragraph:1}[key]||'');el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{block[key]=el.value;persist()})}
  row.querySelectorAll('button').forEach(button=>button.onclick=()=>{if(button.dataset.action==='remove')blocks.splice(n,1);else if(!moveIndexTextBlock(blocks,n,button.dataset.action==='up'?-1:1))return;persist();renderIndexTextBlocks(id)});
- row.querySelector('[data-action=up]').disabled=n===0;row.querySelector('[data-action=down]').disabled=n===blocks.length-1;return row;
+ row.querySelector('[data-action=up]').disabled=n===0;row.querySelector('[data-action=down]').disabled=n===blocks.length-1;addIndexRelativeControls(row,block,n,blocks,persist,id);return row;
 }
 function renderIndexImageBlock(block,n,blocks,persist,id){
  const row=document.createElement('div');row.className='idx-faq-row';
- row.innerHTML='<label>Image '+(n+1)+'</label><input data-image-url placeholder="Lien de ton image" value="'+esc(block.imageUrl||'')+'"><label>1. Choisis le bloc de texte</label><select data-image-text></select><label>2. Place l’image par rapport à ce texte</label><select data-image-position><option value="right-text">À droite du texte choisi</option><option value="left-text">À gauche du texte choisi</option><option value="before-text">En haut du texte choisi</option><option value="after-text">En bas du texte choisi</option><optgroup label="Autres emplacements"><option value="top">Tout en haut de la section</option><option value="bottom">Tout en bas de la section</option><option value="before-image">Avant l’image principale</option><option value="after-image">Après l’image principale</option><option value="paragraph">Entre les paragraphes du texte choisi</option></optgroup></select><label data-paragraph-label>Après le paragraphe numéro</label><input data-image-paragraph type="number" min="1" value="'+esc(block.paragraph||1)+'"><label>Texte alternatif</label><input data-image-alt value="'+esc(block.alt||'')+'"><label>Effet flottant</label><select data-image-float><option value="">Non</option><option value="1">Oui</option></select><label>Effet glow</label><select data-image-glow><option value="">Non</option><option value="1">Oui</option></select><div class="idx-faq-actions"><button class="btn secondary" data-action="up" type="button">↑ Monter</button><button class="btn secondary" data-action="down" type="button">↓ Descendre</button><button class="btn danger" data-action="remove" type="button">Retirer cette image</button></div>';
- const target=row.querySelector('[data-image-text]');target.innerHTML='<option value="">Texte principal de la section</option>';
- blocks.forEach((other,index)=>{if(['text','title'].includes(other.kind)){const option=document.createElement('option');option.value=other.id;option.textContent=indexBlockCaption(other,index);target.appendChild(option)}});
- target.value=block.textKey||'';target.onchange=()=>{block.textKey=target.value;persist()};
+ row.innerHTML='<label>'+indexBlockCaption(block,n,id)+'</label><input data-image-url placeholder="Lien de ton image" value="'+esc(block.imageUrl||'')+'"><label>Texte / titre associé (numéro)</label><select data-image-text></select><label>Position de l’image</label><select data-image-position><option value="right-text">À droite</option><option value="left-text">À gauche</option><option value="before-text">En haut</option><option value="after-text">En bas</option><optgroup label="Autres emplacements"><option value="top">Tout en haut de la section</option><option value="bottom">Tout en bas de la section</option><option value="before-image">Avant l’image principale</option><option value="after-image">Après l’image principale</option><option value="paragraph">Entre les paragraphes du texte choisi</option></optgroup></select><label data-paragraph-label>Après le paragraphe numéro</label><input data-image-paragraph type="number" min="1" value="'+esc(block.paragraph||1)+'"><label>Texte alternatif</label><input data-image-alt value="'+esc(block.alt||'')+'"><label>Effet flottant</label><select data-image-float><option value="">Non</option><option value="1">Oui</option></select><label>Effet glow</label><select data-image-glow><option value="">Non</option><option value="1">Oui</option></select><div class="idx-faq-actions"><button class="btn secondary" data-action="up" type="button">↑ Monter</button><button class="btn secondary" data-action="down" type="button">↓ Descendre</button><button class="btn danger" data-action="remove" type="button">Retirer cette image</button></div>';
+ const target=row.querySelector('[data-image-text]');indexNumberedTargetOptions(target,id,blocks,block.textKey);
+ target.onchange=()=>{block.textKey=target.value;persist()};
  const updateParagraph=()=>{const hidden=row.querySelector('[data-image-position]').value!=='paragraph';row.querySelector('[data-image-paragraph]').hidden=hidden;row.querySelector('[data-paragraph-label]').hidden=hidden};
  for(const [attribute,key]of [['url','imageUrl'],['alt','alt'],['position','position'],['paragraph','paragraph'],['float','imageFloat'],['glow','imageGlow']]){
   const control=row.querySelector('[data-image-'+attribute+']');control.value=block[key]||'';if(attribute==='position')control.value=block.position||'bottom';
   control.addEventListener(control.tagName==='SELECT'?'change':'input',()=>{block[key]=control.value;updateParagraph();persist()});
  }
  updateParagraph();
+ target.hidden=true;target.previousElementSibling.hidden=true;
  row.querySelectorAll('button').forEach(button=>button.onclick=()=>{if(button.dataset.action==='remove')blocks.splice(n,1);else if(!moveIndexTextBlock(blocks,n,button.dataset.action==='up'?-1:1))return;persist();renderIndexTextBlocks(id)});
- row.querySelector('[data-action=up]').disabled=n===0;row.querySelector('[data-action=down]').disabled=n===blocks.length-1;return row;
+ row.querySelector('[data-action=up]').disabled=n===0;row.querySelector('[data-action=down]').disabled=n===blocks.length-1;addIndexRelativeControls(row,block,n,blocks,persist,id);return row;
 }
 function renderIndexTextBlocks(id){
  const host=$('idx-text-blocks-'+id),source=$('idx-'+id+'TextBlocks');if(!host||!source)return;
- const blocks=indexTextBlocks(id);let assigned=false;for(const block of blocks)if(!block.id){block.id=crypto.randomUUID();assigned=true}if(assigned)source.value=JSON.stringify(blocks);host.innerHTML='';
- const persist=()=>{source.value=JSON.stringify(blocks);scheduleIndexPreview()};
+ const blocks=indexTextBlocks(id);let assigned=false;for(const block of blocks){if(!block.kind){block.kind='text';assigned=true}if(!block.targetKey&&block.kind==='image'&&block.textKey){block.targetKey=block.textKey;block.relativePosition=({'right-text':'right','left-text':'left','before-text':'above','after-text':'below'}[block.position]||'right');assigned=true}if(!block.id){block.id=crypto.randomUUID();assigned=true}}if(assigned)source.value=JSON.stringify(blocks);host.innerHTML='';
+ const persist=()=>{source.value=JSON.stringify(blocks);refreshIndexImageTextChoices(id,blocks);refreshIndexRelativeTargets(id,blocks);scheduleIndexPreview()};
+ refreshIndexImageTextChoices(id,blocks);refreshIndexRelativeTargets(id,blocks);
  blocks.forEach((block,n)=>{
   if(block.kind==='button'){host.appendChild(renderIndexButtonBlock(block,n,blocks,persist,id));return}
   if(block.kind==='image'){host.appendChild(renderIndexImageBlock(block,n,blocks,persist,id));return}
   const row=document.createElement('div');row.className='idx-faq-row';
-  row.innerHTML='<label>'+(block.kind==='title'?'Titre ':'Bloc texte ')+(n+1)+'</label><textarea style="min-height:220px" placeholder="Ton texte ou ton HTML">'+esc(block.text||'')+'</textarea><label>Emplacement du bloc</label><select><option value="top">En haut de la section</option><option value="before-text">Avant le texte principal</option><option value="after-text">Après le texte principal</option><option value="before-image">Avant l’image</option><option value="after-image">Après l’image</option><option value="left-image">À gauche de l’image</option><option value="right-image">À droite de l’image</option><option value="paragraph">Entre les paragraphes du texte principal</option><option value="bottom">En bas de la section</option></select><label>Après le paragraphe numéro</label><input type="number" min="1" step="1" value="'+esc(block.paragraph||1)+'"><div class="idx-faq-actions"><button class="btn secondary" type="button" data-action="up">↑ Monter</button><button class="btn secondary" type="button" data-action="down">↓ Descendre</button><button class="btn danger" type="button" data-action="remove">Retirer ce bloc</button></div>';
+  row.innerHTML='<label>'+indexBlockCaption(block,n,id)+'</label><textarea style="min-height:220px" placeholder="Ton texte ou ton HTML">'+esc(block.text||'')+'</textarea><label>Emplacement du bloc</label><select><option value="top">En haut de la section</option><option value="before-text">Avant le texte principal</option><option value="after-text">Après le texte principal</option><option value="before-image">Avant l’image</option><option value="after-image">Après l’image</option><option value="left-image">À gauche de l’image</option><option value="right-image">À droite de l’image</option><option value="paragraph">Entre les paragraphes du texte principal</option><option value="bottom">En bas de la section</option></select><label>Après le paragraphe numéro</label><input type="number" min="1" step="1" value="'+esc(block.paragraph||1)+'"><div class="idx-faq-actions"><button class="btn secondary" type="button" data-action="up">↑ Monter</button><button class="btn secondary" type="button" data-action="down">↓ Descendre</button><button class="btn danger" type="button" data-action="remove">Retirer ce bloc</button></div>';
   const mediaKeys=(INDEX_GROUPS.find(g=>g.id===id)?.keys||[]).filter(k=>INDEX_MEDIA_KEYS.has(k));
-  if(mediaKeys.length>1||blocks.some(b=>b.kind==='image')){const label=document.createElement('label');label.textContent='Image concernée';const target=document.createElement('select');mediaKeys.forEach((key,n)=>{const option=document.createElement('option');option.value=key;option.textContent=n===0?'Image principale':'Deuxième image';target.appendChild(option)});blocks.forEach((other,index)=>{if(other.kind==='image'&&other.id){const option=document.createElement('option');option.value='block:'+other.id;option.textContent='Image ajoutée '+(index+1);target.appendChild(option)}});target.value=block.imageKey||mediaKeys[0]||target.options[0]?.value||'';target.onchange=()=>{block.imageKey=target.value;persist()};row.append(label,target)}
-  if(block.kind==='title'){const label=document.createElement('label');label.textContent='Niveau du titre';const level=document.createElement('select');for(const tag of ['h2','h3','h4']){const option=document.createElement('option');option.value=tag;option.textContent=tag==='h2'?'Grand titre':tag==='h3'?'Sous-titre':'Petit titre';level.appendChild(option)}level.value=block.level||'h2';level.onchange=()=>{block.level=level.value;persist()};row.append(label,level);const colorLabel=document.createElement('label');colorLabel.textContent='Couleur du titre';const color=document.createElement('select');color.innerHTML='<option value="">Couleur habituelle</option><option value="gold">Or</option>';color.value=block.color||'';color.onchange=()=>{block.color=color.value;persist()};row.append(colorLabel,color)}
+  if(mediaKeys.length>1||blocks.some(b=>b.kind==='image')){const label=document.createElement('label');label.textContent='Image concernée';const target=document.createElement('select');mediaKeys.forEach((key,n)=>{const option=document.createElement('option');option.value=key;option.textContent=n===0?'Image principale':'Deuxième image';target.appendChild(option)});blocks.forEach((other,index)=>{if(other.kind==='image'&&other.id){const option=document.createElement('option');option.value='block:'+other.id;option.textContent=indexBlockCaption(other,index,id);target.appendChild(option)}});target.value=block.imageKey||mediaKeys[0]||target.options[0]?.value||'';target.onchange=()=>{block.imageKey=target.value;persist()};target.hidden=true;label.hidden=true;row.append(label,target)}
+  if(block.kind==='title'){const label=document.createElement('label');label.textContent='Niveau du titre';const level=document.createElement('select');for(const tag of ['h2','h3','h4']){const option=document.createElement('option');option.value=tag;option.textContent=tag==='h2'?'Grand titre':tag==='h3'?'Sous-titre':'Petit titre';level.appendChild(option)}level.value=block.level||'h2';level.onchange=()=>{block.level=level.value;persist();renderIndexTextBlocks(id)};row.append(label,level);const colorLabel=document.createElement('label');colorLabel.textContent='Couleur du titre';const color=document.createElement('select');color.innerHTML='<option value="">Couleur habituelle</option><option value="gold">Or</option>';color.value=block.color||'';color.onchange=()=>{block.color=color.value;persist()};row.append(colorLabel,color)}
   const textarea=row.querySelector('textarea'),select=row.querySelector('select'),number=row.querySelector('input');select.value=block.position||'bottom';number.hidden=select.value!=='paragraph';number.previousElementSibling.hidden=number.hidden;
   textarea.oninput=()=>{block.text=textarea.value;persist()};select.onchange=()=>{block.position=select.value;number.hidden=select.value!=='paragraph';number.previousElementSibling.hidden=number.hidden;persist()};number.oninput=()=>{block.paragraph=number.value;persist()};
   const alignLabel=document.createElement('label');alignLabel.textContent='Alignement du bloc';const align=document.createElement('select');align.innerHTML='<option value="">Alignement habituel</option><option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option><option value="justify">Justifié (ajusté)</option>';align.value=block.align||'';align.onchange=()=>{block.align=align.value;persist()};row.append(alignLabel,align);
   row.querySelectorAll('button').forEach(button=>button.onclick=()=>{const action=button.dataset.action;if(action==='remove')blocks.splice(n,1);else{if(!moveIndexTextBlock(blocks,n,action==='up'?-1:1))return}persist();renderIndexTextBlocks(id)});
   row.querySelector('[data-action=up]').disabled=n===0;row.querySelector('[data-action=down]').disabled=n===blocks.length-1;
-  host.appendChild(row);addIndexFormattingToolbar(textarea);
+  addIndexRelativeControls(row,block,n,blocks,persist,id);host.appendChild(row);addIndexFormattingToolbar(textarea);
  });
 }
 function applyIndexTextBlocks(html,blocks,i={},id=""){
@@ -118,8 +179,8 @@ function applyIndexTextBlocks(html,blocks,i={},id=""){
  const queue=blocks.slice();let deferred=0;
  for(let cursor=0;cursor<queue.length;cursor++){
   const block=queue[cursor];text=section.querySelector('.text-block:not(.nx-extra-text),.hero-lead,.faq-container,.footer-sign,.brand-name,.cercle-inner')||section.querySelector('.text-block');
-  if(block.kind==='image'&&['left-text','right-text'].includes(block.position)&&!text&&blocks.some(b=>['text','title'].includes(b.kind))&&deferred<blocks.length){queue.push(block);deferred++;continue}
-  if(block.kind==='image'&&block.textKey){const target=[...section.querySelectorAll('[data-nx-block-id]')].find(el=>el.getAttribute('data-nx-block-id')===block.textKey);if(!target&&deferred<blocks.length){queue.push(block);deferred++;continue}if(target)text=target}
+  if(!block.targetKey&&block.kind==='image'&&['left-text','right-text'].includes(block.position)&&!text&&blocks.some(b=>['text','title'].includes(b.kind))&&deferred<blocks.length){queue.push(block);deferred++;continue}
+  if(!block.targetKey&&block.kind==='image'&&block.textKey){const target=[...section.querySelectorAll('[data-nx-block-id]')].find(el=>el.getAttribute('data-nx-block-id')===block.textKey);if(!target&&deferred<blocks.length){queue.push(block);deferred++;continue}if(target)text=target}
   const targetUrl=block.imageKey?String(i[block.imageKey]||'').trim():'';
   const image=String(block.imageKey||'').startsWith('block:')?[...section.querySelectorAll('[data-nx-image-id]')].find(frame=>frame.getAttribute('data-nx-image-id')===block.imageKey.slice(6)):targetUrl?[...section.querySelectorAll('.img-frame')].find(frame=>frame.querySelector('img,iframe')?.getAttribute('src')===targetUrl):section.querySelector('.img-frame');
   if(String(block.imageKey||'').startsWith('block:')&&!image&&deferred<blocks.length){queue.push(block);deferred++;continue}
@@ -128,12 +189,12 @@ function applyIndexTextBlocks(html,blocks,i={},id=""){
   if(block.kind==='title'){const tag=['h2','h3','h4'].includes(block.level)?block.level:'h2';const heading=document.createElement(tag);heading.className='display';if(block.color==='gold')heading.style.color='#F4C842';heading.innerHTML=raw;node.innerHTML='';node.appendChild(heading)}
   if(block.kind==='image'){
    node.className='img-frame nx-extra-image';if(block.id)node.setAttribute('data-nx-image-id',block.id);
-   const img=document.createElement('img');img.src=String(block.imageUrl||'').trim();img.alt=block.alt||'';
-   if(block.imageFloat==='1')img.classList.add('nx-image-float');if(block.imageGlow==='1')node.classList.add('nx-image-glow');node.innerHTML='';node.appendChild(img);
+   const holder=document.createElement('div');holder.innerHTML=media(String(block.imageUrl||'').trim());const img=holder.firstElementChild;if(img.tagName==='IMG')img.alt=block.alt||'';
+   if(block.imageFloat==='1'&&img.tagName==='IMG')img.classList.add('nx-image-float');if(block.imageGlow==='1')node.classList.add('nx-image-glow');node.innerHTML='';node.appendChild(img);
   }
   if(block.kind==='button'){node.className='hero-cta nx-extra-button';node.innerHTML=btnHtml(block.label,block.url||'#',block.style||'glass')}
   if(block.id)node.setAttribute('data-nx-block-id',block.id);
-  const position=block.position||'bottom';let anchor=null;
+  const position=block.targetKey?'bottom':block.position||'bottom';let anchor=null;
   if(block.kind==='image'&&['left-text','right-text'].includes(position)&&text){
    let layout=text.parentElement?.classList.contains('nx-image-copy')&&text.parentElement.children.length===1?text.parentElement.parentElement:null;if(!layout){layout=document.createElement('div');layout.className='nx-image-layout';text.before(layout);const copy=document.createElement('div');copy.className='nx-image-copy';layout.appendChild(copy);copy.appendChild(text)}
    const copy=[...layout.children].find(child=>child===text||child.contains(text));let slot=position==='left-text'?copy.previousElementSibling:copy.nextElementSibling;
@@ -160,13 +221,29 @@ function applyIndexTextBlocks(html,blocks,i={},id=""){
  return indexFragmentHtml(root);
 }
 const INDEX_MEDIA_KEYS=new Set(['heroMedia','s2Media','s3Media','s45Media','s67Media','s89Media','s1011Media','s1213Media','s1415Media','socialProofMedia','toolsMedia','transformMedia']);
-for(const key of INDEX_MEDIA_KEYS)sections.push([key+'Position','Position de l’image'],[key+'Float','Effet flottant'],[key+'Glow','Effet glow']);
+for(const key of INDEX_MEDIA_KEYS)sections.push([key+'Position','Position de l’image'],[key+'TextKey','Bloc de texte associé à l’image'],[key+'Float','Effet flottant'],[key+'Glow','Effet glow']);
 function indexMediaControls(key){
- return '<div class="field"><label>Position de l’image</label><select id="idx-'+key+'Position"><option value="">En bas (position actuelle)</option><option value="above">En haut</option><option value="below">En bas</option><option value="left">À gauche</option><option value="right">À droite</option></select></div>'+['Float','Glow'].map(effect=>'<div class="field"><label>'+ (effect==='Float'?'Effet flottant':'Effet glow')+'</label><select id="idx-'+key+effect+'"><option value="">Non</option><option value="1">Oui</option></select></div>').join('');
+ return '<select hidden id="idx-'+key+'TextKey"></select><select hidden id="idx-'+key+'Position"><option value="">Position actuelle</option><option value="right">À droite</option><option value="left">À gauche</option><option value="above">En haut</option><option value="below">En bas</option></select>'+['Float','Glow'].map(effect=>'<div class="field"><label>'+(effect==='Float'?'Effet flottant':'Effet glow')+'</label><select id="idx-'+key+effect+'"><option value="">Non</option><option value="1">Oui</option></select></div>').join('');
+}
+function refreshIndexImageTextChoices(id,blocks=indexTextBlocks(id)){
+ const group=INDEX_GROUPS.find(g=>g.id===id);if(!group)return;
+ for(const key of group.keys.filter(k=>INDEX_MEDIA_KEYS.has(k))){const select=$('idx-'+key+'TextKey');if(select)indexNumberedTargetOptions(select,id,blocks,select.value)}
+}
+function placeIndexImagesBesideChosenText(html,i,id){
+ const group=INDEX_GROUPS.find(g=>g.id===id);if(!group)return html;
+ for(const key of group.keys.filter(k=>INDEX_MEDIA_KEYS.has(k))){
+  if(!i[key+'TextKey']||!String(i[key]||'').trim())continue;
+  const doc=document.createElement('template');doc.innerHTML=html;
+  const frame=[...doc.content.querySelectorAll('.img-frame')].find(el=>el.querySelector('img,iframe')?.getAttribute('src')===String(i[key]).trim());if(!frame)continue;
+  const target=[...doc.content.querySelectorAll('[data-nx-block-id]')].find(el=>el.getAttribute('data-nx-block-id')===i[key+'TextKey']);if(!target)continue;
+  frame.remove();html=applyIndexTextBlocks(indexFragmentHtml(doc.content),[{kind:'image',id:'primary:'+key,imageUrl:i[key],textKey:i[key+'TextKey'],position:({right:'right-text',left:'left-text',above:'before-text',below:'after-text'}[i[key+'Position']]||'after-text'),imageFloat:i[key+'Float'],imageGlow:i[key+'Glow']}],i,id);
+ }
+ return html;
 }
 const INDEX_IMAGE_CSS=`<style id="nyxia-index-image-options">
 .nx-image-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:32px}
 .nx-image-layout>.nx-image-copy{min-width:0}.nx-image-layout .nx-image-slot{min-width:0}.nx-image-layout .nx-image-slot>.img-frame{min-width:0;max-width:100%;margin:0}
+.nx-relative-cell{min-width:0}.nx-relative-cell>.img-frame{margin:0;max-width:100%}.nx-relative-cell iframe{width:100%;min-height:300px;border:0}
 .nx-extra-text{margin-top:20px;margin-bottom:20px}.nx-multi-side{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
 .nx-image-float{animation:nyxia-index-image-float 6s ease-in-out infinite!important}
 @keyframes nyxia-index-image-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
@@ -185,7 +262,7 @@ function positionIndexImages(i,id,visual){
   let block=original;
   if(floating)block=block.replace('<img ','<img class="nx-image-float" ');
   if(glow)block=block.replace('class="img-frame','class="img-frame nx-image-glow');
-  const position=i[key+'Position'];
+  const position=i[key+'TextKey']?'':i[key+'Position'];
   if(!['above','left','right'].includes(position)){visual=visual.replace(original,block);continue;}
   const match=visual.match(/^(<section\b[^>]*>)([\s\S]*)(<\/section>)$/);if(!match)continue;
   const copy=match[2].replace(original,'');
@@ -279,33 +356,35 @@ function indexUI(){
 
    for(const key of g.keys){
      if(key===g.id+'TextBlocks'){
-       const wrap=document.createElement('div');wrap.innerHTML='<textarea class="idx-hidden-source" id="idx-'+key+'"></textarea><label style="display:block;margin-bottom:8px">Blocs de texte, titres, images et boutons</label><div class="idx-faq-list" id="idx-text-blocks-'+g.id+'"></div><button class="btn secondary" type="button">＋ Ajouter un bloc texte</button><button class="btn secondary" type="button" data-add-title>＋ Ajouter un titre</button><button class="btn secondary" type="button" data-add-image>＋ Ajouter une image</button><button class="btn secondary" type="button" data-add-button>＋ Ajouter un bouton</button>';
-       wrap.querySelectorAll('button').forEach(button=>button.onclick=()=>{const blocks=indexTextBlocks(g.id);blocks.push(indexNewBlock(blocks,button.hasAttribute('data-add-button')?'button':button.hasAttribute('data-add-image')?'image':button.hasAttribute('data-add-title')?'title':'text'));$('idx-'+key).value=JSON.stringify(blocks);renderIndexTextBlocks(g.id);scheduleIndexPreview()});panel.appendChild(wrap);continue;
+       const wrap=document.createElement('div');wrap.innerHTML='<textarea class="idx-hidden-source" id="idx-'+key+'"></textarea><label style="display:block;margin-bottom:8px">Blocs de texte, titres, images et boutons</label><div class="idx-faq-list" id="idx-text-blocks-'+g.id+'"></div><button class="btn secondary" type="button">＋ Ajouter un bloc texte</button><button class="btn secondary" type="button" data-add-title>＋ Ajouter un titre</button><button class="btn secondary" type="button" data-add-subtitle>＋ Ajouter un sous-titre</button><button class="btn secondary" type="button" data-add-image>＋ Ajouter une image / vidéo</button><button class="btn secondary" type="button" data-add-button>＋ Ajouter un bouton</button>';
+       wrap.querySelectorAll('button').forEach(button=>button.onclick=()=>{const blocks=indexTextBlocks(g.id);const kind=button.hasAttribute('data-add-button')?'button':button.hasAttribute('data-add-image')?'image':button.hasAttribute('data-add-title')||button.hasAttribute('data-add-subtitle')?'title':'text';const block=indexNewBlock(blocks,kind);if(button.hasAttribute('data-add-subtitle'))block.level='h3';blocks.push(block);$('idx-'+key).value=JSON.stringify(blocks);renderIndexTextBlocks(g.id);scheduleIndexPreview()});panel.appendChild(wrap);continue;
      }
      if(key==='faq'){
        const hidden=document.createElement('textarea');hidden.id='idx-faq';hidden.className='idx-hidden-source';panel.appendChild(hidden)
-       const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">Questions / réponses</label><div class="idx-faq-list" id="idxFaqList"></div><button class="btn secondary" type="button" id="idxFaqAddBtn">＋ Ajouter une question</button>';panel.appendChild(wrap);continue
+       const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">'+indexPrimaryCaption(g.id,key)+' · Questions / réponses</label><div class="idx-faq-list" id="idxFaqList"></div><button class="btn secondary" type="button" id="idxFaqAddBtn">＋ Ajouter une question</button>';panel.appendChild(wrap);continue
      }
      if(key==='journeyItems'){
        const hidden=document.createElement('textarea');hidden.id='idx-journeyItems';hidden.className='idx-hidden-source';panel.appendChild(hidden)
-       const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">Étapes du parcours</label><div class="idx-faq-list" id="idxJourneyList"></div><button class="btn secondary" type="button" id="idxJourneyAddBtn">＋ Ajouter une étape</button>';panel.appendChild(wrap);continue
+       const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">'+indexPrimaryCaption(g.id,key)+' · Étapes du parcours</label><div class="idx-faq-list" id="idxJourneyList"></div><button class="btn secondary" type="button" id="idxJourneyAddBtn">＋ Ajouter une étape</button>';panel.appendChild(wrap);continue
      }
      if(key==='proofItems'){
        const hidden=document.createElement('textarea');hidden.id='idx-proofItems';hidden.className='idx-hidden-source';panel.appendChild(hidden)
-       const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">Témoignages</label><div class="idx-faq-list" id="idxProofList"></div><button class="btn secondary" type="button" id="idxProofAddBtn">＋ Ajouter un témoignage</button>';panel.appendChild(wrap);continue
+       const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">'+indexPrimaryCaption(g.id,key)+' · Témoignages</label><div class="idx-faq-list" id="idxProofList"></div><button class="btn secondary" type="button" id="idxProofAddBtn">＋ Ajouter un témoignage</button>';panel.appendChild(wrap);continue
      }
      const field=document.createElement('div'),isAdvanced=(g.advanced||[]).includes(key)
-     field.className='field'+(isAdvanced?' idx-advanced':'')
+     field.className='field'+(isAdvanced?' idx-advanced':'');if(/CtaPosition$|CtaParagraph$/.test(key))field.hidden=true
      const special=specialSelect(key)
      const control=special||(idxIsLong(key)?'<textarea id="idx-'+key+'" style="min-height:240px"></textarea>':'<input id="idx-'+key+'">')
-     field.innerHTML='<label>'+esc(idxFieldLabel(key))+(isAdvanced?' · avancé':'')+'</label>'+control
+     field.innerHTML='<label>'+esc((INDEX_ELEMENT_FIELDS.get(g.id)||[]).includes(key)?indexPrimaryCaption(g.id,key)+' · '+idxFieldLabel(key):idxFieldLabel(key))+(isAdvanced?' · avancé':'')+'</label>'+control
      if(INDEX_MEDIA_KEYS.has(key))field.innerHTML+='<div class="idx-media-thumb" id="idx-media-'+key+'" style="display:none"></div>'
      if(/CtaParagraph$/.test(key))field.innerHTML+='<div class="idx-field-note">Avec « Entre les paragraphes », indique le numéro du paragraphe après lequel placer le bouton. Pour un emplacement précis, choisis « À l’emplacement [[BOUTON]] » et écris [[BOUTON]] dans ton texte ou ton HTML.</div>';
      if(/Socials|marquee/.test(key))field.innerHTML+='<div class="idx-field-note">Option avancée : si tu remplis ce HTML, il remplace les boutons sociaux automatiques.</div>'
      panel.appendChild(field)
+     if((INDEX_ELEMENT_FIELDS.get(g.id)||[]).includes(key)){const relative=document.createElement('div');relative.innerHTML=indexPrimaryPlacementControls(g.id,key);panel.appendChild(relative)}
      if(INDEX_MEDIA_KEYS.has(key)){const options=document.createElement('div');options.innerHTML=indexMediaControls(key);panel.appendChild(options)}
    }
 
+   for(const key of ['faq','journeyItems','proofItems'].filter(k=>(INDEX_ELEMENT_FIELDS.get(g.id)||[]).includes(k))){const relative=document.createElement('div');relative.innerHTML=indexPrimaryPlacementControls(g.id,key);panel.appendChild(relative)}
    const code=document.createElement('div');code.className='idx-advanced'
    code.innerHTML='<hr style="border:0;border-top:1px solid rgba(167,139,250,.2);margin:18px 0"><div class="field"><label>Code HTML personnalisé</label><select id="idx-codeMode'+cap+'"><option value="append">Ajouter après le contenu visuel</option><option value="replace">Remplacer entièrement cette section</option></select></div><div class="field"><label>HTML de cette section</label><textarea id="idx-code'+cap+'" style="min-height:180px" placeholder="<div>...</div>"></textarea><div class="idx-field-note">Tu peux utiliser ton propre HTML lorsque tu veux quelque chose de très précis.</div></div>'
    panel.appendChild(code)
@@ -578,6 +657,8 @@ function apply(d={}){
  }
  for(const g of INDEX_GROUPS)for(const key of g.keys){const inline=$('idx-inline-align-'+key);if(inline)inline.value=idx[g.id+'TextAlign']||'';const titleInline=$('idx-inline-title-align-'+key);if(titleInline)titleInline.value=idx[g.id+'TitleAlign']||''}
  for(const g of INDEX_GROUPS)renderIndexTextBlocks(g.id);
+ for(const [id,keys]of INDEX_ELEMENT_FIELDS)for(const key of keys)if($('idx-'+key+'Target'))$('idx-'+key+'Target').value=idx[key+'Target']||'';
+ for(const key of INDEX_MEDIA_KEYS)if($('idx-'+key+'TextKey'))$('idx-'+key+'TextKey').value=idx[key+'TextKey']||'';
  tools=d.tools||[];renderTools();renderFaqBuilder();renderJourneyBuilder();renderProofBuilder()
  for(const key of INDEX_MEDIA_KEYS)updateIdxMediaPreview(key);scheduleIndexPreview()
 }
@@ -686,7 +767,7 @@ function customSection(i,id,visual){
  const cap=id.charAt(0).toUpperCase()+id.slice(1),show=String(i['show'+cap]??'1')
  if(show==='0')return''
  const code=String(i['code'+cap]||''),mode=String(i['codeMode'+cap]||'append')
- let result=mode==='replace'&&code?code:positionIndexImages(i,id,visual)+code
+ let result=mode==='replace'&&code?markIndexPrimaryElements(code,id):markIndexPrimaryElements(positionIndexImages(i,id,visual),id)+code
  if(['left','center','right','justify'].includes(i[id+'TextAlign'])){
   const doc=document.createElement('template');doc.innerHTML=result;
   const nodes=doc.content.querySelectorAll('.text-block,.text-block p,.hero-lead,.hero-lead p,.hero-note,.faq-content,.faq-content p,.parcours-item p,.auteur-card p,.footer-sign,.brand-name,section p,header p,footer p');
@@ -697,8 +778,9 @@ function customSection(i,id,visual){
   doc.content.querySelectorAll('.section-head,.section-head h2,.section-head .kicker,.hero>h1,.hero>h2,.parcours-item h4,.auteur-card h4,.auteur-card h5,.cercle-inner>h2,section h1,section h2,section h3,section h4,section h5,section h6,.faq-item summary,.brand-name b,footer h1,footer h2,footer h3').forEach(title=>title.style.textAlign=title.closest('[data-nx-text-align]')?.getAttribute('data-nx-text-align')||i[id+'TitleAlign']);result=indexFragmentHtml(doc.content);
  }
  result=applyIndexTextBlocks(result,safeJsonArray(i[id+'TextBlocks']),i,id)
+ result=placeIndexImagesBesideChosenText(result,i,id)
  if(INDEX_BUTTON_GROUPS.some(g=>g.id===id)&&String(i[id+'CtaLabel']||'').trim()){
-  const button='<div class="hero-cta" style="margin-top:28px">'+btnHtml(i[id+'CtaLabel'],i[id+'CtaUrl']||'#',i[id+'CtaStyle']||'glass')+'</div>';
+  const button='<div class="hero-cta" data-nx-block-id="primary:'+id+'CtaLabel" style="margin-top:28px">'+btnHtml(i[id+'CtaLabel'],i[id+'CtaUrl']||'#',i[id+'CtaStyle']||'glass')+'</div>';
   const position=i[id+'CtaPosition'];
   if(position)result=placeIndexButton(result,button,position,i[id+'CtaParagraph']);
   else if(/<\/section>\s*$/.test(result))result=result.replace(/<\/section>(\s*)$/,button+'</section>$1');
@@ -714,7 +796,7 @@ function customSection(i,id,visual){
   const title=doc.content.querySelector(id==='hero'?'#nx-hero>h1':id==='cta'?'.cercle-inner>h2':id==='header'?'.brand-name b':id==='footer'?'h1,h2,h3':'.section-head>h2');
   if(title){title.style.color='#F4C842';title.style.background='none';title.style.setProperty('-webkit-text-fill-color','#F4C842');result=indexFragmentHtml(doc.content)}
  }
- return result
+ return placeRelativeIndexElements(result,i,id)
 }
 function fillIndex(s,p){
  const i=p.index||{},title=p.title||'Portail NyXia',short=p.short||title
@@ -767,7 +849,7 @@ function fillIndex(s,p){
    '__INDEX_FOOTER_BLOCK__':customSection(i,'footer',footer)
  }
  for(const [k,v] of Object.entries(map))s=s.split(k).join(String(v))
- if([...INDEX_MEDIA_KEYS].some(key=>i[key]&&(i[key+'Position']||i[key+'Float']==='1'||i[key+'Glow']==='1'))||INDEX_GROUPS.some(g=>safeJsonArray(i[g.id+'TextBlocks']).some(b=>String((b.kind==='image'?b.imageUrl:b.kind==='button'?b.label:b.text)||'').trim())))s=s.replace('</head>',INDEX_IMAGE_CSS+'</head>')
+ if([...INDEX_ELEMENT_FIELDS.values()].flat().some(key=>i[key+'Target'])||[...INDEX_MEDIA_KEYS].some(key=>i[key]&&(i[key+'Position']||i[key+'Float']==='1'||i[key+'Glow']==='1'))||INDEX_GROUPS.some(g=>safeJsonArray(i[g.id+'TextBlocks']).some(b=>String((b.kind==='image'?b.imageUrl:b.kind==='button'?b.label:b.text)||'').trim())))s=s.replace('</head>',INDEX_IMAGE_CSS+'</head>')
  return s
 }
 async function compile(){try{$('host').value=portalAccessHost(true);const pr=await save(),p=pr.data;const registered=await ensurePortalRegistered(false);if(!registered)throw Error('Le portail n’a pas pu être relié à la liste centrale / Dégustation.');const r=await fetch('/superadmin4/portail-shell-template.zip',{cache:'no-store'});if(!r.ok)throw Error('Coque introuvable');const z=await JSZip.loadAsync(await r.arrayBuffer()),agents=p.agents||[];if(!agents.length)throw Error('Choisis au moins un personnage pour ce portail.');const cfg={id:p.portalId||slug(p.short||p.title),accessVersion:1,title:p.title,shortTitle:p.short||p.title,mission:p.mission,loginImage:p.loginImage,activeAgents:agents.map(a=>a.key),agents};let w=await z.file('_worker.js').async('string');w=w.replace("const PORTAL_CONFIG_B64='__PORTAL_CONFIG_B64__';","const PORTAL_CONFIG_B64='"+b64(JSON.stringify(cfg))+"';");z.file('_worker.js',w);let wr=await z.file('wrangler.toml').async('string');wr=wr.replaceAll('__WORKER_NAME__',p.workerName||slug(p.short||p.title)).replaceAll('__HOST__',p.host).replaceAll('__PORTAL_ID__',cfg.id);z.file('wrangler.toml',wr);let ind=await z.file('index.html').async('string');z.file('index.html',fillIndex(ind,p));let log=await z.file('login.html').async('string');log=log.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_LOGIN_IMAGE__',p.loginImage||'');z.file('login.html',log);const first=z.file('premiere-connexion.html');if(!first)throw Error('La coque doit être mise à jour : premiere-connexion.html manque.');z.file('premiere-connexion.html',(await first.async('string')).replaceAll('__PORTAL_TITLE__',esc(p.title||'Portail NyXia')));for(const path of ['mot-de-passe.html','mot-de-passe-oublie.html','reinitialiser-mot-de-passe.html']){const file=z.file(path);if(!file)throw Error('Coque incomplète : '+path+' manque.');z.file(path,(await file.async('string')).replaceAll('__PORTAL_TITLE__',esc(p.title||'Portail NyXia')));}const pages={},meta={};const principals=agents.filter(a=>(a.placement||'principal')==='principal');const atelierAgents=agents.filter(a=>a.placement==='atelier');const visibleAgents=agents.filter(a=>a.placement!=='hidden');let chat=await z.file('chat-base.html').async('string');for(const a of visibleAgents){pages[a.key]='/chat-'+a.key+'.html';meta[a.key]=a;let c=chat.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_TITLE_JSON__',JSON.stringify(p.title)).replaceAll('__AGENT_KEY__',a.key).replaceAll('__AGENT_NAME__',esc(a.name)).replaceAll('__AGENT_SUB__',esc(a.sub||'Personnage NyXia')).replaceAll('__AGENT_JSON__',JSON.stringify(a)).replaceAll('__AGENT_NAME_JSON__',JSON.stringify(a.name)).replaceAll('__AGENT_SUB_JSON__',JSON.stringify(a.sub||'Personnage NyXia')).replaceAll('__AGENT_GREETING_JSON__',JSON.stringify(a.greeting||'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.')).replaceAll('__AGENT_IMAGE_JSON__',JSON.stringify(a.image||'')).replaceAll('__AGENT_VIDEO_JSON__',JSON.stringify(a.welcomeVideo||'')).replaceAll('__AGENT_AVATAR_HTML__',a.image?'<img src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="avatar-fallback">✦</span>');z.file('chat-'+a.key+'.html',c)}z.remove('chat-base.html');for(const t of p.tools||[]){if(t.content)z.file((t.path||'/outil.html').replace(/^\//,''),t.content);pages['tool-'+t.id]=t.path}let dash=await z.file('dashbord.html').async('string');const avatarHtml=a=>a.image?'<img class="nav-avatar" src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="nav-avatar" style="display:flex;align-items:center;justify-content:center">'+esc(a.icon||'✦')+'</span>';const nav=principals.map((a,i)=>'<div class="nav-item'+(i===0?' active':'')+'" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const atelierNav=atelierAgents.map(a=>'<div class="nav-item" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const toolnav=(p.tools||[]).map(t=>'<div class="nav-item" id="nav-tool-'+t.id+'" onclick="openAgentTab(\'tool-'+t.id+'\')"><span class="nav-icon">'+esc(t.icon||'🧰')+'</span><span class="nav-text"><span class="nav-name">'+esc(t.name||'Outil')+'</span></span><span class="nav-arrow">›</span></div>').join('');dash=dash.replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_AGENT_NAV__',nav).replaceAll('__PORTAL_ATELIER_NAV__',atelierNav).replaceAll('__PORTAL_ATELIER_LABEL__',esc(p.atelierLabel||'Atelier')).replaceAll('__PORTAL_SPECIAL_TOOLS__',toolnav).replaceAll('__PORTAL_AGENT_PAGES__','').replaceAll('__PORTAL_PAGES_JSON__',JSON.stringify(pages)).replaceAll('__PORTAL_AGENT_META_JSON__',JSON.stringify(meta)).replaceAll('__PORTAL_DEFAULT_AGENT_JSON__',JSON.stringify((principals[0]||visibleAgents[0]||agents[0]).key)).replaceAll('__PORTAL_ATELIER_KEYS_JSON__',JSON.stringify(atelierAgents.map(a=>a.key))).replaceAll('__PORTAL_TITLE__',p.title);
