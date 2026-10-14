@@ -154,6 +154,23 @@ function positionIndexImages(i,id,visual){
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const slug=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},...o});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'HTTP '+r.status);return d}
 
 
+function indexAlignmentSelect(value,onChange){
+ const select=document.createElement('select');select.innerHTML='<option value="">Alignement habituel</option><option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option><option value="justify">Justifié (ajusté)</option>';select.value=value||'';select.onchange=()=>onChange(select.value);return select;
+}
+function indexItemAlignAttr(value){return ['left','center','right','justify'].includes(value)?' data-nx-text-align="'+value+'" style="text-align:'+value+'"':''}
+function addIndexListAlignment(host,attribute,getItems,sourceId,property='align'){
+ host.querySelectorAll('['+attribute+']').forEach(textarea=>{
+  const index=Number(textarea.getAttribute(attribute));if(textarea.tagName==='TEXTAREA')addIndexFormattingToolbar(textarea);
+  const label=document.createElement('label');label.textContent='Alignement de ce texte';
+  const select=indexAlignmentSelect(getItems()[index]?.[property],value=>{const items=getItems();items[index]={...items[index],[property]:value};$(sourceId).value=JSON.stringify(items);scheduleIndexPreview()});
+  textarea.before(label,select);
+ });
+}
+function addIndexTitleFieldAlignment(input,key){
+ const group=INDEX_GROUPS.find(g=>g.keys.includes(key));if(!group||!$('idx-'+group.id+'TitleAlign'))return;
+ const label=document.createElement('label');label.textContent='Alignement du titre';
+ const select=indexAlignmentSelect($('idx-'+group.id+'TitleAlign').value,value=>{const main=$('idx-'+group.id+'TitleAlign');main.value=value;main.dispatchEvent(new Event('input',{bubbles:true}))});select.id='idx-inline-title-align-'+key;input.after(label,select);
+}
 function addIndexFormattingToolbar(textarea){
  if(!textarea||textarea.classList.contains('idx-hidden-source')||textarea.dataset.formattingToolbar)return;
  textarea.dataset.formattingToolbar='1';
@@ -168,6 +185,12 @@ function addIndexFormattingToolbar(textarea){
    textarea.dispatchEvent(new Event('input',{bubbles:true}));
   };
   bar.appendChild(button);
+ }
+ const key=textarea.id?.replace(/^idx-/,'');
+ const group=INDEX_GROUPS.find(g=>g.keys.includes(key)||key==='code'+idxCap(g.id));
+ if(group&&!textarea.classList.contains('idx-hidden-source')){
+  const label=document.createElement('label');label.textContent='Alignement du texte';
+  const select=indexAlignmentSelect($('idx-'+group.id+'TextAlign')?.value,value=>{const main=$('idx-'+group.id+'TextAlign');if(main){main.value=value;main.dispatchEvent(new Event('input',{bubbles:true}))}});select.id='idx-inline-align-'+key;bar.append(label,select);
  }
  textarea.before(bar);
 }
@@ -247,7 +270,8 @@ function indexUI(){
  }
  for(const [key] of sections){
    const el=$('idx-'+key);if(!el)continue
-   if(el.tagName==='TEXTAREA')addIndexFormattingToolbar(el)
+   if(el.tagName==='TEXTAREA'||['heroNote','footerSign'].includes(key))addIndexFormattingToolbar(el)
+   else if(/Title$|Subtitle$|Kicker$|Eyebrow$/.test(key))addIndexTitleFieldAlignment(el,key)
    el.addEventListener('input',()=>{if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key);scheduleIndexPreview()})
    el.addEventListener('change',()=>{if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key);scheduleIndexPreview()})
  }
@@ -280,6 +304,7 @@ function renderFaqBuilder(){
  list.forEach((item,i)=>{const row=document.createElement('div');row.className='idx-faq-row';row.innerHTML='<input data-faq-q="'+i+'" placeholder="Question" value="'+esc(item.q||'')+'"><textarea data-faq-a="'+i+'" placeholder="Réponse">'+esc(item.a||'')+'</textarea><div class="idx-faq-actions"><button class="btn danger" type="button" data-faq-del="'+i+'">Supprimer</button></div>';h.appendChild(row)})
  h.querySelectorAll('[data-faq-q]').forEach(el=>el.oninput=()=>{const l=faqData(),i=+el.dataset.faqQ;l[i]={...(l[i]||{}),q:el.value};$('idx-faq').value=JSON.stringify(l);scheduleIndexPreview()})
  h.querySelectorAll('[data-faq-a]').forEach(el=>el.oninput=()=>{const l=faqData(),i=+el.dataset.faqA;l[i]={...(l[i]||{}),a:el.value};$('idx-faq').value=JSON.stringify(l);scheduleIndexPreview()})
+ addIndexListAlignment(h,'data-faq-a',faqData,'idx-faq');addIndexListAlignment(h,'data-faq-q',faqData,'idx-faq','questionAlign');
  h.querySelectorAll('[data-faq-del]').forEach(el=>el.onclick=()=>{const l=faqData();l.splice(+el.dataset.faqDel,1);setJsonArray('idx-faq',l);renderFaqBuilder()})
 }
 function addFaqItem(){const l=faqData();l.push({q:'',a:''});setJsonArray('idx-faq',l);renderFaqBuilder()}
@@ -287,9 +312,10 @@ function journeyData(){return jsonArray('idx-journeyItems')}
 function renderJourneyBuilder(){
  const h=$('idxJourneyList');if(!h)return;const list=journeyData();h.innerHTML=''
  if(!list.length){const e=document.createElement('div');e.className='idx-empty';e.textContent='Aucune étape. Ajoute seulement celles dont tu as besoin.';h.appendChild(e)}
- list.forEach((item,i)=>{const row=document.createElement('div');row.className='idx-faq-row';row.innerHTML='<input data-j-title="'+i+'" placeholder="Titre de l’étape" value="'+esc(item.title||'')+'"><textarea data-j-text="'+i+'" placeholder="Description">'+esc(item.text||'')+'</textarea><div class="idx-faq-actions"><button class="btn danger" type="button" data-j-del="'+i+'">Supprimer</button></div>';h.appendChild(row)})
+ list.forEach((item,i)=>{const row=document.createElement('div');row.className='idx-faq-row';row.innerHTML='<input data-j-title="'+i+'" placeholder="Titre de l’étape" value="'+esc(item.title||'')+'"><textarea data-j-text="'+i+'" placeholder="Description">'+esc(item.text||'')+'</textarea><div class="idx-faq-actions"><button class="btn danger" type="button" data-j-del="'+i+'">Supprimer</button></div>';h.appendChild(row);const textarea=row.querySelector('textarea');addIndexFormattingToolbar(textarea);const label=document.createElement('label');label.textContent='Alignement de cette description';const align=indexAlignmentSelect(item.align,value=>{const items=journeyData();items[i]={...items[i],align:value};$('idx-journeyItems').value=JSON.stringify(items);scheduleIndexPreview()});row.insertBefore(label,textarea);row.insertBefore(align,textarea)})
  h.querySelectorAll('[data-j-title]').forEach(el=>el.oninput=()=>{const l=journeyData(),i=+el.dataset.jTitle;l[i]={...(l[i]||{}),title:el.value};$('idx-journeyItems').value=JSON.stringify(l);scheduleIndexPreview()})
  h.querySelectorAll('[data-j-text]').forEach(el=>el.oninput=()=>{const l=journeyData(),i=+el.dataset.jText;l[i]={...(l[i]||{}),text:el.value};$('idx-journeyItems').value=JSON.stringify(l);scheduleIndexPreview()})
+ addIndexListAlignment(h,'data-j-title',journeyData,'idx-journeyItems','titleAlign');
  h.querySelectorAll('[data-j-del]').forEach(el=>el.onclick=()=>{const l=journeyData();l.splice(+el.dataset.jDel,1);setJsonArray('idx-journeyItems',l);renderJourneyBuilder()})
 }
 function addJourneyItem(){const l=journeyData();l.push({title:'',text:''});setJsonArray('idx-journeyItems',l);renderJourneyBuilder()}
@@ -299,6 +325,7 @@ function renderProofBuilder(){
  if(!list.length){const e=document.createElement('div');e.className='idx-empty';e.textContent='Aucun témoignage pour le moment.';h.appendChild(e)}
  list.forEach((item,i)=>{const row=document.createElement('div');row.className='idx-faq-row';row.innerHTML='<input data-p-name="'+i+'" placeholder="Nom / signature" value="'+esc(item.name||'')+'"><input data-p-sub="'+i+'" placeholder="Résultat / sous-titre" value="'+esc(item.sub||'')+'"><input data-p-image="'+i+'" placeholder="Image ou couverture (URL)" value="'+esc(item.image||'')+'"><textarea data-p-text="'+i+'" placeholder="Témoignage">'+esc(item.text||'')+'</textarea><div class="idx-faq-actions"><button class="btn danger" type="button" data-p-del="'+i+'">Supprimer</button></div>';h.appendChild(row)})
  for(const attr of ['name','sub','image','text'])h.querySelectorAll('[data-p-'+attr+']').forEach(el=>el.oninput=()=>{const l=proofData(),i=+el.dataset['p'+attr.charAt(0).toUpperCase()+attr.slice(1)];l[i]={...(l[i]||{}),[attr]:el.value};$('idx-proofItems').value=JSON.stringify(l);scheduleIndexPreview()})
+ addIndexListAlignment(h,'data-p-text',proofData,'idx-proofItems');addIndexListAlignment(h,'data-p-name',proofData,'idx-proofItems','nameAlign');addIndexListAlignment(h,'data-p-sub',proofData,'idx-proofItems','subAlign');
  h.querySelectorAll('[data-p-del]').forEach(el=>el.onclick=()=>{const l=proofData();l.splice(+el.dataset.pDel,1);setJsonArray('idx-proofItems',l);renderProofBuilder()})
 }
 function addProofItem(){const l=proofData();l.push({name:'',sub:'',image:'',text:''});setJsonArray('idx-proofItems',l);renderProofBuilder()}
@@ -506,6 +533,7 @@ function apply(d={}){
    else if(k==='ctaVariant')el.value=idx[k]||'simple'
    else el.value=idx[k]||''
  }
+ for(const g of INDEX_GROUPS)for(const key of g.keys){const inline=$('idx-inline-align-'+key);if(inline)inline.value=idx[g.id+'TextAlign']||'';const titleInline=$('idx-inline-title-align-'+key);if(titleInline)titleInline.value=idx[g.id+'TitleAlign']||''}
  for(const g of INDEX_BUTTON_POSITION_GROUPS)renderIndexTextBlocks(g.id);
  tools=d.tools||[];renderTools();renderFaqBuilder();renderJourneyBuilder();renderProofBuilder()
  for(const key of INDEX_MEDIA_KEYS)updateIdxMediaPreview(key);scheduleIndexPreview()
@@ -619,11 +647,11 @@ function customSection(i,id,visual){
  if(['left','center','right','justify'].includes(i[id+'TextAlign'])){
   const doc=document.createElement('template');doc.innerHTML=result;
   const nodes=doc.content.querySelectorAll('.text-block,.text-block p,.hero-lead,.hero-lead p,.hero-note,.faq-content,.faq-content p,.parcours-item p,.auteur-card p,.footer-sign,.brand-name,section p,header p,footer p');
-  nodes.forEach(text=>text.style.textAlign=i[id+'TextAlign']);result=indexFragmentHtml(doc.content);
+  nodes.forEach(text=>text.style.textAlign=text.closest('[data-nx-text-align]')?.getAttribute('data-nx-text-align')||i[id+'TextAlign']);result=indexFragmentHtml(doc.content);
  }
  if(['left','center','right','justify'].includes(i[id+'TitleAlign'])){
   const doc=document.createElement('template');doc.innerHTML=result;
-  doc.content.querySelectorAll('.section-head,.section-head h2,.section-head .kicker,.hero>h1,.hero>h2,.parcours-item h4,.auteur-card h4,.auteur-card h5,.cercle-inner>h2,section h1,section h2,section h3,section h4,section h5,section h6,.faq-item summary').forEach(title=>title.style.textAlign=i[id+'TitleAlign']);result=indexFragmentHtml(doc.content);
+  doc.content.querySelectorAll('.section-head,.section-head h2,.section-head .kicker,.hero>h1,.hero>h2,.parcours-item h4,.auteur-card h4,.auteur-card h5,.cercle-inner>h2,section h1,section h2,section h3,section h4,section h5,section h6,.faq-item summary').forEach(title=>title.style.textAlign=title.closest('[data-nx-text-align]')?.getAttribute('data-nx-text-align')||i[id+'TitleAlign']);result=indexFragmentHtml(doc.content);
  }
  result=applyIndexTextBlocks(result,safeJsonArray(i[id+'TextBlocks']),i,id)
  if(INDEX_BUTTON_GROUPS.some(g=>g.id===id)&&String(i[id+'CtaLabel']||'').trim()){
@@ -653,7 +681,7 @@ function fillIndex(s,p){
  const header='<header class="site-header" id="nx-header"><a class="brand" href="/"><img src="/images/NyXia.png" alt="NyXia"><span class="brand-name"><b>NyXia</b><span>L’univers</span></span></a><div class="header-right"><div class="socials">'+(i.headerSocials||defaultSocials)+'</div><span class="cta-glass-wrap"><a class="btn-glass" style="border-color:rgba(244,200,66,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 8px 30px rgba(244,200,66,.16)" href="'+esc(i.headerCtaUrl||'/login.html')+'">'+esc(headerLabel)+'</a></span></div></header>'
  const hero='<section class="hero" id="nx-hero">'+(i.heroEyebrow?'<span class="hero-eyebrow">'+i.heroEyebrow+'</span>':'')+'<h1>'+(i.heroTitle||title)+'</h1>'+(i.heroSubtitle?'<h2>'+i.heroSubtitle+'</h2>':'')+(i.heroNote?'<p class="hero-note">'+i.heroNote+'</p>':'')+(i.heroText||p.mission?'<div class="hero-lead">'+(i.heroText||p.mission||'')+'</div>':'')+(i.heroCtaLabel?'<div class="hero-cta">'+btnHtml(i.heroCtaLabel,i.heroCtaUrl||'/login.html',i.heroButtonStyle||'gold')+'</div>':'')+mediaBlock(i.heroMedia,true)+'</section>'
  const problem='<section class="section-wrap" id="nx-problem">'+sectionHead(i.s2Kicker,i.s2Title)+(i.s2?'<div class="text-block">'+i.s2+'</div>':'')+mediaBlock(i.s2Media,true)+mediaBlock(i.s3Media,false)+'</section>'
- const journeyItems=safeJsonArray(i.journeyItems).map(x=>'<div class="parcours-item"><h4>'+esc(x.title||'')+'</h4><p>'+String(x.text||'')+'</p></div>').join('')
+ const journeyItems=safeJsonArray(i.journeyItems).map(x=>'<div class="parcours-item"><h4>'+esc(x.title||'')+'</h4><p'+indexItemAlignAttr(x.align)+'>'+String(x.text||'')+'</p></div>').join('')
  const journey='<section class="section-wrap" id="nx-journey">'+sectionHead(i.s45Kicker,i.s45Title)+(i.s45?'<div class="text-block">'+i.s45+'</div>':'')+mediaBlock(i.s45Media,true)+(journeyItems?'<div class="parcours-list">'+journeyItems+'</div>':'')+'</section>'
  const simpleSection=(id,kicker,titleKey,textKey,mediaKey)=>'<section class="section-wrap" id="nx-'+id+'">'+sectionHead(i[kicker],i[titleKey])+(i[textKey]?'<div class="text-block">'+i[textKey]+'</div>':'')+mediaBlock(i[mediaKey],true)+'</section>'
  const content=simpleSection('content','s67Kicker','s67Title','s67','s67Media')
@@ -661,11 +689,11 @@ function fillIndex(s,p){
  const evolution=simpleSection('evolution','s1011Kicker','s1011Title','s1011','s1011Media')
  const atelier=simpleSection('atelier','s1213Kicker','s1213Title','s1213','s1213Media')
  const results=simpleSection('results','s1415Kicker','s1415Title','s1415','s1415Media')
- const proofItems=safeJsonArray(i.proofItems).map(x=>'<div class="auteur-card">'+(x.image?'<div class="auteur-cover"><img src="'+esc(x.image)+'" alt="'+esc(x.name||'Témoignage')+'"></div>':'')+(x.name?'<h4>'+esc(x.name)+'</h4>':'')+(x.sub?'<h5>'+esc(x.sub)+'</h5>':'')+(x.text?'<p>'+String(x.text)+'</p>':'')+'</div>').join('')
+ const proofItems=safeJsonArray(i.proofItems).map(x=>'<div class="auteur-card">'+(x.image?'<div class="auteur-cover"><img src="'+esc(x.image)+'" alt="'+esc(x.name||'Témoignage')+'"></div>':'')+(x.name?'<h4'+indexItemAlignAttr(x.nameAlign)+'>'+esc(x.name)+'</h4>':'')+(x.sub?'<h5'+indexItemAlignAttr(x.subAlign)+'>'+esc(x.sub)+'</h5>':'')+(x.text?'<p'+indexItemAlignAttr(x.align)+'>'+String(x.text)+'</p>':'')+'</div>').join('')
  const proof='<section class="section-wrap" id="nx-proof">'+sectionHead(i.socialKicker,i.socialTitle)+(i.socialProof?'<div class="text-block">'+i.socialProof+'</div>':'')+mediaBlock(i.socialProofMedia,true)+(proofItems?'<div class="auteurs-grid">'+proofItems+'</div>':'')+'</section>'
  const tools=simpleSection('tools','toolsKicker','toolsTitle','toolsText','toolsMedia')
  const transform=simpleSection('transform','transKicker','transTitle','transformText','transformMedia')
- const faqItems=safeJsonArray(i.faq).map(x=>'<details class="faq-item"><summary>'+esc(x.q||'')+'</summary><div class="faq-content"><p>'+String(x.a||'')+'</p></div></details>').join('')
+ const faqItems=safeJsonArray(i.faq).map(x=>'<details class="faq-item"><summary'+indexItemAlignAttr(x.questionAlign)+'>'+esc(x.q||'')+'</summary><div class="faq-content"'+indexItemAlignAttr(x.align)+'><p>'+String(x.a||'')+'</p></div></details>').join('')
  const faqBlock='<section class="section-wrap" id="nx-faq">'+sectionHead('',i.faqTitle||'Questions fréquentes')+(faqItems?'<div class="faq-container">'+faqItems+'</div>':'')+'</section>'
  const ctaVariant=i.ctaVariant||'simple',ctaTitle=i.ctaTitle||(ctaVariant==='simple'?'Prends rendez-vous':'Parlons de ton projet')
  const cta='<section class="cercle" id="nx-cta"><div class="cercle-inner">'+(i.ctaKicker?'<span class="kicker">'+i.ctaKicker+'</span>':'')+'<h2>'+ctaTitle+'</h2>'+(ctaVariant==='complete'&&i.ctaText?'<div class="text-block"><p>'+i.ctaText+'</p></div>':'')+'<div class="cercle-cta">'+btnHtml(i.ctaLabel||'Prendre rendez-vous',i.ctaUrl||'#',i.ctaButtonStyle||'glass')+'</div></div></section>'
