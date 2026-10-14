@@ -37,7 +37,7 @@ function placeIndexButton(html,button,position,paragraph){
  }
  const doc=document.createElement('template');doc.innerHTML=html;const root=doc.content;
  const holder=document.createElement('template');holder.innerHTML=button;const node=holder.content.firstElementChild;
- const section=root.querySelector('section')||root;
+ const section=root.querySelector('section,header,footer')||root;
  const text=section.querySelector('.text-block,.hero-lead'),image=section.querySelector('.img-frame');
  if(position==='top')section.insertBefore(node,section.firstChild);
  else if(position==='before-text'&&text)text.before(node);
@@ -50,7 +50,7 @@ function placeIndexButton(html,button,position,paragraph){
  }else section.appendChild(node);
  return indexFragmentHtml(root);
 }
-for(const g of INDEX_BUTTON_POSITION_GROUPS){g.keys.push(g.id+'TextBlocks',g.id+'TitleColor',g.id+'TextAlign');sections.push([g.id+'TextBlocks','Blocs de texte et titres'],[g.id+'TitleColor','Couleur du titre principal'],[g.id+'TextAlign','Alignement du texte principal'])}
+for(const g of INDEX_GROUPS){g.keys.push(g.id+'TextBlocks',g.id+'TitleColor',g.id+'TextAlign');sections.push([g.id+'TextBlocks','Blocs de texte, titres et images'],[g.id+'TitleColor','Couleur du titre principal'],[g.id+'TextAlign','Alignement du texte principal'])}
 for(const g of INDEX_GROUPS){
  if(!g.keys.includes(g.id+'TextAlign')){g.keys.push(g.id+'TextAlign');sections.push([g.id+'TextAlign','Alignement du texte principal'])}
  if(!['header','footer'].includes(g.id)){g.keys.push(g.id+'TitleAlign');sections.push([g.id+'TitleAlign','Alignement des titres principaux'])}
@@ -67,15 +67,27 @@ function moveIndexTextBlock(blocks,index,step){
  [blocks[index],blocks[target]]=[blocks[target],blocks[index]];
  return true;
 }
+function renderIndexImageBlock(block,n,blocks,persist,id){
+ const row=document.createElement('div');row.className='idx-faq-row';
+ row.innerHTML='<label>Image '+(n+1)+'</label><input data-image-url placeholder="Lien de ton image" value="'+esc(block.imageUrl||'')+'"><label>Texte alternatif</label><input data-image-alt value="'+esc(block.alt||'')+'"><label>Emplacement de l’image</label><select data-image-position><option value="top">En haut de la section</option><option value="before-text">Avant le texte principal</option><option value="after-text">Après le texte principal</option><option value="left-text">À gauche du texte</option><option value="right-text">À droite du texte</option><option value="before-image">Avant l’image principale</option><option value="after-image">Après l’image principale</option><option value="paragraph">Entre les paragraphes du texte principal</option><option value="bottom">En bas de la section</option></select><label>Après le paragraphe numéro</label><input data-image-paragraph type="number" min="1" value="'+esc(block.paragraph||1)+'"><label>Effet flottant</label><select data-image-float><option value="">Non</option><option value="1">Oui</option></select><label>Effet glow</label><select data-image-glow><option value="">Non</option><option value="1">Oui</option></select><div class="idx-faq-actions"><button class="btn secondary" data-action="up" type="button">↑ Monter</button><button class="btn secondary" data-action="down" type="button">↓ Descendre</button><button class="btn danger" data-action="remove" type="button">Retirer cette image</button></div>';
+ for(const [attribute,key]of [['url','imageUrl'],['alt','alt'],['position','position'],['paragraph','paragraph'],['float','imageFloat'],['glow','imageGlow']]){
+  const control=row.querySelector('[data-image-'+attribute+']');control.value=block[key]||'';if(attribute==='position')control.value=block.position||'bottom';
+  control.addEventListener(control.tagName==='SELECT'?'change':'input',()=>{block[key]=control.value;persist()});
+ }
+ row.querySelectorAll('button').forEach(button=>button.onclick=()=>{if(button.dataset.action==='remove')blocks.splice(n,1);else if(!moveIndexTextBlock(blocks,n,button.dataset.action==='up'?-1:1))return;persist();renderIndexTextBlocks(id)});
+ row.querySelector('[data-action=up]').disabled=n===0;row.querySelector('[data-action=down]').disabled=n===blocks.length-1;
+ return row;
+}
 function renderIndexTextBlocks(id){
  const host=$('idx-text-blocks-'+id),source=$('idx-'+id+'TextBlocks');if(!host||!source)return;
  const blocks=indexTextBlocks(id);host.innerHTML='';
  const persist=()=>{source.value=JSON.stringify(blocks);scheduleIndexPreview()};
  blocks.forEach((block,n)=>{
+  if(block.kind==='image'){host.appendChild(renderIndexImageBlock(block,n,blocks,persist,id));return}
   const row=document.createElement('div');row.className='idx-faq-row';
   row.innerHTML='<label>'+(block.kind==='title'?'Titre ':'Bloc texte ')+(n+1)+'</label><textarea style="min-height:220px" placeholder="Ton texte ou ton HTML">'+esc(block.text||'')+'</textarea><label>Emplacement du bloc</label><select><option value="top">En haut de la section</option><option value="before-text">Avant le texte principal</option><option value="after-text">Après le texte principal</option><option value="before-image">Avant l’image</option><option value="after-image">Après l’image</option><option value="left-image">À gauche de l’image</option><option value="right-image">À droite de l’image</option><option value="paragraph">Entre les paragraphes du texte principal</option><option value="bottom">En bas de la section</option></select><label>Après le paragraphe numéro</label><input type="number" min="1" step="1" value="'+esc(block.paragraph||1)+'"><div class="idx-faq-actions"><button class="btn secondary" type="button" data-action="up">↑ Monter</button><button class="btn secondary" type="button" data-action="down">↓ Descendre</button><button class="btn danger" type="button" data-action="remove">Retirer ce bloc</button></div>';
   const mediaKeys=(INDEX_GROUPS.find(g=>g.id===id)?.keys||[]).filter(k=>INDEX_MEDIA_KEYS.has(k));
-  if(mediaKeys.length>1){const label=document.createElement('label');label.textContent='Image concernée';const target=document.createElement('select');mediaKeys.forEach((key,n)=>{const option=document.createElement('option');option.value=key;option.textContent=n===0?'Image principale':'Deuxième image';target.appendChild(option)});target.value=block.imageKey||mediaKeys[0];target.onchange=()=>{block.imageKey=target.value;persist()};row.append(label,target)}
+  if(mediaKeys.length>1||blocks.some(b=>b.kind==='image')){const label=document.createElement('label');label.textContent='Image concernée';const target=document.createElement('select');mediaKeys.forEach((key,n)=>{const option=document.createElement('option');option.value=key;option.textContent=n===0?'Image principale':'Deuxième image';target.appendChild(option)});blocks.forEach((other,index)=>{if(other.kind==='image'&&other.id){const option=document.createElement('option');option.value='block:'+other.id;option.textContent='Image ajoutée '+(index+1);target.appendChild(option)}});target.value=block.imageKey||mediaKeys[0]||target.options[0]?.value||'';target.onchange=()=>{block.imageKey=target.value;persist()};row.append(label,target)}
   if(block.kind==='title'){const label=document.createElement('label');label.textContent='Niveau du titre';const level=document.createElement('select');for(const tag of ['h2','h3','h4']){const option=document.createElement('option');option.value=tag;option.textContent=tag==='h2'?'Grand titre':tag==='h3'?'Sous-titre':'Petit titre';level.appendChild(option)}level.value=block.level||'h2';level.onchange=()=>{block.level=level.value;persist()};row.append(label,level);const colorLabel=document.createElement('label');colorLabel.textContent='Couleur du titre';const color=document.createElement('select');color.innerHTML='<option value="">Couleur habituelle</option><option value="gold">Or</option>';color.value=block.color||'';color.onchange=()=>{block.color=color.value;persist()};row.append(colorLabel,color)}
   const textarea=row.querySelector('textarea'),select=row.querySelector('select'),number=row.querySelector('input');select.value=block.position||'bottom';number.hidden=select.value!=='paragraph';number.previousElementSibling.hidden=number.hidden;
   textarea.oninput=()=>{block.text=textarea.value;persist()};select.onchange=()=>{block.position=select.value;number.hidden=select.value!=='paragraph';number.previousElementSibling.hidden=number.hidden;persist()};number.oninput=()=>{block.paragraph=number.value;persist()};
@@ -86,16 +98,30 @@ function renderIndexTextBlocks(id){
  });
 }
 function applyIndexTextBlocks(html,blocks,i={},id=""){
- blocks=blocks.filter(b=>String(b.text||'').trim());if(!blocks.length)return html;
+ blocks=blocks.filter(b=>String((b.kind==='image'?b.imageUrl:b.text)||'').trim());if(!blocks.length)return html;
  const doc=document.createElement('template');doc.innerHTML=html;const root=doc.content,section=root.querySelector('section')||root;
- const text=section.querySelector('.text-block,.hero-lead'),first=section.firstChild,paragraphs=(text||section).querySelectorAll('p'),tails=new Map();
- for(const block of blocks){
+ let text=section.querySelector('.text-block,.hero-lead,.faq-container,.footer-sign,.brand-name,.cercle-inner');const first=section.firstChild,paragraphs=(text||section).querySelectorAll('p'),tails=new Map();
+ const queue=blocks.slice();let deferred=0;
+ for(let cursor=0;cursor<queue.length;cursor++){
+  const block=queue[cursor];text=text||section.querySelector('.text-block,.hero-lead,.faq-container,.footer-sign,.brand-name,.cercle-inner');
+  if(block.kind==='image'&&['left-text','right-text'].includes(block.position)&&!text&&blocks.some(b=>b.kind!=='image')&&deferred<blocks.length){queue.push(block);deferred++;continue}
   const targetUrl=block.imageKey?String(i[block.imageKey]||'').trim():'';
-  const image=targetUrl?[...section.querySelectorAll('.img-frame')].find(frame=>frame.querySelector('img,iframe')?.getAttribute('src')===targetUrl):section.querySelector('.img-frame');
+  const image=String(block.imageKey||'').startsWith('block:')?[...section.querySelectorAll('[data-nx-image-id]')].find(frame=>frame.getAttribute('data-nx-image-id')===block.imageKey.slice(6)):targetUrl?[...section.querySelectorAll('.img-frame')].find(frame=>frame.querySelector('img,iframe')?.getAttribute('src')===targetUrl):section.querySelector('.img-frame');
+  if(String(block.imageKey||'').startsWith('block:')&&!image&&deferred<blocks.length){queue.push(block);deferred++;continue}
   const node=document.createElement('div');node.className='text-block nx-extra-text';if(['left','center','right','justify'].includes(block.align))node.style.textAlign=block.align;
   const raw=String(block.text||'');node.innerHTML=/<[a-z][\s\S]*>/i.test(raw)?raw:raw.split(/\n\s*\n/).map(p=>'<p>'+esc(p).replace(/\n/g,'<br>')+'</p>').join('');
   if(block.kind==='title'){const tag=['h2','h3','h4'].includes(block.level)?block.level:'h2';const heading=document.createElement(tag);heading.className='display';if(block.color==='gold')heading.style.color='#F4C842';heading.innerHTML=raw;node.innerHTML='';node.appendChild(heading)}
+  if(block.kind==='image'){
+   node.className='img-frame nx-extra-image';if(block.id)node.setAttribute('data-nx-image-id',block.id);
+   const img=document.createElement('img');img.src=String(block.imageUrl||'').trim();img.alt=block.alt||'';
+   if(block.imageFloat==='1')img.classList.add('nx-image-float');if(block.imageGlow==='1')node.classList.add('nx-image-glow');node.innerHTML='';node.appendChild(img);
+  }
   const position=block.position||'bottom';let anchor=null;
+  if(block.kind==='image'&&['left-text','right-text'].includes(position)&&text){
+   let layout=text.closest('.nx-image-layout');if(!layout){layout=document.createElement('div');layout.className='nx-image-layout';text.before(layout);const copy=document.createElement('div');copy.className='nx-image-copy';layout.appendChild(copy);copy.appendChild(text)}
+   const copy=[...layout.children].find(child=>child===text||child.contains(text));let slot=position==='left-text'?copy.previousElementSibling:copy.nextElementSibling;
+   if(!slot){slot=document.createElement('div');slot.className='nx-image-slot';if(position==='left-text')copy.before(slot);else copy.after(slot)}slot.appendChild(node);if(layout.children.length>2)layout.classList.add('nx-multi-side');continue;
+  }
   if(['left-image','right-image'].includes(position)&&image){
    let layout=image.closest('.nx-image-layout');
    if(!layout){layout=document.createElement('div');layout.className='nx-image-layout';image.before(layout);const slot=document.createElement('div');slot.className='nx-image-slot';layout.appendChild(slot);slot.appendChild(image)}
@@ -236,8 +262,8 @@ function indexUI(){
 
    for(const key of g.keys){
      if(key===g.id+'TextBlocks'){
-       const wrap=document.createElement('div');wrap.innerHTML='<textarea class="idx-hidden-source" id="idx-'+key+'"></textarea><label style="display:block;margin-bottom:8px">Blocs de texte et titres</label><div class="idx-faq-list" id="idx-text-blocks-'+g.id+'"></div><button class="btn secondary" type="button">＋ Ajouter un bloc texte</button><button class="btn secondary" type="button" data-add-title>＋ Ajouter un titre</button>';
-       wrap.querySelectorAll('button').forEach(button=>button.onclick=()=>{const blocks=indexTextBlocks(g.id);blocks.push({kind:button.hasAttribute('data-add-title')?'title':'text',text:'',position:'bottom',paragraph:1,level:'h2'});$('idx-'+key).value=JSON.stringify(blocks);renderIndexTextBlocks(g.id);scheduleIndexPreview()});panel.appendChild(wrap);continue;
+       const wrap=document.createElement('div');wrap.innerHTML='<textarea class="idx-hidden-source" id="idx-'+key+'"></textarea><label style="display:block;margin-bottom:8px">Blocs de texte, titres et images</label><div class="idx-faq-list" id="idx-text-blocks-'+g.id+'"></div><button class="btn secondary" type="button">＋ Ajouter un bloc texte</button><button class="btn secondary" type="button" data-add-title>＋ Ajouter un titre</button><button class="btn secondary" type="button" data-add-image>＋ Ajouter une image</button>';
+       wrap.querySelectorAll('button').forEach(button=>button.onclick=()=>{const blocks=indexTextBlocks(g.id);blocks.push({kind:button.hasAttribute('data-add-image')?'image':button.hasAttribute('data-add-title')?'title':'text',id:crypto.randomUUID(),text:'',imageUrl:'',position:'bottom',paragraph:1,level:'h2'});$('idx-'+key).value=JSON.stringify(blocks);renderIndexTextBlocks(g.id);scheduleIndexPreview()});panel.appendChild(wrap);continue;
      }
      if(key==='faq'){
        const hidden=document.createElement('textarea');hidden.id='idx-faq';hidden.className='idx-hidden-source';panel.appendChild(hidden)
@@ -534,7 +560,7 @@ function apply(d={}){
    else el.value=idx[k]||''
  }
  for(const g of INDEX_GROUPS)for(const key of g.keys){const inline=$('idx-inline-align-'+key);if(inline)inline.value=idx[g.id+'TextAlign']||'';const titleInline=$('idx-inline-title-align-'+key);if(titleInline)titleInline.value=idx[g.id+'TitleAlign']||''}
- for(const g of INDEX_BUTTON_POSITION_GROUPS)renderIndexTextBlocks(g.id);
+ for(const g of INDEX_GROUPS)renderIndexTextBlocks(g.id);
  tools=d.tools||[];renderTools();renderFaqBuilder();renderJourneyBuilder();renderProofBuilder()
  for(const key of INDEX_MEDIA_KEYS)updateIdxMediaPreview(key);scheduleIndexPreview()
 }
@@ -724,7 +750,7 @@ function fillIndex(s,p){
    '__INDEX_FOOTER_BLOCK__':customSection(i,'footer',footer)
  }
  for(const [k,v] of Object.entries(map))s=s.split(k).join(String(v))
- if([...INDEX_MEDIA_KEYS].some(key=>i[key]&&(i[key+'Position']||i[key+'Float']==='1'||i[key+'Glow']==='1'))||INDEX_BUTTON_POSITION_GROUPS.some(g=>safeJsonArray(i[g.id+'TextBlocks']).some(b=>String(b.text||'').trim())))s=s.replace('</head>',INDEX_IMAGE_CSS+'</head>')
+ if([...INDEX_MEDIA_KEYS].some(key=>i[key]&&(i[key+'Position']||i[key+'Float']==='1'||i[key+'Glow']==='1'))||INDEX_GROUPS.some(g=>safeJsonArray(i[g.id+'TextBlocks']).some(b=>String((b.kind==='image'?b.imageUrl:b.text)||'').trim())))s=s.replace('</head>',INDEX_IMAGE_CSS+'</head>')
  return s
 }
 async function compile(){try{$('host').value=portalAccessHost(true);const pr=await save(),p=pr.data;const registered=await ensurePortalRegistered(false);if(!registered)throw Error('Le portail n’a pas pu être relié à la liste centrale / Dégustation.');const r=await fetch('/superadmin4/portail-shell-template.zip',{cache:'no-store'});if(!r.ok)throw Error('Coque introuvable');const z=await JSZip.loadAsync(await r.arrayBuffer()),agents=p.agents||[];if(!agents.length)throw Error('Choisis au moins un personnage pour ce portail.');const cfg={id:p.portalId||slug(p.short||p.title),accessVersion:1,title:p.title,shortTitle:p.short||p.title,mission:p.mission,loginImage:p.loginImage,activeAgents:agents.map(a=>a.key),agents};let w=await z.file('_worker.js').async('string');w=w.replace("const PORTAL_CONFIG_B64='__PORTAL_CONFIG_B64__';","const PORTAL_CONFIG_B64='"+b64(JSON.stringify(cfg))+"';");z.file('_worker.js',w);let wr=await z.file('wrangler.toml').async('string');wr=wr.replaceAll('__WORKER_NAME__',p.workerName||slug(p.short||p.title)).replaceAll('__HOST__',p.host).replaceAll('__PORTAL_ID__',cfg.id);z.file('wrangler.toml',wr);let ind=await z.file('index.html').async('string');z.file('index.html',fillIndex(ind,p));let log=await z.file('login.html').async('string');log=log.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_LOGIN_IMAGE__',p.loginImage||'');z.file('login.html',log);const first=z.file('premiere-connexion.html');if(!first)throw Error('La coque doit être mise à jour : premiere-connexion.html manque.');z.file('premiere-connexion.html',(await first.async('string')).replaceAll('__PORTAL_TITLE__',esc(p.title||'Portail NyXia')));for(const path of ['mot-de-passe.html','mot-de-passe-oublie.html','reinitialiser-mot-de-passe.html']){const file=z.file(path);if(!file)throw Error('Coque incomplète : '+path+' manque.');z.file(path,(await file.async('string')).replaceAll('__PORTAL_TITLE__',esc(p.title||'Portail NyXia')));}const pages={},meta={};const principals=agents.filter(a=>(a.placement||'principal')==='principal');const atelierAgents=agents.filter(a=>a.placement==='atelier');const visibleAgents=agents.filter(a=>a.placement!=='hidden');let chat=await z.file('chat-base.html').async('string');for(const a of visibleAgents){pages[a.key]='/chat-'+a.key+'.html';meta[a.key]=a;let c=chat.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_TITLE_JSON__',JSON.stringify(p.title)).replaceAll('__AGENT_KEY__',a.key).replaceAll('__AGENT_NAME__',esc(a.name)).replaceAll('__AGENT_SUB__',esc(a.sub||'Personnage NyXia')).replaceAll('__AGENT_JSON__',JSON.stringify(a)).replaceAll('__AGENT_NAME_JSON__',JSON.stringify(a.name)).replaceAll('__AGENT_SUB_JSON__',JSON.stringify(a.sub||'Personnage NyXia')).replaceAll('__AGENT_GREETING_JSON__',JSON.stringify(a.greeting||'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.')).replaceAll('__AGENT_IMAGE_JSON__',JSON.stringify(a.image||'')).replaceAll('__AGENT_VIDEO_JSON__',JSON.stringify(a.welcomeVideo||'')).replaceAll('__AGENT_AVATAR_HTML__',a.image?'<img src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="avatar-fallback">✦</span>');z.file('chat-'+a.key+'.html',c)}z.remove('chat-base.html');for(const t of p.tools||[]){if(t.content)z.file((t.path||'/outil.html').replace(/^\//,''),t.content);pages['tool-'+t.id]=t.path}let dash=await z.file('dashbord.html').async('string');const avatarHtml=a=>a.image?'<img class="nav-avatar" src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="nav-avatar" style="display:flex;align-items:center;justify-content:center">'+esc(a.icon||'✦')+'</span>';const nav=principals.map((a,i)=>'<div class="nav-item'+(i===0?' active':'')+'" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const atelierNav=atelierAgents.map(a=>'<div class="nav-item" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const toolnav=(p.tools||[]).map(t=>'<div class="nav-item" id="nav-tool-'+t.id+'" onclick="openAgentTab(\'tool-'+t.id+'\')"><span class="nav-icon">'+esc(t.icon||'🧰')+'</span><span class="nav-text"><span class="nav-name">'+esc(t.name||'Outil')+'</span></span><span class="nav-arrow">›</span></div>').join('');dash=dash.replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_AGENT_NAV__',nav).replaceAll('__PORTAL_ATELIER_NAV__',atelierNav).replaceAll('__PORTAL_ATELIER_LABEL__',esc(p.atelierLabel||'Atelier')).replaceAll('__PORTAL_SPECIAL_TOOLS__',toolnav).replaceAll('__PORTAL_AGENT_PAGES__','').replaceAll('__PORTAL_PAGES_JSON__',JSON.stringify(pages)).replaceAll('__PORTAL_AGENT_META_JSON__',JSON.stringify(meta)).replaceAll('__PORTAL_DEFAULT_AGENT_JSON__',JSON.stringify((principals[0]||visibleAgents[0]||agents[0]).key)).replaceAll('__PORTAL_ATELIER_KEYS_JSON__',JSON.stringify(atelierAgents.map(a=>a.key))).replaceAll('__PORTAL_TITLE__',p.title);
