@@ -7,9 +7,7 @@
  document.querySelectorAll('a[href]').forEach(decorate);document.addEventListener('click',e=>{const a=e.target.closest?.('a[href]');if(a)decorate(a);},true);
  // Même liaison pour tous les portails : le domaine identifie le produit du Répertoire.
  const script=document.currentScript,product=script?.dataset?.nyxiaProduct,isPortal=product||script?.hasAttribute?.('data-nyxia-portal');
- if(isPortal){const links=[...document.querySelectorAll('a[href]')].filter(a=>{try{return /\/(rdv|rendez-vous|booking|calendar)/i.test(new URL(a.href,location.href).pathname)||/rendez.?vous|réserver|appel de clarté/i.test(a.textContent||'');}catch(_){return false;}}),targets=new Map();
- const target=a=>{const source=a.getAttribute('href');if(!targets.has(a)){const q=new URLSearchParams(product?{product}:{portal:location.origin});q.set('source',source);const promise=fetch('https://univers.nyxia.top/api/closer/booking-target?'+q,{cache:'no-store',credentials:'omit'}).then(async r=>{const d=await r.json();if(!r.ok||!d.success)throw Error('Réservation non raccordée.');const u=new URL(d.url);if(u.protocol!=='https:')throw Error('Lien de réservation invalide.');if(ref)u.searchParams.set('ref',ref);a.href=u.href;return u.href;});promise.catch(()=>console.warn('NyXia : vérifier le lien de rendez-vous enregistré pour ce produit.'));targets.set(a,promise);}return targets.get(a);};
- links.forEach(target);document.addEventListener('click',e=>{const a=e.target.closest?.('a[href]');if(!links.includes(a))return;e.preventDefault();target(a).then(href=>location.assign(href)).catch(()=>{});},true);}
+ // Les liens de réservation configurés dans l’index restent la destination de navigation.
  // Sur la page Systeme.io seulement, transmettre l’origine à la soumission du formulaire existant.
  if(isPortal)return;
  let last='',timer,pending=Promise.resolve();
