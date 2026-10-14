@@ -182,8 +182,9 @@ async function handleCommissionsToPay(request, env) {
 
   // Commissions dues par Super Admin (ses produits)
   const rows = await env.DB.prepare(
-    `SELECT c.*, u.full_name as benef_name, u.email as benef_email, u.paypal_email as benef_paypal
+    `SELECT c.*, COALESCE(NULLIF(p.title,''),'Produit non identifié') AS product_title, u.full_name as benef_name, u.email as benef_email, u.paypal_email as benef_paypal
      FROM commissions c
+     LEFT JOIN marketplace_products p ON p.id = c.product_id
      LEFT JOIN users u ON u.id = c.beneficiary_id
      WHERE (c.seller_id = 'superadmin' OR c.seller_id = 'SUPERADMIN' OR lower(c.seller_id) = 'superadmin')
      ORDER BY c.created_at DESC

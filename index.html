@@ -1304,13 +1304,13 @@ async function loadAPayer(){
         html+='<span style="color:var(--green);font-weight:700;font-size:13px">✓ Tout est payé</span>';
       }
       html+='</div>';
-      html+='<table style="width:100%;font-size:12px"><tr><th align="left">Date</th><th>Niv.</th><th>Montant</th><th>Statut</th><th></th></tr>';
+      html+='<table style="width:100%;font-size:12px"><tr><th align="left">Date</th><th align="left">Produit vendu</th><th align="left">Client</th><th>Origine</th><th>Commission</th><th>Statut</th><th></th></tr>';
       person.items.forEach(function(c){
         var st=c.status||'pending';
         var btn=(st!=='paid')
           ? '<button type="button" class="btn btn-mark-paid" data-id="'+esc(c.id)+'" style="background:linear-gradient(135deg,#00E676,#00c853);color:#041a0c;font-weight:700;padding:8px 14px;font-size:12px">Payé</button>'
           : '<span style="color:var(--green)">Payé</span>';
-        html+='<tr><td>'+esc((c.created_at||'').slice(0,10))+'</td><td>'+esc(String(c.level||''))+'</td><td>'+moneyCAD(c.amount)+'</td><td>'+(st==='paid'?'<span style="color:var(--green)">payé</span>':'<span style="color:#F4C842">à payer</span>')+'</td><td>'+btn+'</td></tr>';
+        html+='<tr><td>'+esc((c.created_at||'').slice(0,10))+'</td><td>'+esc(c.product_title||'Produit non identifié')+'</td><td>'+esc(c.buyer_name||c.buyer_email||'Client non transmis')+'</td><td>'+esc(({0:'Conclusion de vente — Closer',1:'Recommandation Personnelle',2:'Chef d’équipe',3:'Bonus d’équipe'})[Number(c.level)]||'Origine non précisée')+'</td><td>'+moneyCAD(c.amount)+'</td><td>'+(st==='paid'?'<span style="color:var(--green)">payé</span>':'<span style="color:#F4C842">à payer</span>')+'</td><td>'+btn+'</td></tr>';
       });
       html+='</table></div>';
     });
