@@ -50,6 +50,56 @@ function placeIndexButton(html,button,position,paragraph){
  }else section.appendChild(node);
  return indexFragmentHtml(root);
 }
+for(const g of INDEX_BUTTON_POSITION_GROUPS){g.keys.push(g.id+'TextBlocks',g.id+'TitleColor',g.id+'TextAlign');sections.push([g.id+'TextBlocks','Blocs de texte et titres'],[g.id+'TitleColor','Couleur du titre principal'],[g.id+'TextAlign','Alignement du texte principal'])}
+function indexTextBlocks(id){return safeJsonArray($('idx-'+id+'TextBlocks')?.value)}
+function renderIndexTextBlocks(id){
+ const host=$('idx-text-blocks-'+id),source=$('idx-'+id+'TextBlocks');if(!host||!source)return;
+ const blocks=indexTextBlocks(id);host.innerHTML='';
+ const persist=()=>{source.value=JSON.stringify(blocks);scheduleIndexPreview()};
+ blocks.forEach((block,n)=>{
+  const row=document.createElement('div');row.className='idx-faq-row';
+  row.innerHTML='<label>'+(block.kind==='title'?'Titre ':'Bloc texte ')+(n+1)+'</label><textarea style="min-height:220px" placeholder="Ton texte ou ton HTML">'+esc(block.text||'')+'</textarea><label>Emplacement du bloc</label><select><option value="top">En haut de la section</option><option value="before-text">Avant le texte principal</option><option value="after-text">Après le texte principal</option><option value="before-image">Avant l’image</option><option value="after-image">Après l’image</option><option value="left-image">À gauche de l’image</option><option value="right-image">À droite de l’image</option><option value="paragraph">Entre les paragraphes du texte principal</option><option value="bottom">En bas de la section</option></select><label>Après le paragraphe numéro</label><input type="number" min="1" step="1" value="'+esc(block.paragraph||1)+'"><div class="idx-faq-actions"><button class="btn secondary" type="button" data-action="up">↑ Monter</button><button class="btn secondary" type="button" data-action="down">↓ Descendre</button><button class="btn danger" type="button" data-action="remove">Retirer ce bloc</button></div>';
+  const mediaKeys=(INDEX_GROUPS.find(g=>g.id===id)?.keys||[]).filter(k=>INDEX_MEDIA_KEYS.has(k));
+  if(mediaKeys.length>1){const label=document.createElement('label');label.textContent='Image concernée';const target=document.createElement('select');mediaKeys.forEach((key,n)=>{const option=document.createElement('option');option.value=key;option.textContent=n===0?'Image principale':'Deuxième image';target.appendChild(option)});target.value=block.imageKey||mediaKeys[0];target.onchange=()=>{block.imageKey=target.value;persist()};row.append(label,target)}
+  if(block.kind==='title'){const label=document.createElement('label');label.textContent='Niveau du titre';const level=document.createElement('select');for(const tag of ['h2','h3','h4']){const option=document.createElement('option');option.value=tag;option.textContent=tag==='h2'?'Grand titre':tag==='h3'?'Sous-titre':'Petit titre';level.appendChild(option)}level.value=block.level||'h2';level.onchange=()=>{block.level=level.value;persist()};row.append(label,level);const colorLabel=document.createElement('label');colorLabel.textContent='Couleur du titre';const color=document.createElement('select');color.innerHTML='<option value="">Couleur habituelle</option><option value="gold">Or</option>';color.value=block.color||'';color.onchange=()=>{block.color=color.value;persist()};row.append(colorLabel,color)}
+  const textarea=row.querySelector('textarea'),select=row.querySelector('select'),number=row.querySelector('input');select.value=block.position||'bottom';number.hidden=select.value!=='paragraph';number.previousElementSibling.hidden=number.hidden;
+  textarea.oninput=()=>{block.text=textarea.value;persist()};select.onchange=()=>{block.position=select.value;number.hidden=select.value!=='paragraph';number.previousElementSibling.hidden=number.hidden;persist()};number.oninput=()=>{block.paragraph=number.value;persist()};
+  const alignLabel=document.createElement('label');alignLabel.textContent='Alignement du bloc';const align=document.createElement('select');align.innerHTML='<option value="">Alignement habituel</option><option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option><option value="justify">Justifié (ajusté)</option>';align.value=block.align||'';align.onchange=()=>{block.align=align.value;persist()};row.append(alignLabel,align);
+  row.querySelectorAll('button').forEach(button=>button.onclick=()=>{const action=button.dataset.action;if(action==='remove')blocks.splice(n,1);else{const target=n+(action==='up'?-1:1);if(target<0||target>=blocks.length)return;[blocks[n],blocks[target]]=[blocks[target],blocks[n]]}persist();renderIndexTextBlocks(id)});
+  host.appendChild(row);addIndexFormattingToolbar(textarea);
+ });
+}
+function applyIndexTextBlocks(html,blocks,i={},id=""){
+ blocks=blocks.filter(b=>String(b.text||'').trim());if(!blocks.length)return html;
+ const doc=document.createElement('template');doc.innerHTML=html;const root=doc.content,section=root.querySelector('section')||root;
+ const text=section.querySelector('.text-block,.hero-lead'),first=section.firstChild,paragraphs=(text||section).querySelectorAll('p'),tails=new Map();
+ for(const block of blocks){
+  const targetUrl=block.imageKey?String(i[block.imageKey]||'').trim():'';
+  const image=targetUrl?[...section.querySelectorAll('.img-frame')].find(frame=>frame.querySelector('img,iframe')?.getAttribute('src')===targetUrl):section.querySelector('.img-frame');
+  const node=document.createElement('div');node.className='text-block nx-extra-text';if(['left','center','right','justify'].includes(block.align))node.style.textAlign=block.align;
+  const raw=String(block.text||'');node.innerHTML=/<[a-z][\s\S]*>/i.test(raw)?raw:raw.split(/\n\s*\n/).map(p=>'<p>'+esc(p).replace(/\n/g,'<br>')+'</p>').join('');
+  if(block.kind==='title'){const tag=['h2','h3','h4'].includes(block.level)?block.level:'h2';const heading=document.createElement(tag);heading.className='display';if(block.color==='gold')heading.style.color='#F4C842';heading.innerHTML=raw;node.innerHTML='';node.appendChild(heading)}
+  const position=block.position||'bottom';let anchor=null;
+  if(['left-image','right-image'].includes(position)&&image){
+   let layout=image.closest('.nx-image-layout');
+   if(!layout){layout=document.createElement('div');layout.className='nx-image-layout';image.before(layout);const slot=document.createElement('div');slot.className='nx-image-slot';layout.appendChild(slot);slot.appendChild(image)}
+   const slot=[...layout.children].find(child=>child===image||child.contains(image));
+   let side=position==='left-image'?slot.previousElementSibling:slot.nextElementSibling;
+   if(!side){side=document.createElement('div');side.className='nx-image-copy';if(position==='left-image')slot.before(side);else slot.after(side)}
+   side.style.textAlign='left';side.appendChild(node);if(layout.children.length>2)layout.classList.add('nx-multi-side');continue;
+  }
+  if(position==='top')section.insertBefore(node,first);
+  else if(position==='before-text'&&text)text.before(node);
+  else if(position==='before-image'&&image)image.before(node);
+  else{
+   if(position==='after-text')anchor=text;
+   if(position==='after-image')anchor=image;
+   if(position==='paragraph'&&paragraphs.length)anchor=paragraphs[Math.min(Math.max(1,parseInt(block.paragraph,10)||1),paragraphs.length)-1];
+   if(anchor){(tails.get(anchor)||anchor).after(node);tails.set(anchor,node)}else section.appendChild(node);
+  }
+ }
+ return indexFragmentHtml(root);
+}
 const INDEX_MEDIA_KEYS=new Set(['heroMedia','s2Media','s3Media','s45Media','s67Media','s89Media','s1011Media','s1213Media','s1415Media','socialProofMedia','toolsMedia','transformMedia']);
 for(const key of INDEX_MEDIA_KEYS)sections.push([key+'Position','Position de l’image'],[key+'Float','Effet flottant'],[key+'Glow','Effet glow']);
 function indexMediaControls(key){
@@ -58,11 +108,12 @@ function indexMediaControls(key){
 const INDEX_IMAGE_CSS=`<style id="nyxia-index-image-options">
 .nx-image-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:32px}
 .nx-image-layout>.nx-image-copy{min-width:0}.nx-image-layout .nx-image-slot{min-width:0}.nx-image-layout .nx-image-slot>.img-frame{min-width:0;max-width:100%;margin:0}
+.nx-extra-text{margin-top:20px;margin-bottom:20px}.nx-multi-side{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
 .nx-image-float{animation:nyxia-index-image-float 6s ease-in-out infinite!important}
 @keyframes nyxia-index-image-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 .img-frame.nx-image-glow{overflow:visible;box-shadow:none}
 .img-frame.nx-image-glow img{filter:drop-shadow(0 0 16px rgba(123,92,255,.7)) drop-shadow(0 0 32px rgba(123,92,255,.35))}
-@media(max-width:700px){.nx-image-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.nx-image-layout{grid-template-columns:minmax(0,1fr);grid-auto-flow:row}}
 @media(prefers-reduced-motion:reduce){.nx-image-float{animation:none!important}}
 </style>`;
 function positionIndexImages(i,id,visual){
@@ -87,8 +138,25 @@ function positionIndexImages(i,id,visual){
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const slug=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},...o});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'HTTP '+r.status);return d}
 
 
+function addIndexFormattingToolbar(textarea){
+ if(!textarea||textarea.classList.contains('idx-hidden-source')||textarea.dataset.formattingToolbar)return;
+ textarea.dataset.formattingToolbar='1';
+ const bar=document.createElement('div');bar.style.cssText='display:flex;gap:8px;margin:8px 0;flex-wrap:wrap';
+ for(const [label,tag] of [['Gras','strong'],['Italique','em']]){
+  const button=document.createElement('button');button.type='button';button.className='btn secondary';button.textContent=label;button.title='Sélectionne ton texte puis clique sur '+label.toLowerCase();
+  button.onmousedown=e=>e.preventDefault();
+  button.onclick=()=>{
+   const start=textarea.selectionStart,end=textarea.selectionEnd,selected=textarea.value.slice(start,end)||'ton texte';
+   const content='<'+tag+'>'+selected+'</'+tag+'>';
+   textarea.setRangeText(content,start,end,'select');textarea.focus({preventScroll:true});textarea.setSelectionRange(start+tag.length+2,start+tag.length+2+selected.length);
+   textarea.dispatchEvent(new Event('input',{bubbles:true}));
+  };
+  bar.appendChild(button);
+ }
+ textarea.before(bar);
+}
 function idxFieldLabel(key){return (sections.find(x=>x[0]===key)||[key,key])[1]}
-function idxIsLong(key){return key==='faq'||/Text$|^s\d$|Proof$|marquee|footerSocials|headerSocials|^code/.test(key)}
+function idxIsLong(key){return key==='faq'||/Text$|^s\d+$|Proof$|marquee|footerSocials|headerSocials|^code/.test(key)}
 function idxCap(id){return id.charAt(0).toUpperCase()+id.slice(1)}
 function idxMediaPreviewHtml(url){
  url=String(url||'').trim();if(!url)return''
@@ -105,6 +173,8 @@ function updateIdxMediaPreview(key){
  box.style.display=el.value.trim()?'block':'none'
 }
 function specialSelect(key){
+ if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'TextAlign'))return '<select id="idx-'+key+'"><option value="">Alignement habituel</option><option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option><option value="justify">Justifié (ajusté)</option></select>';
+ if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'TitleColor'))return '<select id="idx-'+key+'"><option value="">Couleur habituelle</option><option value="gold">Or</option></select>';
  if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'CtaPosition'))return '<select id="idx-'+key+'"><option value="">Position actuelle</option><option value="top">En haut de la section</option><option value="before-text">Avant le texte</option><option value="after-text">Après le texte</option><option value="before-image">Avant l’image</option><option value="after-image">Après l’image</option><option value="paragraph">Entre les paragraphes</option><option value="marker">À l’emplacement [[BOUTON]]</option><option value="bottom">En bas de la section</option></select>';
  if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'CtaParagraph'))return '<input id="idx-'+key+'" type="number" min="1" step="1" placeholder="1">';
  if(key==='heroButtonStyle'||key==='ctaButtonStyle'||INDEX_BUTTON_GROUPS.some(g=>key===g.id+'CtaStyle'))return '<select id="idx-'+key+'"><option value="gold">Or</option><option value="glass">Glass</option></select>'
@@ -126,6 +196,10 @@ function indexUI(){
    panel.appendChild(controls)
 
    for(const key of g.keys){
+     if(key===g.id+'TextBlocks'){
+       const wrap=document.createElement('div');wrap.innerHTML='<textarea class="idx-hidden-source" id="idx-'+key+'"></textarea><label style="display:block;margin-bottom:8px">Blocs de texte et titres</label><div class="idx-faq-list" id="idx-text-blocks-'+g.id+'"></div><button class="btn secondary" type="button">＋ Ajouter un bloc texte</button><button class="btn secondary" type="button" data-add-title>＋ Ajouter un titre</button>';
+       wrap.querySelectorAll('button').forEach(button=>button.onclick=()=>{const blocks=indexTextBlocks(g.id);blocks.push({kind:button.hasAttribute('data-add-title')?'title':'text',text:'',position:'bottom',paragraph:1,level:'h2'});$('idx-'+key).value=JSON.stringify(blocks);renderIndexTextBlocks(g.id);scheduleIndexPreview()});panel.appendChild(wrap);continue;
+     }
      if(key==='faq'){
        const hidden=document.createElement('textarea');hidden.id='idx-faq';hidden.className='idx-hidden-source';panel.appendChild(hidden)
        const wrap=document.createElement('div');wrap.innerHTML='<label style="display:block;margin-bottom:8px">Questions / réponses</label><div class="idx-faq-list" id="idxFaqList"></div><button class="btn secondary" type="button" id="idxFaqAddBtn">＋ Ajouter une question</button>';panel.appendChild(wrap);continue
@@ -141,7 +215,7 @@ function indexUI(){
      const field=document.createElement('div'),isAdvanced=(g.advanced||[]).includes(key)
      field.className='field'+(isAdvanced?' idx-advanced':'')
      const special=specialSelect(key)
-     const control=special||(idxIsLong(key)?'<textarea id="idx-'+key+'"></textarea>':'<input id="idx-'+key+'">')
+     const control=special||(idxIsLong(key)?'<textarea id="idx-'+key+'" style="min-height:240px"></textarea>':'<input id="idx-'+key+'">')
      field.innerHTML='<label>'+esc(idxFieldLabel(key))+(isAdvanced?' · avancé':'')+'</label>'+control
      if(INDEX_MEDIA_KEYS.has(key))field.innerHTML+='<div class="idx-media-thumb" id="idx-media-'+key+'" style="display:none"></div>'
      if(/CtaParagraph$/.test(key))field.innerHTML+='<div class="idx-field-note">Avec « Entre les paragraphes », indique le numéro du paragraphe après lequel placer le bouton. Pour un emplacement précis, choisis « À l’emplacement [[BOUTON]] » et écris [[BOUTON]] dans ton texte ou ton HTML.</div>';
@@ -157,6 +231,7 @@ function indexUI(){
  }
  for(const [key] of sections){
    const el=$('idx-'+key);if(!el)continue
+   if(el.tagName==='TEXTAREA')addIndexFormattingToolbar(el)
    el.addEventListener('input',()=>{if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key);scheduleIndexPreview()})
    el.addEventListener('change',()=>{if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key);scheduleIndexPreview()})
  }
@@ -173,7 +248,7 @@ function activateIndexGroup(id){
  document.querySelectorAll('.index-group').forEach(p=>p.classList.toggle('active',p.dataset.group===g.id))
  if($('indexEditorTitle'))$('indexEditorTitle').textContent=g.title
  for(const key of g.keys)if(INDEX_MEDIA_KEYS.has(key))updateIdxMediaPreview(key)
- if(g.id==='faq')renderFaqBuilder()
+ renderIndexTextBlocks(g.id);if(g.id==='faq')renderFaqBuilder()
  if(g.id==='journey')renderJourneyBuilder()
  if(g.id==='proof')renderProofBuilder()
  scrollIndexPreviewToGroup(g.id)
@@ -256,7 +331,7 @@ function resetIndexSection(){
  if($('idx-show'+cap))$('idx-show'+cap).value='1'
  if($('idx-codeMode'+cap))$('idx-codeMode'+cap).value='append'
  if($('idx-code'+cap))$('idx-code'+cap).value=''
- if(g.id==='faq')renderFaqBuilder();if(g.id==='journey')renderJourneyBuilder();if(g.id==='proof')renderProofBuilder();scheduleIndexPreview()
+ renderIndexTextBlocks(g.id);if(g.id==='faq')renderFaqBuilder();if(g.id==='journey')renderJourneyBuilder();if(g.id==='proof')renderProofBuilder();scheduleIndexPreview()
 }
 async function load(){
   const map=new Map(Object.entries(CORE).map(([k,v])=>[k,{key:k,...v,portail:'',custom:false}]));
@@ -415,6 +490,7 @@ function apply(d={}){
    else if(k==='ctaVariant')el.value=idx[k]||'simple'
    else el.value=idx[k]||''
  }
+ for(const g of INDEX_BUTTON_POSITION_GROUPS)renderIndexTextBlocks(g.id);
  tools=d.tools||[];renderTools();renderFaqBuilder();renderJourneyBuilder();renderProofBuilder()
  for(const key of INDEX_MEDIA_KEYS)updateIdxMediaPreview(key);scheduleIndexPreview()
 }
@@ -524,6 +600,10 @@ function customSection(i,id,visual){
  if(show==='0')return''
  const code=String(i['code'+cap]||''),mode=String(i['codeMode'+cap]||'append')
  let result=mode==='replace'&&code?code:positionIndexImages(i,id,visual)+code
+ if(['left','center','right','justify'].includes(i[id+'TextAlign'])){
+  const doc=document.createElement('template');doc.innerHTML=result;const text=doc.content.querySelector('.text-block,.hero-lead');if(text){text.style.textAlign=i[id+'TextAlign'];result=indexFragmentHtml(doc.content)}
+ }
+ result=applyIndexTextBlocks(result,safeJsonArray(i[id+'TextBlocks']),i,id)
  if(INDEX_BUTTON_GROUPS.some(g=>g.id===id)&&String(i[id+'CtaLabel']||'').trim()){
   const button='<div class="hero-cta" style="margin-top:28px">'+btnHtml(i[id+'CtaLabel'],i[id+'CtaUrl']||'#',i[id+'CtaStyle']||'glass')+'</div>';
   const position=i[id+'CtaPosition'];
@@ -535,6 +615,11 @@ function customSection(i,id,visual){
   const doc=document.createElement('template');doc.innerHTML=result;
   const node=doc.content.querySelector(id==='hero'?'.hero-cta':'.cercle-cta');
   if(node){const button=node.outerHTML;node.remove();result=placeIndexButton(indexFragmentHtml(doc.content),button,i[id+'CtaPosition'],i[id+'CtaParagraph']);}
+ }
+ if(i[id+'TitleColor']==='gold'){
+  const doc=document.createElement('template');doc.innerHTML=result;
+  const title=doc.content.querySelector(id==='hero'?'#nx-hero>h1':id==='cta'?'.cercle-inner>h2':'.section-head>h2');
+  if(title){title.style.color='#F4C842';title.style.background='none';title.style.setProperty('-webkit-text-fill-color','#F4C842');result=indexFragmentHtml(doc.content)}
  }
  return result
 }
@@ -589,7 +674,7 @@ function fillIndex(s,p){
    '__INDEX_FOOTER_BLOCK__':customSection(i,'footer',footer)
  }
  for(const [k,v] of Object.entries(map))s=s.split(k).join(String(v))
- if([...INDEX_MEDIA_KEYS].some(key=>i[key]&&(i[key+'Position']||i[key+'Float']==='1'||i[key+'Glow']==='1')))s=s.replace('</head>',INDEX_IMAGE_CSS+'</head>')
+ if([...INDEX_MEDIA_KEYS].some(key=>i[key]&&(i[key+'Position']||i[key+'Float']==='1'||i[key+'Glow']==='1'))||INDEX_BUTTON_POSITION_GROUPS.some(g=>safeJsonArray(i[g.id+'TextBlocks']).some(b=>String(b.text||'').trim())))s=s.replace('</head>',INDEX_IMAGE_CSS+'</head>')
  return s
 }
 async function compile(){try{$('host').value=portalAccessHost(true);const pr=await save(),p=pr.data;const registered=await ensurePortalRegistered(false);if(!registered)throw Error('Le portail n’a pas pu être relié à la liste centrale / Dégustation.');const r=await fetch('/superadmin4/portail-shell-template.zip',{cache:'no-store'});if(!r.ok)throw Error('Coque introuvable');const z=await JSZip.loadAsync(await r.arrayBuffer()),agents=p.agents||[];if(!agents.length)throw Error('Choisis au moins un personnage pour ce portail.');const cfg={id:p.portalId||slug(p.short||p.title),accessVersion:1,title:p.title,shortTitle:p.short||p.title,mission:p.mission,loginImage:p.loginImage,activeAgents:agents.map(a=>a.key),agents};let w=await z.file('_worker.js').async('string');w=w.replace("const PORTAL_CONFIG_B64='__PORTAL_CONFIG_B64__';","const PORTAL_CONFIG_B64='"+b64(JSON.stringify(cfg))+"';");z.file('_worker.js',w);let wr=await z.file('wrangler.toml').async('string');wr=wr.replaceAll('__WORKER_NAME__',p.workerName||slug(p.short||p.title)).replaceAll('__HOST__',p.host).replaceAll('__PORTAL_ID__',cfg.id);z.file('wrangler.toml',wr);let ind=await z.file('index.html').async('string');z.file('index.html',fillIndex(ind,p));let log=await z.file('login.html').async('string');log=log.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_LOGIN_IMAGE__',p.loginImage||'');z.file('login.html',log);const first=z.file('premiere-connexion.html');if(!first)throw Error('La coque doit être mise à jour : premiere-connexion.html manque.');z.file('premiere-connexion.html',(await first.async('string')).replaceAll('__PORTAL_TITLE__',esc(p.title||'Portail NyXia')));for(const path of ['mot-de-passe.html','mot-de-passe-oublie.html','reinitialiser-mot-de-passe.html']){const file=z.file(path);if(!file)throw Error('Coque incomplète : '+path+' manque.');z.file(path,(await file.async('string')).replaceAll('__PORTAL_TITLE__',esc(p.title||'Portail NyXia')));}const pages={},meta={};const principals=agents.filter(a=>(a.placement||'principal')==='principal');const atelierAgents=agents.filter(a=>a.placement==='atelier');const visibleAgents=agents.filter(a=>a.placement!=='hidden');let chat=await z.file('chat-base.html').async('string');for(const a of visibleAgents){pages[a.key]='/chat-'+a.key+'.html';meta[a.key]=a;let c=chat.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_TITLE_JSON__',JSON.stringify(p.title)).replaceAll('__AGENT_KEY__',a.key).replaceAll('__AGENT_NAME__',esc(a.name)).replaceAll('__AGENT_SUB__',esc(a.sub||'Personnage NyXia')).replaceAll('__AGENT_JSON__',JSON.stringify(a)).replaceAll('__AGENT_NAME_JSON__',JSON.stringify(a.name)).replaceAll('__AGENT_SUB_JSON__',JSON.stringify(a.sub||'Personnage NyXia')).replaceAll('__AGENT_GREETING_JSON__',JSON.stringify(a.greeting||'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.')).replaceAll('__AGENT_IMAGE_JSON__',JSON.stringify(a.image||'')).replaceAll('__AGENT_VIDEO_JSON__',JSON.stringify(a.welcomeVideo||'')).replaceAll('__AGENT_AVATAR_HTML__',a.image?'<img src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="avatar-fallback">✦</span>');z.file('chat-'+a.key+'.html',c)}z.remove('chat-base.html');for(const t of p.tools||[]){if(t.content)z.file((t.path||'/outil.html').replace(/^\//,''),t.content);pages['tool-'+t.id]=t.path}let dash=await z.file('dashbord.html').async('string');const avatarHtml=a=>a.image?'<img class="nav-avatar" src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="nav-avatar" style="display:flex;align-items:center;justify-content:center">'+esc(a.icon||'✦')+'</span>';const nav=principals.map((a,i)=>'<div class="nav-item'+(i===0?' active':'')+'" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const atelierNav=atelierAgents.map(a=>'<div class="nav-item" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const toolnav=(p.tools||[]).map(t=>'<div class="nav-item" id="nav-tool-'+t.id+'" onclick="openAgentTab(\'tool-'+t.id+'\')"><span class="nav-icon">'+esc(t.icon||'🧰')+'</span><span class="nav-text"><span class="nav-name">'+esc(t.name||'Outil')+'</span></span><span class="nav-arrow">›</span></div>').join('');dash=dash.replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_AGENT_NAV__',nav).replaceAll('__PORTAL_ATELIER_NAV__',atelierNav).replaceAll('__PORTAL_ATELIER_LABEL__',esc(p.atelierLabel||'Atelier')).replaceAll('__PORTAL_SPECIAL_TOOLS__',toolnav).replaceAll('__PORTAL_AGENT_PAGES__','').replaceAll('__PORTAL_PAGES_JSON__',JSON.stringify(pages)).replaceAll('__PORTAL_AGENT_META_JSON__',JSON.stringify(meta)).replaceAll('__PORTAL_DEFAULT_AGENT_JSON__',JSON.stringify((principals[0]||visibleAgents[0]||agents[0]).key)).replaceAll('__PORTAL_ATELIER_KEYS_JSON__',JSON.stringify(atelierAgents.map(a=>a.key))).replaceAll('__PORTAL_TITLE__',p.title);
