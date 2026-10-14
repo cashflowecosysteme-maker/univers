@@ -819,7 +819,7 @@ function fillIndex(s,p){
  const tools=simpleSection('tools','toolsKicker','toolsTitle','toolsText','toolsMedia')
  const transform=simpleSection('transform','transKicker','transTitle','transformText','transformMedia')
  const faqItems=safeJsonArray(i.faq).map(x=>'<details class="faq-item"><summary'+indexItemAlignAttr(x.questionAlign)+'>'+esc(x.q||'')+'</summary><div class="faq-content"'+indexItemAlignAttr(x.align)+'><p>'+String(x.a||'')+'</p></div></details>').join('')
- const faqBlock='<section class="section-wrap" id="nx-faq">'+sectionHead('',i.faqTitle||'Questions fréquentes')+(faqItems?'<div class="faq-container">'+faqItems+'</div>':'')+'</section>'
+ const faqBlock='<section class="section-wrap" id="nx-faq">'+sectionHead('',String(i.faqTitle||'').trim())+(faqItems?'<div class="faq-container">'+faqItems+'</div>':'')+'</section>'
  const ctaVariant=i.ctaVariant||'simple',ctaTitle=i.ctaTitle||(ctaVariant==='simple'?'Prends rendez-vous':'Parlons de ton projet')
  const cta='<section class="cercle" id="nx-cta"><div class="cercle-inner">'+(i.ctaKicker?'<span class="kicker">'+i.ctaKicker+'</span>':'')+'<h2>'+ctaTitle+'</h2>'+(ctaVariant==='complete'&&i.ctaText?'<div class="text-block"><p>'+i.ctaText+'</p></div>':'')+'<div class="cercle-cta">'+btnHtml(i.ctaLabel||'Prendre rendez-vous',i.ctaUrl||'#',i.ctaButtonStyle||'glass')+'</div></div></section>'
  const footerSocialHtml=i.footerSocials||defaultSocials
