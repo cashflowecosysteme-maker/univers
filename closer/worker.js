@@ -103,7 +103,14 @@ export default {async fetch(request,env,helpers){const url=new URL(request.url);
  if(!webhook&&!booking&&!intent&&!bookingTarget&&!pay&&!await helpers.requireAdmin(request,env))return json({error:'Session Super Admin expirée. Reconnecte-toi dans Univers.'},401);
  if(request.method==='POST'&&!webhook&&!booking&&!intent&&request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'Origine de la requête non autorisée.'},403);
  await schema(env,helpers);
- if(bookingTarget){const rows=await query(env,"SELECT booking_url FROM closer_offers WHERE product_id=? AND active=1 AND booking_url<>''",txt(url.searchParams.get('product'),100));if(rows.length!==1)fail('Une seule page de réservation active doit être associée à ce produit.',422);return new Response(JSON.stringify({success:true,url:safeUrl(rows[0].booking_url,true)}),{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Cache-Control':'no-store'}});}
+ if(bookingTarget){
+ const product=txt(url.searchParams.get('product'),100);let rows;
+ if(product)rows=await query(env,"SELECT booking_url FROM closer_offers WHERE product_id=? AND active=1 AND booking_url<>''",product);
+ else{const host=safeUrl(url.searchParams.get('portal'),true);if(new URL(host).origin!==host.replace(/\/$/,''))fail('Adresse de portail invalide.');const candidates=await query(env,"SELECT p.*,o.booking_url FROM closer_offers o JOIN marketplace_products p ON p.id=o.product_id WHERE o.active=1 AND o.booking_url<>''");rows=candidates.filter(p=>['portal_index_url','affiliate_link','portal_url'].some(k=>{try{return new URL(p[k]).origin===new URL(host).origin;}catch(_){return false;}}));}
+ if(rows.length>1&&url.searchParams.get('source'))rows=rows.filter(r=>samePage(r.booking_url,url.searchParams.get('source')));
+ if(rows.length!==1)fail('Une seule page de réservation active doit correspondre à ce portail et à ce bouton.',422);
+ return new Response(JSON.stringify({success:true,url:safeUrl(rows[0].booking_url,true)}),{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Cache-Control':'no-store'}});
+ }
  if(intent)return await bookingOrigin(request,env);
  if(booking){const result=await bookingWebhook(request,env,url);await bookingReceipt(env,result);return result;}
  if(webhook){const response=await saleWebhook(request,env);await receipt(env,response);return response;}
