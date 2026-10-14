@@ -58,14 +58,16 @@ for(const g of INDEX_GROUPS){
 function indexTextBlocks(id){return safeJsonArray($('idx-'+id+'TextBlocks')?.value)}
 function moveIndexTextBlock(blocks,index,step){
  const target=index+step;if(target<0||target>=blocks.length)return false;
- const current=blocks[index],neighbor=blocks[target];
- for(const key of ['position','imageKey','paragraph']){
-  const value=current[key];
-  if(neighbor[key]===undefined)delete current[key];else current[key]=neighbor[key];
-  if(value===undefined)delete neighbor[key];else neighbor[key]=value;
- }
- [blocks[index],blocks[target]]=[blocks[target],blocks[index]];
- return true;
+ [blocks[index],blocks[target]]=[blocks[target],blocks[index]];return true;
+}
+function indexBlockCaption(block,n){
+ const plain=String(block.text||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+ return (block.kind==='title'?'Titre ':'Bloc texte ')+(n+1)+(plain?' — '+plain.slice(0,70):' — vide');
+}
+function indexNewBlock(blocks,kind){
+ for(const block of blocks)if(!block.id)block.id=crypto.randomUUID();
+ const previousText=[...blocks].reverse().find(b=>b.kind==='text');
+ return {kind,id:crypto.randomUUID(),text:'',imageUrl:'',position:kind==='image'?'right-text':'bottom',textKey:kind==='image'?(previousText?.id||''):'',paragraph:1,level:'h2'};
 }
 function renderIndexButtonBlock(block,n,blocks,persist,id){
  const row=document.createElement('div');row.className='idx-faq-row';
@@ -76,19 +78,22 @@ function renderIndexButtonBlock(block,n,blocks,persist,id){
 }
 function renderIndexImageBlock(block,n,blocks,persist,id){
  const row=document.createElement('div');row.className='idx-faq-row';
- row.innerHTML='<label>Image '+(n+1)+'</label><input data-image-url placeholder="Lien de ton image" value="'+esc(block.imageUrl||'')+'"><label>Texte alternatif</label><input data-image-alt value="'+esc(block.alt||'')+'"><label>Emplacement de l’image</label><select data-image-position><option value="top">En haut de la section</option><option value="before-text">Au-dessus du texte</option><option value="after-text">En dessous du texte</option><option value="left-text">À gauche du texte</option><option value="right-text">À droite du texte</option><option value="before-image">Avant l’image principale</option><option value="after-image">Après l’image principale</option><option value="paragraph">Entre les paragraphes du texte principal</option><option value="bottom">En bas de la section</option></select><label>Après le paragraphe numéro</label><input data-image-paragraph type="number" min="1" value="'+esc(block.paragraph||1)+'"><label>Effet flottant</label><select data-image-float><option value="">Non</option><option value="1">Oui</option></select><label>Effet glow</label><select data-image-glow><option value="">Non</option><option value="1">Oui</option></select><div class="idx-faq-actions"><button class="btn secondary" data-action="up" type="button">↑ Monter</button><button class="btn secondary" data-action="down" type="button">↓ Descendre</button><button class="btn danger" data-action="remove" type="button">Retirer cette image</button></div>';
+ row.innerHTML='<label>Image '+(n+1)+'</label><input data-image-url placeholder="Lien de ton image" value="'+esc(block.imageUrl||'')+'"><label>1. Choisis le bloc de texte</label><select data-image-text></select><label>2. Place l’image par rapport à ce texte</label><select data-image-position><option value="right-text">À droite du texte choisi</option><option value="left-text">À gauche du texte choisi</option><option value="before-text">En haut du texte choisi</option><option value="after-text">En bas du texte choisi</option><optgroup label="Autres emplacements"><option value="top">Tout en haut de la section</option><option value="bottom">Tout en bas de la section</option><option value="before-image">Avant l’image principale</option><option value="after-image">Après l’image principale</option><option value="paragraph">Entre les paragraphes du texte choisi</option></optgroup></select><label data-paragraph-label>Après le paragraphe numéro</label><input data-image-paragraph type="number" min="1" value="'+esc(block.paragraph||1)+'"><label>Texte alternatif</label><input data-image-alt value="'+esc(block.alt||'')+'"><label>Effet flottant</label><select data-image-float><option value="">Non</option><option value="1">Oui</option></select><label>Effet glow</label><select data-image-glow><option value="">Non</option><option value="1">Oui</option></select><div class="idx-faq-actions"><button class="btn secondary" data-action="up" type="button">↑ Monter</button><button class="btn secondary" data-action="down" type="button">↓ Descendre</button><button class="btn danger" data-action="remove" type="button">Retirer cette image</button></div>';
+ const target=row.querySelector('[data-image-text]');target.innerHTML='<option value="">Texte principal de la section</option>';
+ blocks.forEach((other,index)=>{if(['text','title'].includes(other.kind)){const option=document.createElement('option');option.value=other.id;option.textContent=indexBlockCaption(other,index);target.appendChild(option)}});
+ target.value=block.textKey||'';target.onchange=()=>{block.textKey=target.value;persist()};
+ const updateParagraph=()=>{const hidden=row.querySelector('[data-image-position]').value!=='paragraph';row.querySelector('[data-image-paragraph]').hidden=hidden;row.querySelector('[data-paragraph-label]').hidden=hidden};
  for(const [attribute,key]of [['url','imageUrl'],['alt','alt'],['position','position'],['paragraph','paragraph'],['float','imageFloat'],['glow','imageGlow']]){
   const control=row.querySelector('[data-image-'+attribute+']');control.value=block[key]||'';if(attribute==='position')control.value=block.position||'bottom';
-  control.addEventListener(control.tagName==='SELECT'?'change':'input',()=>{block[key]=control.value;persist()});
+  control.addEventListener(control.tagName==='SELECT'?'change':'input',()=>{block[key]=control.value;updateParagraph();persist()});
  }
- const targetLabel=document.createElement('label');targetLabel.textContent='Texte concerné';const target=document.createElement('select');target.innerHTML='<option value="">Texte principal de la section</option>';blocks.forEach((other,index)=>{if(['text','title'].includes(other.kind)&&other.id){const option=document.createElement('option');option.value=other.id;option.textContent=(other.kind==='title'?'Titre ajouté ':'Texte ajouté ')+(index+1);target.appendChild(option)}});target.value=block.textKey||'';target.onchange=()=>{block.textKey=target.value;persist()};row.append(targetLabel,target);
+ updateParagraph();
  row.querySelectorAll('button').forEach(button=>button.onclick=()=>{if(button.dataset.action==='remove')blocks.splice(n,1);else if(!moveIndexTextBlock(blocks,n,button.dataset.action==='up'?-1:1))return;persist();renderIndexTextBlocks(id)});
- row.querySelector('[data-action=up]').disabled=n===0;row.querySelector('[data-action=down]').disabled=n===blocks.length-1;
- return row;
+ row.querySelector('[data-action=up]').disabled=n===0;row.querySelector('[data-action=down]').disabled=n===blocks.length-1;return row;
 }
 function renderIndexTextBlocks(id){
  const host=$('idx-text-blocks-'+id),source=$('idx-'+id+'TextBlocks');if(!host||!source)return;
- const blocks=indexTextBlocks(id);host.innerHTML='';
+ const blocks=indexTextBlocks(id);let assigned=false;for(const block of blocks)if(!block.id){block.id=crypto.randomUUID();assigned=true}if(assigned)source.value=JSON.stringify(blocks);host.innerHTML='';
  const persist=()=>{source.value=JSON.stringify(blocks);scheduleIndexPreview()};
  blocks.forEach((block,n)=>{
   if(block.kind==='button'){host.appendChild(renderIndexButtonBlock(block,n,blocks,persist,id));return}
@@ -112,7 +117,7 @@ function applyIndexTextBlocks(html,blocks,i={},id=""){
  let text=section.querySelector('.text-block,.hero-lead,.faq-container,.footer-sign,.brand-name,.cercle-inner');const first=section.firstChild,paragraphs=(text||section).querySelectorAll('p'),tails=new Map();
  const queue=blocks.slice();let deferred=0;
  for(let cursor=0;cursor<queue.length;cursor++){
-  const block=queue[cursor];text=text||section.querySelector('.text-block,.hero-lead,.faq-container,.footer-sign,.brand-name,.cercle-inner');
+  const block=queue[cursor];text=section.querySelector('.text-block:not(.nx-extra-text),.hero-lead,.faq-container,.footer-sign,.brand-name,.cercle-inner')||section.querySelector('.text-block');
   if(block.kind==='image'&&['left-text','right-text'].includes(block.position)&&!text&&blocks.some(b=>['text','title'].includes(b.kind))&&deferred<blocks.length){queue.push(block);deferred++;continue}
   if(block.kind==='image'&&block.textKey){const target=[...section.querySelectorAll('[data-nx-block-id]')].find(el=>el.getAttribute('data-nx-block-id')===block.textKey);if(!target&&deferred<blocks.length){queue.push(block);deferred++;continue}if(target)text=target}
   const targetUrl=block.imageKey?String(i[block.imageKey]||'').trim():'';
@@ -130,7 +135,7 @@ function applyIndexTextBlocks(html,blocks,i={},id=""){
   if(block.id)node.setAttribute('data-nx-block-id',block.id);
   const position=block.position||'bottom';let anchor=null;
   if(block.kind==='image'&&['left-text','right-text'].includes(position)&&text){
-   let layout=text.closest('.nx-image-layout');if(!layout){layout=document.createElement('div');layout.className='nx-image-layout';text.before(layout);const copy=document.createElement('div');copy.className='nx-image-copy';layout.appendChild(copy);copy.appendChild(text)}
+   let layout=text.parentElement?.classList.contains('nx-image-copy')&&text.parentElement.children.length===1?text.parentElement.parentElement:null;if(!layout){layout=document.createElement('div');layout.className='nx-image-layout';text.before(layout);const copy=document.createElement('div');copy.className='nx-image-copy';layout.appendChild(copy);copy.appendChild(text)}
    const copy=[...layout.children].find(child=>child===text||child.contains(text));let slot=position==='left-text'?copy.previousElementSibling:copy.nextElementSibling;
    if(!slot){slot=document.createElement('div');slot.className='nx-image-slot';if(position==='left-text')copy.before(slot);else copy.after(slot)}slot.appendChild(node);if(layout.children.length>2)layout.classList.add('nx-multi-side');continue;
   }
@@ -148,7 +153,7 @@ function applyIndexTextBlocks(html,blocks,i={},id=""){
   else{
    if(position==='after-text')anchor=text;
    if(position==='after-image')anchor=image;
-   if(position==='paragraph'&&paragraphs.length)anchor=paragraphs[Math.min(Math.max(1,parseInt(block.paragraph,10)||1),paragraphs.length)-1];
+   if(position==='paragraph'){const targetParagraphs=(text||section).querySelectorAll('p');if(targetParagraphs.length)anchor=targetParagraphs[Math.min(Math.max(1,parseInt(block.paragraph,10)||1),targetParagraphs.length)-1]}
    if(anchor){(tails.get(anchor)||anchor).after(node);tails.set(anchor,node)}else section.appendChild(node);
   }
  }
@@ -275,7 +280,7 @@ function indexUI(){
    for(const key of g.keys){
      if(key===g.id+'TextBlocks'){
        const wrap=document.createElement('div');wrap.innerHTML='<textarea class="idx-hidden-source" id="idx-'+key+'"></textarea><label style="display:block;margin-bottom:8px">Blocs de texte, titres, images et boutons</label><div class="idx-faq-list" id="idx-text-blocks-'+g.id+'"></div><button class="btn secondary" type="button">＋ Ajouter un bloc texte</button><button class="btn secondary" type="button" data-add-title>＋ Ajouter un titre</button><button class="btn secondary" type="button" data-add-image>＋ Ajouter une image</button><button class="btn secondary" type="button" data-add-button>＋ Ajouter un bouton</button>';
-       wrap.querySelectorAll('button').forEach(button=>button.onclick=()=>{const blocks=indexTextBlocks(g.id);blocks.push({kind:button.hasAttribute('data-add-button')?'button':button.hasAttribute('data-add-image')?'image':button.hasAttribute('data-add-title')?'title':'text',id:crypto.randomUUID(),text:'',imageUrl:'',position:'bottom',paragraph:1,level:'h2'});$('idx-'+key).value=JSON.stringify(blocks);renderIndexTextBlocks(g.id);scheduleIndexPreview()});panel.appendChild(wrap);continue;
+       wrap.querySelectorAll('button').forEach(button=>button.onclick=()=>{const blocks=indexTextBlocks(g.id);blocks.push(indexNewBlock(blocks,button.hasAttribute('data-add-button')?'button':button.hasAttribute('data-add-image')?'image':button.hasAttribute('data-add-title')?'title':'text'));$('idx-'+key).value=JSON.stringify(blocks);renderIndexTextBlocks(g.id);scheduleIndexPreview()});panel.appendChild(wrap);continue;
      }
      if(key==='faq'){
        const hidden=document.createElement('textarea');hidden.id='idx-faq';hidden.className='idx-hidden-source';panel.appendChild(hidden)
