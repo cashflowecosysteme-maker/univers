@@ -16,6 +16,12 @@ const INDEX_GROUPS=[
  {id:'cta',icon:'◎',title:'Rendez-vous / CTA',keys:['ctaKicker','ctaTitle','ctaText','ctaLabel','ctaUrl','ctaVariant','ctaButtonStyle']},
  {id:'footer',icon:'⌄',title:'Footer',keys:['footerContactLabel','footerContactUrl','footerLegalLabel','footerLegalUrl','footerPrivacyLabel','footerPrivacyUrl','footerCguLabel','footerCguUrl','footerSign','footerSocials','marquee'],advanced:['footerSocials','marquee']}
 ];
+const INDEX_BUTTON_GROUPS=INDEX_GROUPS.filter(g=>!['header','hero','cta','footer'].includes(g.id));
+for(const g of INDEX_BUTTON_GROUPS){
+ const prefix=g.id+'Cta';
+ g.keys.push(prefix+'Label',prefix+'Url',prefix+'Style');
+ sections.push([prefix+'Label','Texte du bouton de rendez-vous'],[prefix+'Url','Lien du rendez-vous'],[prefix+'Style','Style du bouton']);
+}
 const INDEX_MEDIA_KEYS=new Set(['heroMedia','s2Media','s3Media','s45Media','s67Media','s89Media','s1011Media','s1213Media','s1415Media','socialProofMedia','toolsMedia','transformMedia']);
 for(const key of INDEX_MEDIA_KEYS)sections.push([key+'Position','Position de l’image'],[key+'Float','Effet flottant'],[key+'Glow','Effet glow']);
 function indexMediaControls(key){
@@ -71,7 +77,7 @@ function updateIdxMediaPreview(key){
  box.style.display=el.value.trim()?'block':'none'
 }
 function specialSelect(key){
- if(key==='heroButtonStyle'||key==='ctaButtonStyle')return '<select id="idx-'+key+'"><option value="gold">Or</option><option value="glass">Glass</option></select>'
+ if(key==='heroButtonStyle'||key==='ctaButtonStyle'||INDEX_BUTTON_GROUPS.some(g=>key===g.id+'CtaStyle'))return '<select id="idx-'+key+'"><option value="gold">Or</option><option value="glass">Glass</option></select>'
  if(key==='ctaVariant')return '<select id="idx-'+key+'"><option value="simple">Simple · Prends rendez-vous</option><option value="complete">Complet · titre + texte + bouton</option></select>'
  return''
 }
@@ -374,6 +380,7 @@ function apply(d={}){
    else if(k==='tiktokUrl')el.value=idx[k]||'https://www.tiktok.com/@lemiroirdenyxia'
    else if(k==='heroButtonStyle')el.value=idx[k]||'gold'
    else if(k==='ctaButtonStyle')el.value=idx[k]||'glass'
+   else if(INDEX_BUTTON_GROUPS.some(g=>k===g.id+'CtaStyle'))el.value=idx[k]||'glass'
    else if(k==='ctaVariant')el.value=idx[k]||'simple'
    else el.value=idx[k]||''
  }
@@ -485,7 +492,13 @@ function customSection(i,id,visual){
  const cap=id.charAt(0).toUpperCase()+id.slice(1),show=String(i['show'+cap]??'1')
  if(show==='0')return''
  const code=String(i['code'+cap]||''),mode=String(i['codeMode'+cap]||'append')
- return mode==='replace'&&code?code:positionIndexImages(i,id,visual)+code
+ let result=mode==='replace'&&code?code:positionIndexImages(i,id,visual)+code
+ if(INDEX_BUTTON_GROUPS.some(g=>g.id===id)&&String(i[id+'CtaLabel']||'').trim()){
+  const button='<div class="hero-cta" style="margin-top:28px">'+btnHtml(i[id+'CtaLabel'],i[id+'CtaUrl']||'#',i[id+'CtaStyle']||'glass')+'</div>';
+  if(/<\/section>\s*$/.test(result))result=result.replace(/<\/section>(\s*)$/,button+'</section>$1');
+  else result+=button;
+ }
+ return result
 }
 function fillIndex(s,p){
  const i=p.index||{},title=p.title||'Portail NyXia',short=p.short||title
