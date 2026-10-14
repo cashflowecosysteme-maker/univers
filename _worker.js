@@ -235,7 +235,16 @@ async function handleListMembers(request, env) {
   const closerTable = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='closer_accounts'").first();
   const closerRows = closerTable ? await env.DB.prepare('SELECT user_id,active FROM closer_accounts').all() : {results:[]};
   const closerStates = new Map((closerRows.results || []).map(c => [c.user_id,Number(c.active)]));
+  const productsForRates = await env.DB.prepare('SELECT id,title,commission_n1,commission_n2,commission_n3 FROM marketplace_products ORDER BY title').all();
+  const overridesTable = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='commission_overrides'").first();
+  const overridesForRates = overridesTable ? await env.DB.prepare('SELECT product_id,beneficiary_id,commission_n1,commission_n2,commission_n3 FROM commission_overrides').all() : {results:[]};
+  const overrideMap = new Map((overridesForRates.results || []).map(o => [JSON.stringify([o.beneficiary_id,o.product_id]),o]));
   const members = (rows.results || []).map(u => ({
+    commission_rates: u.role === 'affiliate' ? (productsForRates.results || []).map(p => {
+      const personal = overrideMap.get(JSON.stringify([u.id,p.id]));
+      return {product_id:p.id,title:p.title,rates:[1,2,3].map(n => Number(personal?.['commission_n'+n] ?? p['commission_n'+n] ?? 0)),personal:!!personal};
+    }) : [],
+
     closer: closerStates.has(u.id),
     closer_active: closerStates.get(u.id) === 1,
     id: u.id,
@@ -2187,7 +2196,7 @@ export default {
         const updated = new HTMLRewriter().on('script[src]', {
           element(element) {
             const src = element.getAttribute('src') || '';
-            if (src.split('?')[0] === '/js/member-editor.js') element.setAttribute('src', '/js/member-editor-v33.js');
+            if (src.split('?')[0] === '/js/member-editor.js') element.setAttribute('src', '/js/member-editor-v35.js');
           }
         }).transform(page);
         const headers = new Headers(updated.headers);
