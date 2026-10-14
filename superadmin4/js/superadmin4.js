@@ -22,6 +22,34 @@ for(const g of INDEX_BUTTON_GROUPS){
  g.keys.push(prefix+'Label',prefix+'Url',prefix+'Style');
  sections.push([prefix+'Label','Texte du bouton de rendez-vous'],[prefix+'Url','Lien du rendez-vous'],[prefix+'Style','Style du bouton']);
 }
+const INDEX_BUTTON_POSITION_GROUPS=INDEX_GROUPS.filter(g=>!['header','footer'].includes(g.id));
+for(const g of INDEX_BUTTON_POSITION_GROUPS){
+ const prefix=g.id+'Cta';g.keys.push(prefix+'Position',prefix+'Paragraph');
+ sections.push([prefix+'Position','Emplacement du bouton'],[prefix+'Paragraph','Après le paragraphe numéro']);
+}
+function indexFragmentHtml(fragment){const wrapper=document.createElement('div');wrapper.appendChild(fragment.cloneNode(true));return wrapper.innerHTML}
+function placeIndexButton(html,button,position,paragraph){
+ if(!position)return html;
+ if(position==='marker'){
+  if(!html.includes('[[BOUTON]]'))return html+button;
+  const markerParagraph=/<p\b[^>]*>\s*\[\[BOUTON\]\]\s*<\/p>/i;
+  return markerParagraph.test(html)?html.replace(markerParagraph,button):html.replace('[[BOUTON]]',button);
+ }
+ const doc=document.createElement('template');doc.innerHTML=html;const root=doc.content;
+ const holder=document.createElement('template');holder.innerHTML=button;const node=holder.content.firstElementChild;
+ const section=root.querySelector('section')||root;
+ const text=section.querySelector('.text-block,.hero-lead'),image=section.querySelector('.img-frame');
+ if(position==='top')section.insertBefore(node,section.firstChild);
+ else if(position==='before-text'&&text)text.before(node);
+ else if(position==='after-text'&&text)text.after(node);
+ else if(position==='before-image'&&image)image.before(node);
+ else if(position==='after-image'&&image)image.after(node);
+ else if(position==='paragraph'){
+  const paragraphs=(text||section).querySelectorAll('p'),n=Math.max(1,parseInt(paragraph,10)||1);
+  if(paragraphs.length)paragraphs[Math.min(n,paragraphs.length)-1].after(node);else section.appendChild(node);
+ }else section.appendChild(node);
+ return indexFragmentHtml(root);
+}
 const INDEX_MEDIA_KEYS=new Set(['heroMedia','s2Media','s3Media','s45Media','s67Media','s89Media','s1011Media','s1213Media','s1415Media','socialProofMedia','toolsMedia','transformMedia']);
 for(const key of INDEX_MEDIA_KEYS)sections.push([key+'Position','Position de l’image'],[key+'Float','Effet flottant'],[key+'Glow','Effet glow']);
 function indexMediaControls(key){
@@ -77,6 +105,8 @@ function updateIdxMediaPreview(key){
  box.style.display=el.value.trim()?'block':'none'
 }
 function specialSelect(key){
+ if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'CtaPosition'))return '<select id="idx-'+key+'"><option value="">Position actuelle</option><option value="top">En haut de la section</option><option value="before-text">Avant le texte</option><option value="after-text">Après le texte</option><option value="before-image">Avant l’image</option><option value="after-image">Après l’image</option><option value="paragraph">Entre les paragraphes</option><option value="marker">À l’emplacement [[BOUTON]]</option><option value="bottom">En bas de la section</option></select>';
+ if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'CtaParagraph'))return '<input id="idx-'+key+'" type="number" min="1" step="1" placeholder="1">';
  if(key==='heroButtonStyle'||key==='ctaButtonStyle'||INDEX_BUTTON_GROUPS.some(g=>key===g.id+'CtaStyle'))return '<select id="idx-'+key+'"><option value="gold">Or</option><option value="glass">Glass</option></select>'
  if(key==='ctaVariant')return '<select id="idx-'+key+'"><option value="simple">Simple · Prends rendez-vous</option><option value="complete">Complet · titre + texte + bouton</option></select>'
  return''
@@ -114,6 +144,7 @@ function indexUI(){
      const control=special||(idxIsLong(key)?'<textarea id="idx-'+key+'"></textarea>':'<input id="idx-'+key+'">')
      field.innerHTML='<label>'+esc(idxFieldLabel(key))+(isAdvanced?' · avancé':'')+'</label>'+control
      if(INDEX_MEDIA_KEYS.has(key))field.innerHTML+='<div class="idx-media-thumb" id="idx-media-'+key+'" style="display:none"></div>'
+     if(/CtaParagraph$/.test(key))field.innerHTML+='<div class="idx-field-note">Avec « Entre les paragraphes », indique le numéro du paragraphe après lequel placer le bouton. Pour un emplacement précis, choisis « À l’emplacement [[BOUTON]] » et écris [[BOUTON]] dans ton texte ou ton HTML.</div>';
      if(/Socials|marquee/.test(key))field.innerHTML+='<div class="idx-field-note">Option avancée : si tu remplis ce HTML, il remplace les boutons sociaux automatiques.</div>'
      panel.appendChild(field)
      if(INDEX_MEDIA_KEYS.has(key)){const options=document.createElement('div');options.innerHTML=indexMediaControls(key);panel.appendChild(options)}
@@ -495,8 +526,15 @@ function customSection(i,id,visual){
  let result=mode==='replace'&&code?code:positionIndexImages(i,id,visual)+code
  if(INDEX_BUTTON_GROUPS.some(g=>g.id===id)&&String(i[id+'CtaLabel']||'').trim()){
   const button='<div class="hero-cta" style="margin-top:28px">'+btnHtml(i[id+'CtaLabel'],i[id+'CtaUrl']||'#',i[id+'CtaStyle']||'glass')+'</div>';
-  if(/<\/section>\s*$/.test(result))result=result.replace(/<\/section>(\s*)$/,button+'</section>$1');
+  const position=i[id+'CtaPosition'];
+  if(position)result=placeIndexButton(result,button,position,i[id+'CtaParagraph']);
+  else if(/<\/section>\s*$/.test(result))result=result.replace(/<\/section>(\s*)$/,button+'</section>$1');
   else result+=button;
+ }
+ if(['hero','cta'].includes(id)&&i[id+'CtaPosition']){
+  const doc=document.createElement('template');doc.innerHTML=result;
+  const node=doc.content.querySelector(id==='hero'?'.hero-cta':'.cercle-cta');
+  if(node){const button=node.outerHTML;node.remove();result=placeIndexButton(indexFragmentHtml(doc.content),button,i[id+'CtaPosition'],i[id+'CtaParagraph']);}
  }
  return result
 }
