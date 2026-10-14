@@ -51,6 +51,10 @@ function placeIndexButton(html,button,position,paragraph){
  return indexFragmentHtml(root);
 }
 for(const g of INDEX_BUTTON_POSITION_GROUPS){g.keys.push(g.id+'TextBlocks',g.id+'TitleColor',g.id+'TextAlign');sections.push([g.id+'TextBlocks','Blocs de texte et titres'],[g.id+'TitleColor','Couleur du titre principal'],[g.id+'TextAlign','Alignement du texte principal'])}
+for(const g of INDEX_GROUPS){
+ if(!g.keys.includes(g.id+'TextAlign')){g.keys.push(g.id+'TextAlign');sections.push([g.id+'TextAlign','Alignement du texte principal'])}
+ if(!['header','footer'].includes(g.id)){g.keys.push(g.id+'TitleAlign');sections.push([g.id+'TitleAlign','Alignement des titres principaux'])}
+}
 function indexTextBlocks(id){return safeJsonArray($('idx-'+id+'TextBlocks')?.value)}
 function renderIndexTextBlocks(id){
  const host=$('idx-text-blocks-'+id),source=$('idx-'+id+'TextBlocks');if(!host||!source)return;
@@ -173,7 +177,7 @@ function updateIdxMediaPreview(key){
  box.style.display=el.value.trim()?'block':'none'
 }
 function specialSelect(key){
- if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'TextAlign'))return '<select id="idx-'+key+'"><option value="">Alignement habituel</option><option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option><option value="justify">Justifié (ajusté)</option></select>';
+ if(INDEX_GROUPS.some(g=>key===g.id+'TextAlign'||key===g.id+'TitleAlign'))return '<select id="idx-'+key+'"><option value="">Alignement habituel</option><option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option><option value="justify">Justifié (ajusté)</option></select>';
  if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'TitleColor'))return '<select id="idx-'+key+'"><option value="">Couleur habituelle</option><option value="gold">Or</option></select>';
  if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'CtaPosition'))return '<select id="idx-'+key+'"><option value="">Position actuelle</option><option value="top">En haut de la section</option><option value="before-text">Avant le texte</option><option value="after-text">Après le texte</option><option value="before-image">Avant l’image</option><option value="after-image">Après l’image</option><option value="paragraph">Entre les paragraphes</option><option value="marker">À l’emplacement [[BOUTON]]</option><option value="bottom">En bas de la section</option></select>';
  if(INDEX_BUTTON_POSITION_GROUPS.some(g=>key===g.id+'CtaParagraph'))return '<input id="idx-'+key+'" type="number" min="1" step="1" placeholder="1">';
@@ -601,7 +605,13 @@ function customSection(i,id,visual){
  const code=String(i['code'+cap]||''),mode=String(i['codeMode'+cap]||'append')
  let result=mode==='replace'&&code?code:positionIndexImages(i,id,visual)+code
  if(['left','center','right','justify'].includes(i[id+'TextAlign'])){
-  const doc=document.createElement('template');doc.innerHTML=result;const text=doc.content.querySelector('.text-block,.hero-lead');if(text){text.style.textAlign=i[id+'TextAlign'];result=indexFragmentHtml(doc.content)}
+  const doc=document.createElement('template');doc.innerHTML=result;
+  const nodes=doc.content.querySelectorAll('.text-block,.text-block p,.hero-lead,.hero-lead p,.hero-note,.faq-content,.faq-content p,.parcours-item p,.auteur-card p,.footer-sign,.brand-name,section p,header p,footer p');
+  nodes.forEach(text=>text.style.textAlign=i[id+'TextAlign']);result=indexFragmentHtml(doc.content);
+ }
+ if(['left','center','right','justify'].includes(i[id+'TitleAlign'])){
+  const doc=document.createElement('template');doc.innerHTML=result;
+  doc.content.querySelectorAll('.section-head,.section-head h2,.section-head .kicker,.hero>h1,.hero>h2,.parcours-item h4,.auteur-card h4,.auteur-card h5,.cercle-inner>h2,section h1,section h2,section h3,section h4,section h5,section h6,.faq-item summary').forEach(title=>title.style.textAlign=i[id+'TitleAlign']);result=indexFragmentHtml(doc.content);
  }
  result=applyIndexTextBlocks(result,safeJsonArray(i[id+'TextBlocks']),i,id)
  if(INDEX_BUTTON_GROUPS.some(g=>g.id===id)&&String(i[id+'CtaLabel']||'').trim()){
