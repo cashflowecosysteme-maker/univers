@@ -56,6 +56,17 @@ for(const g of INDEX_GROUPS){
  if(!['header','footer'].includes(g.id)){g.keys.push(g.id+'TitleAlign');sections.push([g.id+'TitleAlign','Alignement des titres principaux'])}
 }
 function indexTextBlocks(id){return safeJsonArray($('idx-'+id+'TextBlocks')?.value)}
+function moveIndexTextBlock(blocks,index,step){
+ const target=index+step;if(target<0||target>=blocks.length)return false;
+ const current=blocks[index],neighbor=blocks[target];
+ for(const key of ['position','imageKey','paragraph']){
+  const value=current[key];
+  if(neighbor[key]===undefined)delete current[key];else current[key]=neighbor[key];
+  if(value===undefined)delete neighbor[key];else neighbor[key]=value;
+ }
+ [blocks[index],blocks[target]]=[blocks[target],blocks[index]];
+ return true;
+}
 function renderIndexTextBlocks(id){
  const host=$('idx-text-blocks-'+id),source=$('idx-'+id+'TextBlocks');if(!host||!source)return;
  const blocks=indexTextBlocks(id);host.innerHTML='';
@@ -69,7 +80,8 @@ function renderIndexTextBlocks(id){
   const textarea=row.querySelector('textarea'),select=row.querySelector('select'),number=row.querySelector('input');select.value=block.position||'bottom';number.hidden=select.value!=='paragraph';number.previousElementSibling.hidden=number.hidden;
   textarea.oninput=()=>{block.text=textarea.value;persist()};select.onchange=()=>{block.position=select.value;number.hidden=select.value!=='paragraph';number.previousElementSibling.hidden=number.hidden;persist()};number.oninput=()=>{block.paragraph=number.value;persist()};
   const alignLabel=document.createElement('label');alignLabel.textContent='Alignement du bloc';const align=document.createElement('select');align.innerHTML='<option value="">Alignement habituel</option><option value="left">Gauche</option><option value="center">Centre</option><option value="right">Droite</option><option value="justify">Justifié (ajusté)</option>';align.value=block.align||'';align.onchange=()=>{block.align=align.value;persist()};row.append(alignLabel,align);
-  row.querySelectorAll('button').forEach(button=>button.onclick=()=>{const action=button.dataset.action;if(action==='remove')blocks.splice(n,1);else{const target=n+(action==='up'?-1:1);if(target<0||target>=blocks.length)return;[blocks[n],blocks[target]]=[blocks[target],blocks[n]]}persist();renderIndexTextBlocks(id)});
+  row.querySelectorAll('button').forEach(button=>button.onclick=()=>{const action=button.dataset.action;if(action==='remove')blocks.splice(n,1);else{if(!moveIndexTextBlock(blocks,n,action==='up'?-1:1))return}persist();renderIndexTextBlocks(id)});
+  row.querySelector('[data-action=up]').disabled=n===0;row.querySelector('[data-action=down]').disabled=n===blocks.length-1;
   host.appendChild(row);addIndexFormattingToolbar(textarea);
  });
 }
