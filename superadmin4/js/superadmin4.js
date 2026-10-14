@@ -17,6 +17,39 @@ const INDEX_GROUPS=[
  {id:'footer',icon:'⌄',title:'Footer',keys:['footerContactLabel','footerContactUrl','footerLegalLabel','footerLegalUrl','footerPrivacyLabel','footerPrivacyUrl','footerCguLabel','footerCguUrl','footerSign','footerSocials','marquee'],advanced:['footerSocials','marquee']}
 ];
 const INDEX_MEDIA_KEYS=new Set(['heroMedia','s2Media','s3Media','s45Media','s67Media','s89Media','s1011Media','s1213Media','s1415Media','socialProofMedia','toolsMedia','transformMedia']);
+for(const key of INDEX_MEDIA_KEYS)sections.push([key+'Position','Position de l’image'],[key+'Float','Effet flottant'],[key+'Glow','Effet glow']);
+function indexMediaControls(key){
+ return '<div class="field"><label>Position de l’image</label><select id="idx-'+key+'Position"><option value="">En bas (position actuelle)</option><option value="above">En haut</option><option value="below">En bas</option><option value="left">À gauche</option><option value="right">À droite</option></select></div>'+['Float','Glow'].map(effect=>'<div class="field"><label>'+ (effect==='Float'?'Effet flottant':'Effet glow')+'</label><select id="idx-'+key+effect+'"><option value="">Non</option><option value="1">Oui</option></select></div>').join('');
+}
+const INDEX_IMAGE_CSS=`<style id="nyxia-index-image-options">
+.nx-image-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:32px}
+.nx-image-layout>.nx-image-copy{min-width:0}.nx-image-layout .nx-image-slot{min-width:0}.nx-image-layout .nx-image-slot>.img-frame{min-width:0;max-width:100%;margin:0}
+.nx-image-float{animation:nyxia-index-image-float 6s ease-in-out infinite!important}
+@keyframes nyxia-index-image-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.img-frame.nx-image-glow{overflow:visible;box-shadow:none}
+.img-frame.nx-image-glow img{filter:drop-shadow(0 0 16px rgba(123,92,255,.7)) drop-shadow(0 0 32px rgba(123,92,255,.35))}
+@media(max-width:700px){.nx-image-layout{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.nx-image-float{animation:none!important}}
+</style>`;
+function positionIndexImages(i,id,visual){
+ const group=INDEX_GROUPS.find(g=>g.id===id);if(!group)return visual;
+ for(const key of group.keys.filter(k=>INDEX_MEDIA_KEYS.has(k))){
+  const url=String(i[key]||'').trim();if(!url)continue;
+  const original=mediaBlock(url,key!=='s3Media');if(!visual.includes(original))continue;
+  const isImage=!/youtube\.com|youtu\.be|drive\.google\.com|\.mp4(?:\?|$)|\.webm(?:\?|$)/i.test(url);
+  const floating=isImage&&i[key+'Float']==='1',glow=isImage&&i[key+'Glow']==='1';
+  let block=original;
+  if(floating)block=block.replace('<img ','<img class="nx-image-float" ');
+  if(glow)block=block.replace('class="img-frame','class="img-frame nx-image-glow');
+  const position=i[key+'Position'];
+  if(!['above','left','right'].includes(position)){visual=visual.replace(original,block);continue;}
+  const match=visual.match(/^(<section\b[^>]*>)([\s\S]*)(<\/section>)$/);if(!match)continue;
+  const copy=match[2].replace(original,'');
+  if(position==='above')visual=match[1]+block+copy+match[3];
+  else visual=match[1]+'<div class="nx-image-layout"><div class="'+(position==='left'?'nx-image-slot':'nx-image-copy')+'">'+(position==='left'?block:copy)+'</div><div class="'+(position==='left'?'nx-image-copy':'nx-image-slot')+'">'+(position==='left'?copy:block)+'</div></div>'+match[3];
+ }
+ return visual;
+}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const slug=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60);async function api(p,o={}){const r=await fetch(p,{credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},...o});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'HTTP '+r.status);return d}
 
 
@@ -77,6 +110,7 @@ function indexUI(){
      if(INDEX_MEDIA_KEYS.has(key))field.innerHTML+='<div class="idx-media-thumb" id="idx-media-'+key+'" style="display:none"></div>'
      if(/Socials|marquee/.test(key))field.innerHTML+='<div class="idx-field-note">Option avancée : si tu remplis ce HTML, il remplace les boutons sociaux automatiques.</div>'
      panel.appendChild(field)
+     if(INDEX_MEDIA_KEYS.has(key)){const options=document.createElement('div');options.innerHTML=indexMediaControls(key);panel.appendChild(options)}
    }
 
    const code=document.createElement('div');code.className='idx-advanced'
@@ -451,7 +485,7 @@ function customSection(i,id,visual){
  const cap=id.charAt(0).toUpperCase()+id.slice(1),show=String(i['show'+cap]??'1')
  if(show==='0')return''
  const code=String(i['code'+cap]||''),mode=String(i['codeMode'+cap]||'append')
- return mode==='replace'&&code?code:visual+code
+ return mode==='replace'&&code?code:positionIndexImages(i,id,visual)+code
 }
 function fillIndex(s,p){
  const i=p.index||{},title=p.title||'Portail NyXia',short=p.short||title
@@ -504,6 +538,7 @@ function fillIndex(s,p){
    '__INDEX_FOOTER_BLOCK__':customSection(i,'footer',footer)
  }
  for(const [k,v] of Object.entries(map))s=s.split(k).join(String(v))
+ if([...INDEX_MEDIA_KEYS].some(key=>i[key]&&(i[key+'Position']||i[key+'Float']==='1'||i[key+'Glow']==='1')))s=s.replace('</head>',INDEX_IMAGE_CSS+'</head>')
  return s
 }
 async function compile(){try{$('host').value=portalAccessHost(true);const pr=await save(),p=pr.data;const registered=await ensurePortalRegistered(false);if(!registered)throw Error('Le portail n’a pas pu être relié à la liste centrale / Dégustation.');const r=await fetch('/superadmin4/portail-shell-template.zip',{cache:'no-store'});if(!r.ok)throw Error('Coque introuvable');const z=await JSZip.loadAsync(await r.arrayBuffer()),agents=p.agents||[];if(!agents.length)throw Error('Choisis au moins un personnage pour ce portail.');const cfg={id:p.portalId||slug(p.short||p.title),accessVersion:1,title:p.title,shortTitle:p.short||p.title,mission:p.mission,loginImage:p.loginImage,activeAgents:agents.map(a=>a.key),agents};let w=await z.file('_worker.js').async('string');w=w.replace("const PORTAL_CONFIG_B64='__PORTAL_CONFIG_B64__';","const PORTAL_CONFIG_B64='"+b64(JSON.stringify(cfg))+"';");z.file('_worker.js',w);let wr=await z.file('wrangler.toml').async('string');wr=wr.replaceAll('__WORKER_NAME__',p.workerName||slug(p.short||p.title)).replaceAll('__HOST__',p.host).replaceAll('__PORTAL_ID__',cfg.id);z.file('wrangler.toml',wr);let ind=await z.file('index.html').async('string');z.file('index.html',fillIndex(ind,p));let log=await z.file('login.html').async('string');log=log.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_LOGIN_IMAGE__',p.loginImage||'');z.file('login.html',log);const first=z.file('premiere-connexion.html');if(!first)throw Error('La coque doit être mise à jour : premiere-connexion.html manque.');z.file('premiere-connexion.html',(await first.async('string')).replaceAll('__PORTAL_TITLE__',esc(p.title||'Portail NyXia')));for(const path of ['mot-de-passe.html','mot-de-passe-oublie.html','reinitialiser-mot-de-passe.html']){const file=z.file(path);if(!file)throw Error('Coque incomplète : '+path+' manque.');z.file(path,(await file.async('string')).replaceAll('__PORTAL_TITLE__',esc(p.title||'Portail NyXia')));}const pages={},meta={};const principals=agents.filter(a=>(a.placement||'principal')==='principal');const atelierAgents=agents.filter(a=>a.placement==='atelier');const visibleAgents=agents.filter(a=>a.placement!=='hidden');let chat=await z.file('chat-base.html').async('string');for(const a of visibleAgents){pages[a.key]='/chat-'+a.key+'.html';meta[a.key]=a;let c=chat.replaceAll('__PORTAL_TITLE__',p.title).replaceAll('__PORTAL_TITLE_JSON__',JSON.stringify(p.title)).replaceAll('__AGENT_KEY__',a.key).replaceAll('__AGENT_NAME__',esc(a.name)).replaceAll('__AGENT_SUB__',esc(a.sub||'Personnage NyXia')).replaceAll('__AGENT_JSON__',JSON.stringify(a)).replaceAll('__AGENT_NAME_JSON__',JSON.stringify(a.name)).replaceAll('__AGENT_SUB_JSON__',JSON.stringify(a.sub||'Personnage NyXia')).replaceAll('__AGENT_GREETING_JSON__',JSON.stringify(a.greeting||'Je suis là. Dis-moi ce que tu veux faire avancer dans ce portail.')).replaceAll('__AGENT_IMAGE_JSON__',JSON.stringify(a.image||'')).replaceAll('__AGENT_VIDEO_JSON__',JSON.stringify(a.welcomeVideo||'')).replaceAll('__AGENT_AVATAR_HTML__',a.image?'<img src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="avatar-fallback">✦</span>');z.file('chat-'+a.key+'.html',c)}z.remove('chat-base.html');for(const t of p.tools||[]){if(t.content)z.file((t.path||'/outil.html').replace(/^\//,''),t.content);pages['tool-'+t.id]=t.path}let dash=await z.file('dashbord.html').async('string');const avatarHtml=a=>a.image?'<img class="nav-avatar" src="'+esc(a.image)+'" alt="'+esc(a.name)+'">':'<span class="nav-avatar" style="display:flex;align-items:center;justify-content:center">'+esc(a.icon||'✦')+'</span>';const nav=principals.map((a,i)=>'<div class="nav-item'+(i===0?' active':'')+'" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const atelierNav=atelierAgents.map(a=>'<div class="nav-item" id="nav-'+a.key+'" onclick="openAgentTab(\''+a.key+'\')">'+avatarHtml(a)+'<span class="nav-text"><span class="nav-name">'+esc(a.name)+'</span><span class="nav-sub">'+esc(a.sub||'')+'</span></span><span class="nav-arrow">›</span></div>').join('');const toolnav=(p.tools||[]).map(t=>'<div class="nav-item" id="nav-tool-'+t.id+'" onclick="openAgentTab(\'tool-'+t.id+'\')"><span class="nav-icon">'+esc(t.icon||'🧰')+'</span><span class="nav-text"><span class="nav-name">'+esc(t.name||'Outil')+'</span></span><span class="nav-arrow">›</span></div>').join('');dash=dash.replaceAll('__PORTAL_SHORT_TITLE__',p.short||p.title).replaceAll('__PORTAL_AGENT_NAV__',nav).replaceAll('__PORTAL_ATELIER_NAV__',atelierNav).replaceAll('__PORTAL_ATELIER_LABEL__',esc(p.atelierLabel||'Atelier')).replaceAll('__PORTAL_SPECIAL_TOOLS__',toolnav).replaceAll('__PORTAL_AGENT_PAGES__','').replaceAll('__PORTAL_PAGES_JSON__',JSON.stringify(pages)).replaceAll('__PORTAL_AGENT_META_JSON__',JSON.stringify(meta)).replaceAll('__PORTAL_DEFAULT_AGENT_JSON__',JSON.stringify((principals[0]||visibleAgents[0]||agents[0]).key)).replaceAll('__PORTAL_ATELIER_KEYS_JSON__',JSON.stringify(atelierAgents.map(a=>a.key))).replaceAll('__PORTAL_TITLE__',p.title);
