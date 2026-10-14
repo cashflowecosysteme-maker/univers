@@ -38,6 +38,9 @@
   function showRates(){
     var p=products.find(function(p){return p.id===el('member-product').value});
     var o=overrides.find(function(o){return o.product_id===el('member-product').value});
+    if(el('member-product').value==='__all__'){
+      [1,2,3].forEach(function(n){var values=products.map(function(p){var rate=overrides.find(function(r){return r.product_id===p.id});return rate&&rate['commission_n'+n]!=null?rate['commission_n'+n]:null});var same=values.length&&values.every(function(v){return v===values[0]});el('member-n'+n).value=same&&values[0]!=null?values[0]:'';el('member-n'+n).placeholder=same?'Taux de chaque produit':'Taux différents — saisir le taux commun'});return;
+    }
     [1,2,3].forEach(function(n){el('member-n'+n).value=o&&o['commission_n'+n]!=null?o['commission_n'+n]:'';el('member-n'+n).placeholder='Taux du produit : '+(p&&p['commission_n'+n]!=null?p['commission_n'+n]:0)+' %'});
   }
   window.editCommissionMember=async function(id,role){
@@ -45,13 +48,13 @@
       var d=await call('/api/members?role='+encodeURIComponent(role),'GET');
       member=(d.members||[]).find(function(m){return m.id===id});
       if(!member)throw new Error('Compte introuvable.');
-      el('member-name').textContent=member.prenom+' — '+member.email;
+      el('member-name').textContent=member.prenom+' — '+member.email+(member.closer?(member.closer_active?' · Closer actif — tous les portails':' · Closer désactivé'):'');
       el('member-paypal').value=member.paypal||'';message('');
       el('member-rates').hidden=role!=='affiliate';
       if(role==='affiliate'){
         var data=await call('/api/products','GET');products=data.products||[];
         var ods=await call('/api/commission-overrides?beneficiary_id='+encodeURIComponent(id),'GET');overrides=ods.overrides||[];
-        el('member-product').replaceChildren();products.forEach(function(p){var opt=document.createElement('option');opt.value=p.id;opt.textContent=p.title+' · '+(p.seller_name||p.seller_id||'Super Admin');el('member-product').appendChild(opt)});showRates();
+        el('member-product').replaceChildren();var all=document.createElement('option');all.value='__all__';all.textContent='Tous les produits ('+products.length+')';el('member-product').appendChild(all);products.forEach(function(p){var opt=document.createElement('option');opt.value=p.id;opt.textContent=p.title+' · '+(p.seller_name||p.seller_id||'Super Admin');el('member-product').appendChild(opt)});showRates();
       }
       dialog.showModal();
     }catch(e){alert(e.message)}
@@ -63,7 +66,27 @@
     var b={beneficiary_id:member.id,product_id:productId};
     [1,2,3].forEach(function(n){var input=el('member-n'+n);if(!reset&&!input.reportValidity())throw new Error('Pourcentage invalide.');b['commission_n'+n]=reset||input.value===''?null:Number(input.value)});
     await call('/api/commission-overrides','POST',b);
-    var ods=await call('/api/commission-overrides?beneficiary_id='+encodeURIComponent(member.id),'GET');overrides=ods.overrides||[];showRates();message(reset?'Les taux du produit sont rétablis.':'Commissions personnelles enregistrées.');
+    var ods=await call('/api/commission-overrides?beneficiary_id='+encodeURIComponent(member.id),'GET');overrides=ods.overrides||[];showRates();message(productId==='__all__'?(reset?'Les taux de tous les produits sont rétablis.':'Commissions enregistrées pour les '+products.length+' produits.'):(reset?'Les taux du produit sont rétablis.':'Commissions personnelles enregistrées.'));
   }catch(e){message(e.message)}}
   el('save-member-rates').onclick=function(){saveRates(false)};el('reset-member-rates').onclick=function(){saveRates(true)};
+window.loadMembers=async function(role,listId){
+  var box=document.getElementById(listId);if(!box)return;
+  box.textContent='Chargement…';
+  try{
+    var out=await api('/api/members?role='+encodeURIComponent(role),'GET');
+    var list=(out.data&&out.data.members)||out.members||[];
+    if(!list.length){box.textContent='Aucun compte.';return;}
+    box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Code unique</th><th>Lien /r/</th><th>PayPal</th><th></th></tr>'+list.map(function(m){
+      var code=(m.code||m.affiliate_code||'').toString().trim().toUpperCase();
+      var codeCell=code
+        ? ('<code style="color:#c4b5fd;font-size:13px;font-weight:700;letter-spacing:.04em">'+esc(code)+'</code>')
+        : '<span style="color:#F4C842">sans code</span>';
+      var lien=code?('https://nyxia.top/r/'+code):'—';
+      var lienCell=code
+        ? ('<button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" onclick="navigator.clipboard.writeText(\''+esc(lien)+'\')">Copier lien</button>')
+        : '—';
+      return '<tr><td><strong>'+esc(m.prenom)+'</strong>'+(m.closer?'<br><span style="color:#f2c66d;font-size:12px">'+(m.closer_active?'Closer · tous les portails':'Closer désactivé')+'</span>':'')+'</td><td>'+esc(m.email)+'</td><td>'+codeCell+'</td><td>'+lienCell+'</td><td>'+esc(m.paypal||'—')+'</td><td style="white-space:nowrap"><button class="btn btn-ghost" type="button" onclick="editCommissionMember(\''+esc(m.id)+'\',\''+role+'\')">Modifier</button> <button class="btn btn-ghost" type="button" onclick="regenCode(\''+esc(m.id)+'\',\''+role+'\',\''+esc(listId)+'\')">Nouveau code</button> <button class="btn btn-danger" type="button" onclick="delMember(\''+esc(m.id)+'\',\''+role+'\')">Supprimer</button></td></tr>';
+    }).join('')+'</table>';
+  }catch(e){box.textContent=e.message;}
+};
 })();

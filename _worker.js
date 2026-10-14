@@ -182,9 +182,8 @@ async function handleCommissionsToPay(request, env) {
 
   // Commissions dues par Super Admin (ses produits)
   const rows = await env.DB.prepare(
-    `SELECT c.*, COALESCE(NULLIF(p.title,''),'Produit non identifié') AS product_title, u.full_name as benef_name, u.email as benef_email, u.paypal_email as benef_paypal
+    `SELECT c.*, u.full_name as benef_name, u.email as benef_email, u.paypal_email as benef_paypal
      FROM commissions c
-     LEFT JOIN marketplace_products p ON p.id = c.product_id
      LEFT JOIN users u ON u.id = c.beneficiary_id
      WHERE (c.seller_id = 'superadmin' OR c.seller_id = 'SUPERADMIN' OR lower(c.seller_id) = 'superadmin')
      ORDER BY c.created_at DESC
@@ -233,7 +232,12 @@ async function handleListMembers(request, env) {
   const rows = binds.length
     ? await env.DB.prepare(q).bind(...binds).all()
     : await env.DB.prepare(q).all();
+  const closerTable = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='closer_accounts'").first();
+  const closerRows = closerTable ? await env.DB.prepare('SELECT user_id,active FROM closer_accounts').all() : {results:[]};
+  const closerStates = new Map((closerRows.results || []).map(c => [c.user_id,Number(c.active)]));
   const members = (rows.results || []).map(u => ({
+    closer: closerStates.has(u.id),
+    closer_active: closerStates.get(u.id) === 1,
     id: u.id,
     email: u.email,
     prenom: (u.full_name || '').trim().split(/\s+/)[0] || '—',
@@ -2384,15 +2388,20 @@ async function nyxPersonalOverride(request, env) {
     return json({overrides:rows.results || []});
   }
   const b = await request.json();
-  const product = await env.DB.prepare('SELECT id FROM marketplace_products WHERE id = ?').bind(String(b.product_id || '')).first();
+  const allProducts = b.product_id === '__all__';
+  const productRows = allProducts
+    ? await env.DB.prepare('SELECT id FROM marketplace_products').all()
+    : await env.DB.prepare('SELECT id FROM marketplace_products WHERE id = ?').bind(String(b.product_id || '')).all();
+  const products = productRows.results || [];
   const member = await env.DB.prepare("SELECT id FROM users WHERE id = ? AND role = 'affiliate'").bind(String(b.beneficiary_id || '')).first();
-  if (!product || !member) return json({error:'Produit ou promoteur introuvable.'},404);
+  if (!products.length || !member) return json({error:'Produit ou promoteur introuvable.'},404);
   let rates; try { rates = [1,2,3].map(n => nyxRate(b['commission_n'+n])); } catch(e) { return json({error:e.message},400); }
-  if (rates.every(n => n === null)) {
-    await env.DB.prepare('DELETE FROM commission_overrides WHERE product_id = ? AND beneficiary_id = ?').bind(product.id,member.id).run();
-  } else {
-    await env.DB.prepare(`INSERT INTO commission_overrides (product_id,beneficiary_id,commission_n1,commission_n2,commission_n3,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(product_id,beneficiary_id) DO UPDATE SET commission_n1=excluded.commission_n1,commission_n2=excluded.commission_n2,commission_n3=excluded.commission_n3,updated_at=excluded.updated_at`).bind(product.id,member.id,...rates,new Date().toISOString()).run();
-  }
+  const reset = rates.every(n => n === null);
+  const updatedAt = new Date().toISOString();
+  const statements = products.map(product => reset
+    ? env.DB.prepare('DELETE FROM commission_overrides WHERE product_id = ? AND beneficiary_id = ?').bind(product.id,member.id)
+    : env.DB.prepare(`INSERT INTO commission_overrides (product_id,beneficiary_id,commission_n1,commission_n2,commission_n3,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(product_id,beneficiary_id) DO UPDATE SET commission_n1=excluded.commission_n1,commission_n2=excluded.commission_n2,commission_n3=excluded.commission_n3,updated_at=excluded.updated_at`).bind(product.id,member.id,...rates,updatedAt));
+  await env.DB.batch(statements);
   return json({success:true});
 }
 async function nyxOwnPaypal(request, env) {
