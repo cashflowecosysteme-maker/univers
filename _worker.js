@@ -2181,7 +2181,21 @@ export default {
     }
     if (env.ASSETS) {
       if (path === '/premiere-connexion') return env.ASSETS.fetch(request);
-      if (path === '/' || path === '') return env.ASSETS.fetch(request);
+      if (path === '/' || path === '' || path === '/index.html') {
+        const page = await env.ASSETS.fetch(request);
+        if (!(page.headers.get('Content-Type') || '').includes('text/html')) return page;
+        const updated = new HTMLRewriter().on('script[src]', {
+          element(element) {
+            const src = element.getAttribute('src') || '';
+            if (src.split('?')[0] === '/js/member-editor.js') element.setAttribute('src', '/js/member-editor-v33.js');
+          }
+        }).transform(page);
+        const headers = new Headers(updated.headers);
+        headers.set('Cache-Control', 'no-store');
+        headers.delete('ETag');
+        headers.delete('Content-Length');
+        return new Response(updated.body, {status: updated.status, headers});
+      }
       return env.ASSETS.fetch(request);
     }
     return new Response('Not found', { status: 404 });
