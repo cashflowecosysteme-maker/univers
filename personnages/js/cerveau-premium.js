@@ -88,10 +88,12 @@ async function renderEnhancedBrain(){
     addStyles();
     const code=currentCode();
     const name=currentName();
+    let ovIds=[];if(code==='ovilus'){try{ovIds=(await api('/api/defunts')).defunts||[]}catch(_){}}
     const oldNs=panel.querySelector('#vectorNamespace')?.value||code;
     let b={vectors:0,sources:[],bindings:{}};
     try{b=await loadBrain()}catch(e){setMainStatus(e.message,'err')}
 
+    if(currentCode()!==code||panel.querySelector('h2')?.textContent.trim()!=='Cerveau & connaissances')return;
     panel.dataset.brainPremium='1';
     panel.innerHTML=`<div class="card">
       <div class="brain-premium-head">
@@ -103,7 +105,7 @@ async function renderEnhancedBrain(){
       </div>
 
       <div class="grid">
-        <div><label>Namespace</label><input id="vectorNamespace" value="${esc(oldNs)}"></div>
+        <div><label>Namespace</label><input id="vectorNamespace" value="${esc(code==='ovilus'?'ovilus':oldNs)}" ${code==='ovilus'?'readonly':''}></div>
         <div><label>État</label><div class="hint">Vectorize : ${b.bindings?.vectorize?'actif':'non détecté'} · AI : ${b.bindings?.ai?'actif':'non détecté'}</div></div>
         <div class="full brain-stats">
           <div class="stat"><span>Fragments</span><b>${Number(b.vectors||0)}</b></div>
@@ -136,6 +138,7 @@ async function renderEnhancedBrain(){
           <h3>Ajouter rapidement du texte</h3>
           <div class="grid">
             <div><label>Nom de la source</label><input id="brainSourcePremium" placeholder="Ex. Manuel chamanisme — Module 1"></div>
+            ${code==='ovilus'?`<div><label>Type de connaissances</label><select id="ov-brain-kind"><option value="general">Connaissances générales</option><option value="prenoms">Banque de prénoms féminins / masculins</option><option value="epoque">Connaissances d’époque</option><option value="identite">Histoire d’une identité</option></select></div><div><label>Identité concernée</label><select id="ov-brain-identity"><option value="">Ressource commune</option>${ovIds.map(d=>`<option value="${esc(d.id)}">${esc([d.prenom,d.nom].filter(Boolean).join(' '))}</option>`).join('')}</select></div><div><label>Première année — requise pour une époque</label><input id="ov-brain-from" type="number" min="0" max="9999"></div><div><label>Dernière année — requise pour une époque</label><input id="ov-brain-to" type="number" min="0" max="9999"></div><div class="full"><label>Pays / région (facultatif)</label><input id="ov-brain-region"></div><p class="hint full">Les prénoms restent dans ce cerveau, sans fiches individuelles. Pour une époque, indique les années et le lieu. Une histoire personnelle doit être associée à son identité pour éviter les mélanges.</p>`:''}
             <div class="full"><label>Texte à ingérer</label><textarea id="brainTextPremium" style="min-height:240px" placeholder="Colle ici une note, une consigne ou un passage de texte."></textarea></div>
           </div>
           <div class="actions-row"><button class="btn primary" id="brainIngestPremium" type="button">🧠 Ajouter au cerveau</button></div>
@@ -195,7 +198,7 @@ async function quickIngest(){
   if(!text)return setMainStatus('Ajoute du texte à ingérer.','err');
   setMainStatus('Vectorisation…');
   try{
-    await api('/api/vectorize/ingest',{method:'POST',body:JSON.stringify({agent:code,source,text})});
+    await api('/api/vectorize/ingest',{method:'POST',body:JSON.stringify({agent:code,source,text,...(code==='ovilus'?{ovilus:{kind:$('ov-brain-kind')?.value||'general',identityId:$('ov-brain-identity')?.value||'',from:$('ov-brain-from')?.value||'',to:$('ov-brain-to')?.value||'',region:$('ov-brain-region')?.value||''}}:{})})});
     if($('brainTextPremium'))$('brainTextPremium').value='';
     if($('brainSourcePremium'))$('brainSourcePremium').value='';
     await refreshPremiumBrain();

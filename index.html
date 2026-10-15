@@ -533,75 +533,7 @@ td strong{color:#fff}
       </div>
     </div>
 
-    <div class="module-panel" id="module-defunts">
-      <div class="panel">
-        <h3>🧠 Modèle IA — Léna-Ovilus</h3>
-        <p class="hint" style="margin-bottom:14px">Choisis ici le modèle OpenRouter utilisé par l’Ovilus de Léna. Ce réglage est enregistré uniquement dans <code>SPIRITUEL_KV</code> sous <code>config:ovilus_model</code>.</p>
-        <div class="grid2">
-          <div>
-            <label class="f">Modèle</label>
-            <select class="f" id="ov-model-select" onchange="ovModelChanged()">
-              <option value="aion-labs/aion-3.5-mini">Aion 3.5 Mini — recommandé</option>
-              <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
-              <option value="mistralai/mistral-small-3.2-24b-instruct">Mistral Small 3.2</option>
-              <option value="__custom__">Autre modèle OpenRouter…</option>
-            </select>
-          </div>
-          <div id="ov-model-custom-wrap" style="display:none">
-            <label class="f">Slug OpenRouter personnalisé</label>
-            <input class="f" id="ov-model-custom" placeholder="ex. fournisseur/modele">
-          </div>
-        </div>
-        <div class="hint" style="margin-top:10px">Modèle actuellement enregistré : <strong id="ov-model-current">—</strong></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-          <button class="btn" type="button" onclick="ovModelSave()">Enregistrer le modèle</button>
-          <button class="btn btn-ghost" type="button" onclick="ovModelLoad()">Recharger</button>
-        </div>
-        <div class="msg" id="ov-model-msg"></div>
-      </div>
-      <div class="panel">
-        <h3>🔮 Léna-Ovilus — Création d’identité</h3>
-        <p class="hint" style="margin-bottom:14px">Crée ici une identité complète et cohérente pour l’Ovilus de Léna. Les fiches restent structurées dans la D1 centrale puis sont synchronisées exclusivement vers <code>SPIRITUEL_KV</code>.</p>
-        <input type="hidden" id="df-id">
-        <h4 style="margin:18px 0 10px">Identité de base</h4>
-        <div class="grid2">
-          <div><label class="f">Prénom</label><input class="f" id="df-prenom" placeholder="Irène"></div>
-          <div><label class="f">Nom</label><input class="f" id="df-nom" placeholder="Leblanc"></div>
-          <div><label class="f">Date de naissance</label><input class="f" id="df-birth" type="date"></div>
-          <div><label class="f">Date de la mort</label><input class="f" id="df-death" type="date"></div>
-          <div><label class="f">Lieu / région</label><input class="f" id="df-lieu" placeholder="Joliette, Québec"></div>
-          <div><label class="f">Métier / rôle dans la vie</label><input class="f" id="df-metier" placeholder="Couturière, infirmier, agriculteur…"></div>
-        </div>
-        <h4 style="margin:18px 0 10px">Histoire et manifestation</h4>
-        <div><label class="f">Circonstance de la mort</label><textarea class="f" id="df-circ" rows="4"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Message à transmettre</label><textarea class="f" id="df-message" rows="4"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Ce qui reste incomplet</label><textarea class="f" id="df-incomplet" rows="4"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Non-dits</label><textarea class="f" id="df-unsaid" rows="4"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Chronologie / événements marquants</label><textarea class="f" id="df-chronology" rows="7"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Relations importantes</label><textarea class="f" id="df-relationships" rows="6"></textarea></div>
-        <h4 style="margin:18px 0 10px">Personnalité et parole</h4>
-        <div><label class="f">Personnalité détaillée</label><textarea class="f" id="df-personality" rows="7"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Style de parole / voix</label><textarea class="f" id="df-voice-style" rows="6"></textarea></div>
-        <h4 style="margin:18px 0 10px">Cohérence conversationnelle</h4>
-        <div><label class="f">Faits immuables — ne jamais changer</label><textarea class="f" id="df-immutable" rows="7"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Secrets à révéler progressivement</label><textarea class="f" id="df-secrets" rows="7"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Questions / sujets qu’elle peut refuser</label><textarea class="f" id="df-refusals" rows="6"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Ce personnage PEUT faire</label><textarea class="f" id="df-can-do" rows="5" placeholder="Hésiter, refuser, se taire, dire qu’il ne sait pas…"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Ce personnage ne doit JAMAIS faire</label><textarea class="f" id="df-never-do" rows="6" placeholder="Changer de prénom, d’époque, inventer une autre famille, devenir une autre entité…"></textarea></div>
-        <div style="margin-top:12px"><label class="f">Conditions de départ / fin de manifestation</label><textarea class="f" id="df-departure" rows="5"></textarea></div>
-        <h4 style="margin:18px 0 10px">Prompt maître</h4>
-        <div><label class="f">Grand prompt libre</label><textarea class="f" id="df-master-prompt" rows="14" maxlength="24000"></textarea><div class="hint"><span id="df-master-count">0</span> / 24 000 caractères</div></div>
-        <div style="margin-top:12px"><label class="f">Notes internes Super Admin</label><textarea class="f" id="df-notes" rows="5"></textarea></div>
-        <div class="grid2" style="margin-top:12px">
-          <div><label class="f">Tempérament principal</label><select class="f" id="df-tone"><option value="story">Récit — veut partager</option><option value="reserved">Réservé</option><option value="talkative">Bavard</option><option value="grouch">Bougon</option><option value="emotional">Émotif</option><option value="calm">Calme</option></select></div>
-          <div><label class="f">Actif dans Léna-Ovilus</label><select class="f" id="df-active"><option value="1">Oui — peut se manifester</option><option value="0">Non — en réserve</option></select></div>
-        </div>
-        <div style="margin-top:12px"><label class="f">Étiquette / groupe (optionnel)</label><input class="f" id="df-soiree"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn" type="button" onclick="dfSave()">Enregistrer l’identité</button><button class="btn btn-ghost" type="button" onclick="dfReset()">Nouvelle identité</button></div>
-        <div class="msg" id="df-msg"></div>
-      </div>
-      <div class="panel"><h3>Identités disponibles dans Léna-Ovilus</h3><p class="hint" style="margin-bottom:10px">Une identité active conserve sa propre histoire et ses règles de cohérence pendant une manifestation.</p><div id="df-list">—</div></div>
-    </div>
+    <div class="module-panel" id="module-defunts"><div class="panel"><h3>Léna-Ovilus — Personnage Premium</h3><p>Prépare sa personnalité, ses consignes, ses connaissances, ses déclencheurs et les identités qu’il peut incarner. Tes identités existantes sont conservées.</p><a class="btn" href="/personnages/?agent=ovilus" target="_blank" rel="noopener">Ouvrir la fiche Premium Ovilus</a></div></div>
 
     <div class="module-panel" id="module-formations">
       <div class="panel">
@@ -1068,7 +1000,7 @@ function switchModule(name){
   if(name==='messagerie'){ msgAdminLoad(); }
   if(name==='degustations' && typeof degustationsLoad==='function'){ degustationsLoad(); }
   if(name==='formations'){ loadPortals(); foLoadAgents(); }
-  if(name==='defunts'){ ovModelLoad(); dfLoad(); }
+  if(name==='defunts'){ /* Ovilus est administré dans sa fiche Premium. */ }
 }
 function showMsg(id,text,ok){var el=document.getElementById(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text;el.style.display='block';}
 async function api(path,method,body){

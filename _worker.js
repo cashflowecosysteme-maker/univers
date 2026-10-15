@@ -2223,6 +2223,7 @@ const PERSONNAGES_DEFAUT = [
   { code: 'diane', nom: 'Diane', portail: 'lena', custom: false },
   { code: 'nyxia', nom: 'NyXia', portail: 'tous', custom: false },
   { code: 'lena', nom: 'Léna', portail: 'lena', custom: false },
+  { code: 'ovilus', nom: 'Ovilus', portail: 'lena', custom: false },
   { code: 'sophia', nom: 'Sophia', portail: 'lena', custom: false },
   { code: 'aletheia', nom: 'Aletheia', portail: 'lena', custom: false },
   { code: 'cassandre', nom: 'Cassandre', portail: 'lena', custom: false },
@@ -2324,6 +2325,10 @@ async function handleVectorizeIngest(request, env) {
     return json({ error: 'Vectorisation inactive sur Univers. Utilise Ingestion (Studio Prompt) pour remplir le cerveau.' }, 400);
   }
   const index = env.VECTORIZE_INDEX || env.VECTORIZE;
+  const ov=agent==='ovilus'?(body.ovilus||{}):null;
+  const ovMeta=ov?{ovilus_kind:['general','prenoms','epoque','identite'].includes(ov.kind)?ov.kind:'general',ovilus_identity:String(ov.identityId||'').slice(0,120),ovilus_region:String(ov.region||'').slice(0,200),ovilus_from:Math.max(0,Math.min(9999,Number(ov.from)||0)),ovilus_to:Math.max(0,Math.min(9999,Number(ov.to)||0))}:{};
+  if(ov&&ovMeta.ovilus_kind==='identite'&&!ovMeta.ovilus_identity)return json({error:'Choisis l’identité concernée par cette histoire.'},400);
+  if(ov&&ovMeta.ovilus_kind==='epoque'&&(!ovMeta.ovilus_from||!ovMeta.ovilus_to||ovMeta.ovilus_to<ovMeta.ovilus_from))return json({error:'Indique la première et la dernière année de cette ressource d’époque, dans cet ordre.'},400);
   const chunks = [];
   const raw = text.replace(/\r/g, '');
   let parts = raw.split(/\n(?=#{1,3} )/);
@@ -2338,11 +2343,12 @@ async function handleVectorizeIngest(request, env) {
     const id = agent + '-' + source.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '-' + n;
     await env.CASHFLOW_KV.put('brain_text:' + agent + ':' + id, piece);
     await env.CASHFLOW_KV.put('brain_id:' + agent + ':' + id, '1');
-    const embedText = piece.length > 8000 ? piece.slice(0, 8000) : piece;
+    const contextLabel=ov?('OVILUS — '+({general:'connaissances générales',prenoms:'banque de prénoms féminins et masculins pour appeler quelqu’un',epoque:'connaissances historiques d’époque',identite:'histoire personnelle d’une identité'})[ovMeta.ovilus_kind]+' — source '+source+' — années '+ovMeta.ovilus_from+' à '+ovMeta.ovilus_to+' — '+ovMeta.ovilus_region+'\n'):'';
+    const embedText = contextLabel+(piece.length > 8000 ? piece.slice(0, 8000) : piece);
     const embeddings = await env.AI.run('@cf/baai/bge-m3', { text: [embedText] });
     await index.upsert([{
       id, values: embeddings.data[0], namespace: agent,
-      metadata: { texte_original: piece.slice(0, 1500), source, cible: agent, has_full: piece.length > 1500 ? '1' : '0' }
+      metadata: { texte_original: piece.slice(0, 1500), source, cible: agent, has_full: piece.length > 1500 ? '1' : '0', ...ovMeta }
     }]);
     chunks.push(id);
   }
