@@ -8,3 +8,15 @@
 .resource-row label{margin-bottom:5px}.resource-usage{grid-column:1/4}.resource-usage textarea{min-height:72px}.resource-auto{display:flex;align-items:center}.resource-auto .chip{margin:0}.resource-remove{display:flex;justify-content:flex-end}
 @media(max-width:900px){.resource-row{grid-template-columns:1fr 1fr}.resource-usage{grid-column:1/-1}}
 @media(max-width:600px){.resource-row{grid-template-columns:1fr}.resource-usage{grid-column:auto}.resource-remove{justify-content:flex-start}}
+
+
+/* Une seule fiche visible pour la banque d’identités Ovilus. */
+#ov-identity-list .ov-identity-picker{display:grid;gap:12px;min-width:0}
+#ov-identity-select{width:100%;min-width:0;max-width:100%}
+#ov-identity-list .ov-identity-summary{padding:18px;border:1px solid rgba(224,190,119,.24);border-radius:14px;background:rgba(6,10,24,.45);overflow-wrap:anywhere}
+#ov-identity-list .ov-identity-summary h3{margin:0 0 8px;font-weight:500}
+#ov-identity-list .ov-identity-summary p{margin:8px 0;line-height:1.6}
+#ov-identity-list .ov-identity-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+#ov-identity-list .btn{border-color:rgba(224,190,119,.35);background:linear-gradient(135deg,rgba(18,30,59,.86),rgba(6,10,24,.92));color:#f0d493;font-weight:400}
+#ov-new-identity{justify-self:start}
+#ov-identity-list .btn:disabled{opacity:.4;cursor:default}
