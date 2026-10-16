@@ -88,6 +88,15 @@ td strong{color:#fff}
 .msg-empty{padding:30px 14px;text-align:center;color:var(--t3);font-size:12px}
 @media(max-width:860px){.msg-admin-layout{grid-template-columns:1fr}.msg-conv-list{max-height:280px}.msg-thread-body{height:360px}}
 
+
+/* Encadré d’accès à la fiche Premium Ovilus. */
+#module-defunts .ovilus-entry{display:flex;flex-direction:column;align-items:flex-start;gap:16px;width:100%;max-width:960px;padding:26px 28px;border:1px solid rgba(224,190,119,.26);border-radius:18px;background:rgba(6,10,24,.68);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 12px 32px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.04)}
+#module-defunts .ovilus-entry h3{margin:0;color:#f0d493;font-size:20px;font-weight:500;line-height:1.4}
+#module-defunts .ovilus-entry p{margin:0;max-width:72ch;color:#d6d9f0;font-size:15px;line-height:1.7}
+#module-defunts .ovilus-entry-link{display:inline-flex;align-items:center;justify-content:center;max-width:100%;min-height:44px;margin:2px 0 0;padding:11px 18px;border:1px solid rgba(224,190,119,.48);border-radius:11px;background:linear-gradient(135deg,rgba(18,30,59,.86),rgba(6,10,24,.92));color:#f0d493;font-family:inherit;font-size:14px;font-weight:400;line-height:1.5;text-align:center;text-decoration:none;white-space:normal;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 4px 16px rgba(0,0,0,.12);transition:border-color .18s ease,box-shadow .18s ease}
+#module-defunts .ovilus-entry-link:hover{border-color:rgba(240,212,147,.8);box-shadow:0 0 16px rgba(224,190,119,.10),inset 0 1px 0 rgba(255,255,255,.05)}
+#module-defunts .ovilus-entry-link:focus-visible{outline:2px solid #f0d493;outline-offset:4px}
+@media(max-width:640px){#module-defunts .ovilus-entry{padding:22px 20px;gap:16px}#module-defunts .ovilus-entry h3{font-size:18px}}
 </style>
 </head>
 <body>
@@ -533,7 +542,7 @@ td strong{color:#fff}
       </div>
     </div>
 
-    <div class="module-panel" id="module-defunts"><div class="panel"><h3>Léna-Ovilus — Personnage Premium</h3><p>Prépare sa personnalité, ses consignes, ses connaissances, ses déclencheurs et les identités qu’il peut incarner. Tes identités existantes sont conservées.</p><a class="btn" href="/personnages/?agent=ovilus" target="_blank" rel="noopener">Ouvrir la fiche Premium Ovilus</a></div></div>
+    <div class="module-panel" id="module-defunts"><div class="panel ovilus-entry"><h3>Léna-Ovilus — Personnage Premium</h3><p>Prépare sa personnalité, ses consignes, ses connaissances, ses déclencheurs et les identités qu’il peut incarner. Tes identités existantes sont conservées.</p><a class="btn ovilus-entry-link" href="/personnages/?agent=ovilus" target="_blank" rel="noopener">Ouvrir la fiche Premium Ovilus</a></div></div>
 
     <div class="module-panel" id="module-formations">
       <div class="panel">
@@ -1863,6 +1872,7 @@ document.getElementById('login-password').addEventListener('keydown',function(e)
 <script src="/js/formation-format-toolbar.js?v=20261015"></script>
 </body>
 </html>
+
 
 
 
