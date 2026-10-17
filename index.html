@@ -301,7 +301,11 @@ td strong{color:#fff}
           <div><label class="f">Ancien prix (facultatif)</label><input class="f" id="bt-old-price" type="number" min="0" step="0.01"></div>
           <div><label class="f">Devise</label><select class="f" id="bt-currency"><option value="CAD">CAD</option><option value="EUR">EUR</option><option value="USD">USD</option></select></div>
           <div><label class="f">Texte de prix (facultatif)</label><input class="f" id="bt-price-label" placeholder="Ex. À partir de 125 $"></div>
-          <div style="grid-column:1/-1"><label class="f">Image principale (URL)</label><input class="f" id="bt-image-main" placeholder="https://..."></div>
+          <div style="grid-column:1/-1"><label class="f">Image de couverture (URL)</label><input class="f" id="bt-image-main" placeholder="https://..."><p class="hint">Tu peux garder une image de couverture et ajouter ta vidéo ci-dessous. Un lien vidéo collé ici est également reconnu lors de l’enregistrement.</p></div>
+          <div style="grid-column:1/-1"><label class="f" for="bt-video-url">Vidéo de présentation du produit — URL</label><input class="f" id="bt-video-url" type="url" placeholder="Lien MP4, YouTube ou Vimeo"><p class="hint">La démonstration du produit sera lisible dans sa fiche, dans la boutique et dans les aperçus des portails.</p></div>
+          <div><label class="f" for="bt-video-title">Titre de la vidéo (facultatif)</label><input class="f" id="bt-video-title"></div>
+          <div><label class="f" for="bt-video-position">Emplacement de la vidéo</label><select class="f" id="bt-video-position"><option value="gallery">Présentation, avec les images</option><option value="description">Après la description</option><option value="hidden">Ne pas afficher</option></select></div>
+          <div style="grid-column:1/-1"><label class="hint"><input type="checkbox" id="bt-video-first" checked> Afficher la vidéo en premier dans la présentation</label></div>
           <div><label class="f">Petite image 1</label><input class="f" id="bt-image-1" placeholder="https://..."></div>
           <div><label class="f">Petite image 2</label><input class="f" id="bt-image-2" placeholder="https://..."></div>
           <div><label class="f">Petite image 3</label><input class="f" id="bt-image-3" placeholder="https://..."></div>
@@ -800,6 +804,26 @@ function btCleanTestimonials(){
   }).filter(function(t){return t.type==='image'?!!t.imageUrl:!!t.text;});
 }
 
+function nxProductVideoInfo(value){
+ var raw=String(value||'').trim();if(!raw)return null;
+ try{
+  var url=new URL(raw,'https://boutique.nyxia.top');if(url.protocol!=='https:'&&url.protocol!=='http:')return null;
+  var host=url.hostname.toLowerCase().replace(/^www\./,''),id='',match;
+  if(host==='youtu.be')id=url.pathname.split('/')[1]||'';
+  else if(host==='youtube.com'||host==='m.youtube.com'||host==='youtube-nocookie.com'){
+   if(url.pathname==='/watch')id=url.searchParams.get('v')||'';
+   else{match=url.pathname.match(/^\/(?:embed|shorts|live)\/([A-Za-z0-9_-]+)/);if(match)id=match[1];}
+  }
+  if(id&&/^[A-Za-z0-9_-]{6,}$/.test(id))return{kind:'iframe',src:'https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?rel=0',provider:'YouTube'};
+  if(host==='vimeo.com'||host==='player.vimeo.com'){
+   match=url.pathname.match(/(?:\/video)?\/(\d+)(?:\/([A-Za-z0-9]+))?/);
+   if(match){var hash=url.searchParams.get('h')||match[2]||'';return{kind:'iframe',src:'https://player.vimeo.com/video/'+match[1]+(hash?'?h='+encodeURIComponent(hash):''),provider:'Vimeo'};}
+  }
+  if(/\.mp4$/i.test(url.pathname))return{kind:'video',src:url.href,provider:'MP4'};
+ }catch(_){}
+ return null;
+}
+
 function btProductBody(source){
   if(source)return Object.assign({},source,{images:Array.isArray(source.images)?source.images:[]});
   var numberOrNull=function(id){var value=document.getElementById(id).value;return value===''?null:Number(value);};
@@ -828,6 +852,10 @@ function btProductBody(source){
     currency:document.getElementById('bt-currency').value,
     priceLabel:priceLabel,
     imageMain:document.getElementById('bt-image-main').value.trim(),
+    videoUrl:document.getElementById('bt-video-url').value.trim(),
+    videoTitle:document.getElementById('bt-video-title').value.trim(),
+    videoPosition:document.getElementById('bt-video-position').value,
+    videoFirst:document.getElementById('bt-video-first').checked,
     images:[1,2,3,4].map(function(n){return document.getElementById('bt-image-'+n).value.trim();}),
     testimonialTitle:document.getElementById('bt-testimonial-title').value.trim(),
     testimonials:btCleanTestimonials(),
@@ -879,7 +907,12 @@ function btEditProduct(id){
   document.getElementById('bt-old-price').value=(uiCta==='gratuit')?'':(p.oldPrice==null?'':p.oldPrice);
   document.getElementById('bt-currency').value=p.currency||'CAD';
   document.getElementById('bt-price-label').value=(uiCta==='gratuit')?'':(p.priceLabel||'');
-  document.getElementById('bt-image-main').value=p.imageMain||'';
+  var legacyVideo=nxProductVideoInfo(p.imageMain);
+  document.getElementById('bt-image-main').value=legacyVideo?'':(p.imageMain||'');
+  document.getElementById('bt-video-url').value=p.videoUrl||(legacyVideo?p.imageMain:'');
+  document.getElementById('bt-video-title').value=p.videoTitle||'';
+  document.getElementById('bt-video-position').value=p.videoPosition||'gallery';
+  document.getElementById('bt-video-first').checked=p.videoFirst!==false;
   [1,2,3,4].forEach(function(n){document.getElementById('bt-image-'+n).value=(p.images||[])[n-1]||'';});
   document.getElementById('bt-testimonial-title').value=p.testimonialTitle||'';
   BT_TESTIMONIALS=btNormalizeTestimonials(p);
@@ -900,7 +933,8 @@ function btEditProduct(id){
 
 function btResetProduct(clearMessage){
   document.getElementById('bt-id').value='';
-  ['bt-category','bt-product-title','bt-short-description','bt-description','bt-price','bt-old-price','bt-price-label','bt-image-main','bt-image-1','bt-image-2','bt-image-3','bt-image-4','bt-testimonial-title','bt-cta-url','bt-checkout-url','bt-promo-code','bt-promo-text','bt-promo-expires'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('bt-video-position').value='gallery';document.getElementById('bt-video-first').checked=true;
+  ['bt-category','bt-product-title','bt-short-description','bt-description','bt-price','bt-old-price','bt-price-label','bt-image-main','bt-video-url','bt-video-title','bt-image-1','bt-image-2','bt-image-3','bt-image-4','bt-testimonial-title','bt-cta-url','bt-checkout-url','bt-promo-code','bt-promo-text','bt-promo-expires'].forEach(function(id){document.getElementById(id).value='';});
   BT_TESTIMONIALS=[];btRenderTestimonialsEditor();
   document.getElementById('bt-portal').value='nyxia';document.getElementById('bt-type').value='formation';document.getElementById('bt-currency').value='CAD';document.getElementById('bt-cta-type').value='auto';document.getElementById('bt-order').value='0';document.getElementById('bt-active').checked=false;document.getElementById('bt-featured').checked=false;
   document.getElementById('bt-editor-title').textContent='Ajouter un produit, service ou événement';document.getElementById('bt-cancel').style.display='none';
@@ -908,6 +942,7 @@ function btResetProduct(clearMessage){
 }
 
 btRenderTestimonialsEditor();
+document.getElementById('bt-image-main').addEventListener('change',function(){if(nxProductVideoInfo(this.value)){document.getElementById('bt-video-url').value=this.value.trim();document.getElementById('bt-video-first').checked=true;this.value='';}});
 
 async function btToggleProduct(id){
   var p=BT_PRODUCTS.find(function(item){return item.id===id;});if(!p)return;

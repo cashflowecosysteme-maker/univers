@@ -704,6 +704,26 @@ async function handleBoutiqueProductsAdmin(request, env) {
   return json({ products: await boutiqueProducts(env) });
 }
 
+function boutiqueVideoInfo(value){
+ var raw=String(value||'').trim();if(!raw)return null;
+ try{
+  var url=new URL(raw,'https://boutique.nyxia.top');if(url.protocol!=='https:'&&url.protocol!=='http:')return null;
+  var host=url.hostname.toLowerCase().replace(/^www\./,''),id='',match;
+  if(host==='youtu.be')id=url.pathname.split('/')[1]||'';
+  else if(host==='youtube.com'||host==='m.youtube.com'||host==='youtube-nocookie.com'){
+   if(url.pathname==='/watch')id=url.searchParams.get('v')||'';
+   else{match=url.pathname.match(/^\/(?:embed|shorts|live)\/([A-Za-z0-9_-]+)/);if(match)id=match[1];}
+  }
+  if(id&&/^[A-Za-z0-9_-]{6,}$/.test(id))return{kind:'iframe',src:'https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?rel=0',provider:'YouTube'};
+  if(host==='vimeo.com'||host==='player.vimeo.com'){
+   match=url.pathname.match(/(?:\/video)?\/(\d+)(?:\/([A-Za-z0-9]+))?/);
+   if(match){var hash=url.searchParams.get('h')||match[2]||'';return{kind:'iframe',src:'https://player.vimeo.com/video/'+match[1]+(hash?'?h='+encodeURIComponent(hash):''),provider:'Vimeo'};}
+  }
+  if(/\.mp4$/i.test(url.pathname))return{kind:'video',src:url.href,provider:'MP4'};
+ }catch(_){}
+ return null;
+}
+
 async function handleBoutiqueProductSave(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const body = await request.json().catch(() => ({}));
@@ -719,7 +739,11 @@ async function handleBoutiqueProductSave(request, env) {
   try { old = oldRaw ? JSON.parse(oldRaw) : null; } catch (_) {}
 
   const imageValues = Array.isArray(body.images) ? body.images : [body.image1, body.image2, body.image3, body.image4];
-  const imageMainRaw = boutiqueText(body.imageMain, 2000);
+  let imageMainRaw = boutiqueText(body.imageMain, 2000);
+  const mainVideo = boutiqueVideoInfo(imageMainRaw);
+  let videoUrlRaw = boutiqueText(body.videoUrl !== undefined ? body.videoUrl : old && old.videoUrl, 2000);
+  if (mainVideo) { videoUrlRaw = boutiqueText(body.videoUrl,2000) || imageMainRaw; imageMainRaw = ''; }
+  if (videoUrlRaw && !boutiqueVideoInfo(videoUrlRaw)) return json({error:'Le lien vidéo doit être un MP4, un lien YouTube ou un lien Vimeo.'},400);
   const ctaUrlRaw = boutiqueText(body.ctaUrl, 2000);
   const checkoutRaw = boutiqueText(body.systemeCheckoutUrl !== undefined ? body.systemeCheckoutUrl : old && old.systemeCheckoutUrl, 2000);
   if (checkoutRaw && !boutiqueUrl(checkoutRaw)) return json({ error: 'Le lien d’achat est invalide. Utilise une adresse https:// complète.' }, 400);
@@ -758,6 +782,10 @@ async function handleBoutiqueProductSave(request, env) {
     priceLabel: boutiqueText(body.priceLabel, 80),
     currency: ['CAD', 'EUR', 'USD'].includes(body.currency) ? body.currency : 'CAD',
     imageMain: boutiqueUrl(imageMainRaw),
+    videoUrl: boutiqueUrl(videoUrlRaw),
+    videoTitle: boutiqueText(body.videoTitle !== undefined ? body.videoTitle : old && old.videoTitle, 180),
+    videoPosition: ['gallery','description','hidden'].includes(body.videoPosition) ? body.videoPosition : (old && old.videoPosition || 'gallery'),
+    videoFirst: mainVideo ? true : (body.videoFirst !== undefined ? boutiqueBool(body.videoFirst,false) : !!(old && old.videoFirst)),
     images: imageValues.map(boutiqueUrl).filter(Boolean).slice(0, 4),
     testimonialTitle,
     testimonials,
