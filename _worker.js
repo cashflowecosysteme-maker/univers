@@ -721,6 +721,8 @@ async function handleBoutiqueProductSave(request, env) {
   const imageValues = Array.isArray(body.images) ? body.images : [body.image1, body.image2, body.image3, body.image4];
   const imageMainRaw = boutiqueText(body.imageMain, 2000);
   const ctaUrlRaw = boutiqueText(body.ctaUrl, 2000);
+  const checkoutRaw = boutiqueText(body.systemeCheckoutUrl !== undefined ? body.systemeCheckoutUrl : old && old.systemeCheckoutUrl, 2000);
+  if (checkoutRaw && !boutiqueUrl(checkoutRaw)) return json({ error: 'Le lien d’achat est invalide. Utilise une adresse https:// complète.' }, 400);
   const promoExpiresRaw = boutiqueText(body.promoExpiresAt, 40);
   const invalidImage = imageMainRaw && !boutiqueUrl(imageMainRaw);
   const invalidCta = ctaUrlRaw && !boutiqueUrl(ctaUrlRaw);
@@ -741,6 +743,7 @@ async function handleBoutiqueProductSave(request, env) {
   const ctaType = BOUTIQUE_CTA_TYPES.includes(body.ctaType) ? body.ctaType : 'en-savoir-plus';
   const now = new Date().toISOString();
   const product = {
+    ...(old || {}),
     schemaVersion: 2,
     id,
     slug: boutiqueSlug(body.slug || title),
@@ -762,6 +765,7 @@ async function handleBoutiqueProductSave(request, env) {
     testimonialAuthor: firstTextTestimonial ? boutiqueText(firstTextTestimonial.author, 120) : '',
     ctaType,
     ctaUrl: boutiqueUrl(ctaUrlRaw),
+    systemeCheckoutUrl: boutiqueUrl(checkoutRaw),
     order: Math.max(0, Math.trunc(boutiqueNumber(body.order, 0))),
     active: boutiqueBool(body.active, false),
     featured: boutiqueBool(body.featured, false),

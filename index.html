@@ -323,7 +323,8 @@ td strong{color:#fff}
             </select>
             <p class="hint">« Voir la fiche » reste toujours affiché. Ce choix contrôle uniquement le texte qui apparaît après.</p>
           </div>
-          <div style="grid-column:1/-1"><label class="f">Lien de l’action (facultatif)</label><input class="f" id="bt-cta-url" placeholder="https://..."><p class="hint">Ex. lien Systeme.io pour un rendez-vous, une consultation ou une inscription gratuite.</p></div>
+          <div style="grid-column:1/-1"><label class="f" for="bt-checkout-url">Lien d’achat — page de paiement</label><input class="f" id="bt-checkout-url" type="url" placeholder="https://..."><p class="hint">Colle ici l’adresse où le client peut acheter ce produit. Elle alimentera automatiquement le bouton de sa fiche dans la boutique. La fiche et son lien sont créés pour chaque produit, sans modification de code.</p></div>
+          <div style="grid-column:1/-1"><label class="f" for="bt-cta-url">Autre destination (facultatif)</label><input class="f" id="bt-cta-url" type="url" placeholder="https://..."><p class="hint">Pour un rendez-vous, une consultation, une page de présentation ou une inscription gratuite. Si un lien d’achat est renseigné, il est utilisé en priorité sur la fiche produit.</p></div>
           <div><label class="f">Code promo</label><input class="f" id="bt-promo-code"></div>
           <div><label class="f">Expiration du code</label><input class="f" id="bt-promo-expires" type="datetime-local"></div>
           <div style="grid-column:1/-1"><label class="f">Texte de la promotion</label><input class="f" id="bt-promo-text"></div>
@@ -834,6 +835,7 @@ function btProductBody(source){
     testimonialAuthor:(btCleanTestimonials().find(function(t){return t.type==='text';})||{}).author||'',
     ctaType:btTechnicalCta(uiCta),
     ctaUrl:document.getElementById('bt-cta-url').value.trim(),
+    systemeCheckoutUrl:document.getElementById('bt-checkout-url').value.trim(),
     promoCode:document.getElementById('bt-promo-code').value.trim(),
     promoText:document.getElementById('bt-promo-text').value.trim(),
     promoExpiresAt:document.getElementById('bt-promo-expires').value,
@@ -884,6 +886,7 @@ function btEditProduct(id){
   btRenderTestimonialsEditor();
   document.getElementById('bt-cta-type').value=uiCta;
   document.getElementById('bt-cta-url').value=p.ctaUrl||'';
+  document.getElementById('bt-checkout-url').value=p.systemeCheckoutUrl||'';
   document.getElementById('bt-promo-code').value=p.promoCode||'';
   document.getElementById('bt-promo-text').value=p.promoText||'';
   document.getElementById('bt-promo-expires').value=btDateInput(p.promoExpiresAt);
@@ -897,7 +900,7 @@ function btEditProduct(id){
 
 function btResetProduct(clearMessage){
   document.getElementById('bt-id').value='';
-  ['bt-category','bt-product-title','bt-short-description','bt-description','bt-price','bt-old-price','bt-price-label','bt-image-main','bt-image-1','bt-image-2','bt-image-3','bt-image-4','bt-testimonial-title','bt-cta-url','bt-promo-code','bt-promo-text','bt-promo-expires'].forEach(function(id){document.getElementById(id).value='';});
+  ['bt-category','bt-product-title','bt-short-description','bt-description','bt-price','bt-old-price','bt-price-label','bt-image-main','bt-image-1','bt-image-2','bt-image-3','bt-image-4','bt-testimonial-title','bt-cta-url','bt-checkout-url','bt-promo-code','bt-promo-text','bt-promo-expires'].forEach(function(id){document.getElementById(id).value='';});
   BT_TESTIMONIALS=[];btRenderTestimonialsEditor();
   document.getElementById('bt-portal').value='nyxia';document.getElementById('bt-type').value='formation';document.getElementById('bt-currency').value='CAD';document.getElementById('bt-cta-type').value='auto';document.getElementById('bt-order').value='0';document.getElementById('bt-active').checked=false;document.getElementById('bt-featured').checked=false;
   document.getElementById('bt-editor-title').textContent='Ajouter un produit, service ou événement';document.getElementById('bt-cancel').style.display='none';
@@ -922,7 +925,7 @@ function btRenderProducts(){
   var portalNames={nyxia:'NyXia',diane:'Diane',eric:'Éric',lena:'Léna',selena:'Séléna',kael:'Kael',alex:'Alex'};
   box.innerHTML='<table><thead><tr><th>Ordre</th><th>Titre</th><th>Univers</th><th>Type</th><th>Prix</th><th>État</th><th></th></tr></thead><tbody>'+BT_PRODUCTS.map(function(p){
     var price=p.priceLabel||((p.price==null)?'—':Number(p.price).toLocaleString('fr-CA',{style:'currency',currency:p.currency||'CAD'}));
-    return '<tr><td>'+esc(p.order||0)+'</td><td><strong>'+esc(p.title||'')+'</strong>'+(p.featured?' <span title="Vedette">★</span>':'')+'</td><td>'+esc(portalNames[p.portal]||p.portal)+'</td><td>'+esc(p.type||'')+'</td><td>'+esc(price)+'</td><td>'+(p.active?'<span style="color:var(--green)">Visible</span>':'<span style="color:#F4C842">Brouillon</span>')+'</td><td><div class="boutique-actions"><button class="btn btn-ghost" type="button" onclick="btEditProduct(\''+esc(p.id)+'\')">Modifier</button><button class="btn btn-ghost" type="button" onclick="btToggleProduct(\''+esc(p.id)+'\')">'+(p.active?'Masquer':'Publier')+'</button><button class="btn btn-danger" type="button" onclick="btDeleteProduct(\''+esc(p.id)+'\')">Supprimer</button></div></td></tr>';
+    return '<tr><td>'+esc(p.order||0)+'</td><td><strong>'+esc(p.title||'')+'</strong>'+(p.featured?' <span title="Vedette">★</span>':'')+'</td><td>'+esc(portalNames[p.portal]||p.portal)+'</td><td>'+esc(p.type||'')+'</td><td>'+esc(price)+'</td><td>'+(p.active?'<span style="color:var(--green)">Visible</span>':'<span style="color:#F4C842">Brouillon</span>')+'</td><td><div class="boutique-actions"><a class="btn btn-ghost" href="https://boutique.nyxia.top/produit.html?id='+encodeURIComponent(p.id)+'" target="_blank" rel="noopener">Voir la fiche</a><button class="btn btn-ghost" type="button" onclick="btEditProduct(\''+esc(p.id)+'\')">Modifier</button><button class="btn btn-ghost" type="button" onclick="btToggleProduct(\''+esc(p.id)+'\')">'+(p.active?'Masquer':'Publier')+'</button><button class="btn btn-danger" type="button" onclick="btDeleteProduct(\''+esc(p.id)+'\')">Supprimer</button></div></td></tr>';
   }).join('')+'</tbody></table>';
 }
 
