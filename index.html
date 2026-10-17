@@ -97,6 +97,25 @@ td strong{color:#fff}
 #module-defunts .ovilus-entry-link:hover{border-color:rgba(240,212,147,.8);box-shadow:0 0 16px rgba(224,190,119,.10),inset 0 1px 0 rgba(255,255,255,.05)}
 #module-defunts .ovilus-entry-link:focus-visible{outline:2px solid #f0d493;outline-offset:4px}
 @media(max-width:640px){#module-defunts .ovilus-entry{padding:22px 20px;gap:16px}#module-defunts .ovilus-entry h3{font-size:18px}}
+
+/* Éditeur Formation vivante : modules compacts, une fiche ouverte à la fois. */
+#fo-modules{gap:10px!important}
+#fo-modules .fo-module-card{border:1px solid rgba(233,204,128,.22);border-radius:13px;background:rgba(6,10,24,.65);overflow:hidden}
+#fo-modules .fo-module-summary{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 16px;cursor:pointer;list-style:none}
+#fo-modules .fo-module-summary::-webkit-details-marker{display:none}
+#fo-modules .fo-module-summary:focus-visible{outline:2px solid #e9cc80;outline-offset:-3px}
+#fo-modules .fo-module-label{display:flex;align-items:center;gap:10px;min-width:0;color:#e9cc80;font-weight:400}
+#fo-modules .fo-module-label>[id]{overflow-wrap:anywhere}
+#fo-modules .fo-module-chevron{font-size:24px;line-height:1;transition:transform .15s}
+#fo-modules details[open]>.fo-module-summary .fo-module-chevron{transform:rotate(90deg)}
+#fo-modules details[open]>.fo-module-summary{border-bottom:1px solid rgba(233,204,128,.15)}
+#fo-modules .fo-module-count{font-size:12px;color:var(--t3);white-space:nowrap}
+#fo-modules .fo-module-actions{display:flex;gap:6px;flex-shrink:0}
+#fo-modules .fo-module-actions .btn{padding:6px 10px;font-weight:400;background:rgba(6,10,24,.72);border:1px solid rgba(233,204,128,.32);color:#e9cc80}
+#fo-modules .fo-module-actions .btn-danger{color:#ff9ba8;border-color:rgba(255,114,139,.3)}
+#fo-modules .fo-module-actions .btn:disabled{opacity:.35;cursor:default}
+#fo-modules .fo-module-body{padding:16px}
+@media(max-width:640px){#fo-modules .fo-module-summary{flex-wrap:wrap;padding:12px}#fo-modules .fo-module-label{width:100%}#fo-modules .fo-module-actions{margin-left:auto}}
 </style>
 </head>
 <body>
@@ -612,8 +631,7 @@ td strong{color:#fff}
           <div style="font-size:14px;font-weight:700;color:#fff">Modules</div>
           <button class="btn btn-ghost" type="button" onclick="foAddModuleLive()">➕ Ajouter un module</button>
         </div>
-        <div id="fo-modules" style="margin-top:12px;display:flex;flex-direction:column;gap:14px"></div>
-        <div style="margin-top:14px"><button id="fo-add-module-bottom" class="btn btn-ghost" type="button" onclick="foAddModuleLive()" style="background:rgba(6,10,24,.72);border:1px solid rgba(233,204,128,.4);color:#e9cc80;font-weight:400;backdrop-filter:blur(10px)">➕ Ajouter un module</button></div>
+        <div id="fo-modules" style="margin-top:12px;display:flex;flex-direction:column;gap:14px"></div><div style="margin-top:14px"><button id="fo-add-module-bottom" class="btn btn-ghost" type="button" onclick="foAddModuleLive()" style="background:rgba(6,10,24,.72);border:1px solid rgba(233,204,128,.4);color:#e9cc80;font-weight:400">➕ Ajouter un module</button></div>
 
         <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn" type="button" onclick="foSave()">💾 Enregistrer la formation</button>
@@ -1667,10 +1685,10 @@ async function foDelete(id){
 function foAddModule(){
   if(!FO_STATE)return;
   var n=FO_STATE.modules.length+1;
-  FO_STATE.modules.push({id:'m'+n,numero:n,titre:'',blocs:[]});
+  var added={id:'m'+n,numero:n,titre:'',blocs:[]};FO_STATE.modules.push(added);FO_OPEN_MODULE=added;
   foRenderEditor();
 }
-function foRemoveModule(mi){FO_STATE.modules.splice(mi,1);foRenumberModules();foRenderEditor();}
+function foRemoveModule(mi){var removed=FO_STATE.modules.splice(mi,1)[0];if(FO_OPEN_MODULE===removed)FO_OPEN_MODULE=FO_STATE.modules[Math.min(mi,FO_STATE.modules.length-1)]||null;foRenumberModules();foRenderEditor();}
 function foMoveModule(mi,dir){
   var j=mi+dir;if(j<0||j>=FO_STATE.modules.length)return;
   var tmp=FO_STATE.modules[mi];FO_STATE.modules[mi]=FO_STATE.modules[j];FO_STATE.modules[j]=tmp;
@@ -1720,6 +1738,18 @@ function foBlocFields(mi,bi,b){
 }
 
 function nxModuleHeading(m,index){const title=String(m?.titre||'');const mode=m?.prefixMode||'none';const prefix=mode==='none'?'':mode==='custom'?String(m?.prefixText||''):'Module '+(m?.numero||index+1)+' ·';return[prefix,title].filter(Boolean).join(' ')}
+let FO_OPEN_MODULE=null;
+function foModuleToggled(details,mi){
+ if(details.open){
+  FO_OPEN_MODULE=FO_STATE.modules[mi];
+  document.querySelectorAll('#fo-modules details.fo-module-card[open]').forEach(function(other){if(other!==details)other.open=false;});
+ }else if(FO_OPEN_MODULE===FO_STATE.modules[mi])FO_OPEN_MODULE=null;
+}
+function foModuleTitleChanged(input,mi){
+ FO_STATE.modules[mi].titre=input.value;
+ var title=document.getElementById('fo-module-heading-'+mi);
+ if(title)title.textContent=nxModuleHeading(FO_STATE.modules[mi],mi)||'Sans titre';
+}
 function foRenderEditor(){
   var ed=document.getElementById('fo-editor');ed.style.display='block';
   document.getElementById('fo-titre').value=FO_STATE.titre||'';
@@ -1731,15 +1761,14 @@ function foRenderEditor(){
   if(!FO_STATE.modules.length){wrap.innerHTML='<p class="hint">Aucun module. Ajoute ton premier module ci-dessus.</p>';return;}
   var html='';
   FO_STATE.modules.forEach(function(m,mi){
-    html+='<div style="background:rgba(15,28,63,.55);border:1px solid rgba(123,92,255,.22);border-radius:14px;padding:14px">';
-    html+='<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">'
-      +'<div style="font-weight:400;color:#fff">'+esc(nxModuleHeading(m,mi))+'</div>'
-      +'<div style="white-space:nowrap">'
-      +'<button class="btn btn-ghost" type="button" onclick="foMoveModuleLive('+mi+',-1)">↑</button> '
-      +'<button class="btn btn-ghost" type="button" onclick="foMoveModuleLive('+mi+',1)">↓</button> '
-      +'<button class="btn btn-danger" type="button" onclick="foRemoveModuleLive('+mi+')">Retirer le module</button>'
-      +'</div></div>';
-    html+='<div style="margin-top:8px"><label class="f">Titre du module</label><input class="f" id="fo-m-titre-'+mi+'" value="'+esc(m.titre||'')+'" placeholder="Ex. Construire ton personnage"></div>';
+    html+='<details class="fo-module-card" data-fo-module="'+mi+'"'+(FO_OPEN_MODULE===m?' open':'')+' ontoggle="foModuleToggled(this,'+mi+')">';
+    html+='<summary class="fo-module-summary"><span class="fo-module-label"><span class="fo-module-chevron" aria-hidden="true">›</span><span id="fo-module-heading-'+mi+'">'+esc(nxModuleHeading(m,mi)||'Sans titre')+'</span><span class="fo-module-count">'+m.blocs.length+' bloc'+(m.blocs.length===1?'':'s')+'</span></span>'
+      +'<span class="fo-module-actions">'
+      +'<button class="btn btn-ghost" type="button" aria-label="Monter" '+(mi===0?'disabled ':'')+'onclick="event.preventDefault();event.stopPropagation();foMoveModuleLive('+mi+',-1)">↑</button> '
+      +'<button class="btn btn-ghost" type="button" aria-label="Descendre" '+(mi===FO_STATE.modules.length-1?'disabled ':'')+'onclick="event.preventDefault();event.stopPropagation();foMoveModuleLive('+mi+',1)">↓</button> '
+      +'<button class="btn btn-danger" type="button" onclick="event.preventDefault();event.stopPropagation();foRemoveModuleLive('+mi+')">Retirer</button>'
+      +'</span></summary><div class="fo-module-body">';
+    html+='<div style="margin-top:8px"><label class="f">Titre du module</label><input class="f" id="fo-m-titre-'+mi+'" oninput="foModuleTitleChanged(this,'+mi+')" value="'+esc(m.titre||'')+'" placeholder="Ex. Construire ton personnage"></div>';
     html+='<div style="margin-top:10px"><label class="f" for="fo-m-prefix-mode-'+mi+'">Texte avant le titre</label><select class="f" id="fo-m-prefix-mode-'+mi+'" onchange="foCollect();foRenderEditor()">'+[['auto','Module et numéro automatiques'],['custom','Mon texte personnalisé'],['none','Titre seulement']].map(function(o){return '<option value="'+o[0]+'"'+((m.prefixMode||'none')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div>';
     html+='<div style="margin-top:8px;'+(m.prefixMode==='custom'?'':'display:none')+'"><label class="f" for="fo-m-prefix-text-'+mi+'">Ton texte personnalisé</label><input class="f" id="fo-m-prefix-text-'+mi+'" value="'+esc(m.prefixText||'')+'" placeholder="Ex. Chapitre 1 ·"></div>';
     html+='<div style="margin-top:12px;font-size:12px;color:var(--t3);font-weight:600">Blocs</div>';
@@ -1759,7 +1788,7 @@ function foRenderEditor(){
       html+='</div>';
     });
     html+='<button class="btn btn-ghost" type="button" style="margin-top:10px" onclick="foAddBlocLive('+mi+')">➕ Ajouter un bloc</button>';
-    html+='</div>';
+    html+='</div></details>';
   });
   wrap.innerHTML=html;
 }
