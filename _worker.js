@@ -1637,7 +1637,9 @@ function sanitizeFormationDoc(input) {
   const modules = modulesIn.map((m, i) => ({
     id: String((m && m.id) || ('m' + (i + 1))).trim() || ('m' + (i + 1)),
     numero: Number.isFinite(m && m.numero) ? m.numero : (i + 1),
-    titre: String((m && m.titre) || ('Module ' + (i + 1))),
+    titre: String((m && m.titre) ?? ''),
+    prefixMode: ['auto','custom','none'].includes(m && m.prefixMode)?m.prefixMode:'none',
+    prefixText: String((m && m.prefixText)||'').slice(0,300),
     blocs: Array.isArray(m && m.blocs) ? m.blocs.map(sanitizeFormationBloc) : []
   }));
   return {
@@ -2487,3 +2489,4 @@ async function nyxEnsureCommissionSchema(env) {
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_comm_seller ON commissions(seller_id)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_comm_benef ON commissions(beneficiary_id)').run();
 }
+

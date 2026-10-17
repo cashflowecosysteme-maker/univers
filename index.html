@@ -1646,7 +1646,7 @@ async function foEdit(id){
     FO_STATE={
       id:f.id||'',titre:f.titre||'',description:f.description||'',ordre:f.ordre||0,
       modules:(f.modules||[]).map(function(m,i){
-        return {id:m.id||('m'+(i+1)),numero:(m.numero!=null?m.numero:(i+1)),titre:m.titre||('Module '+(i+1)),
+        return {id:m.id||('m'+(i+1)),numero:(m.numero!=null?m.numero:(i+1)),titre:m.titre??'',prefixMode:['auto','custom','none'].includes(m.prefixMode)?m.prefixMode:'none',prefixText:String(m.prefixText||''),
           blocs:(m.blocs||[]).map(function(b){var nb=foBlankBloc(b.type);for(var k in b){if(b[k]!=null)nb[k]=b[k];}return nb;})};
       })
     };
@@ -1666,7 +1666,7 @@ async function foDelete(id){
 function foAddModule(){
   if(!FO_STATE)return;
   var n=FO_STATE.modules.length+1;
-  FO_STATE.modules.push({id:'m'+n,numero:n,titre:'Module '+n,blocs:[]});
+  FO_STATE.modules.push({id:'m'+n,numero:n,titre:'',blocs:[]});
   foRenderEditor();
 }
 function foRemoveModule(mi){FO_STATE.modules.splice(mi,1);foRenumberModules();foRenderEditor();}
@@ -1693,6 +1693,8 @@ function foCollect(){
   if(idField)FO_STATE.id=idField;
   FO_STATE.modules.forEach(function(m,mi){
     var t=document.getElementById('fo-m-titre-'+mi);if(t)m.titre=t.value;
+    var pm=document.getElementById('fo-m-prefix-mode-'+mi);if(pm)m.prefixMode=pm.value;
+    var pt=document.getElementById('fo-m-prefix-text-'+mi);if(pt)m.prefixText=pt.value;
     m.blocs.forEach(function(b,bi){
       var typeEl=document.getElementById('fo-b-type-'+mi+'-'+bi);if(typeEl)b.type=typeEl.value;
       ['contenu','url','legende','titre','intro','objectif','consigne'].forEach(function(f){
@@ -1716,6 +1718,7 @@ function foBlocFields(mi,bi,b){
   return '';
 }
 
+function nxModuleHeading(m,index){const title=String(m?.titre||'');const mode=m?.prefixMode||'none';const prefix=mode==='none'?'':mode==='custom'?String(m?.prefixText||''):'Module '+(m?.numero||index+1)+' ·';return[prefix,title].filter(Boolean).join(' ')}
 function foRenderEditor(){
   var ed=document.getElementById('fo-editor');ed.style.display='block';
   document.getElementById('fo-titre').value=FO_STATE.titre||'';
@@ -1729,13 +1732,15 @@ function foRenderEditor(){
   FO_STATE.modules.forEach(function(m,mi){
     html+='<div style="background:rgba(15,28,63,.55);border:1px solid rgba(123,92,255,.22);border-radius:14px;padding:14px">';
     html+='<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">'
-      +'<div style="font-weight:700;color:#fff">Module '+(mi+1)+'</div>'
+      +'<div style="font-weight:400;color:#fff">'+esc(nxModuleHeading(m,mi))+'</div>'
       +'<div style="white-space:nowrap">'
       +'<button class="btn btn-ghost" type="button" onclick="foMoveModuleLive('+mi+',-1)">↑</button> '
       +'<button class="btn btn-ghost" type="button" onclick="foMoveModuleLive('+mi+',1)">↓</button> '
       +'<button class="btn btn-danger" type="button" onclick="foRemoveModuleLive('+mi+')">Retirer le module</button>'
       +'</div></div>';
     html+='<div style="margin-top:8px"><label class="f">Titre du module</label><input class="f" id="fo-m-titre-'+mi+'" value="'+esc(m.titre||'')+'" placeholder="Ex. Construire ton personnage"></div>';
+    html+='<div style="margin-top:10px"><label class="f" for="fo-m-prefix-mode-'+mi+'">Texte avant le titre</label><select class="f" id="fo-m-prefix-mode-'+mi+'" onchange="foCollect();foRenderEditor()">'+[['auto','Module et numéro automatiques'],['custom','Mon texte personnalisé'],['none','Titre seulement']].map(function(o){return '<option value="'+o[0]+'"'+((m.prefixMode||'none')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div>';
+    html+='<div style="margin-top:8px;'+(m.prefixMode==='custom'?'':'display:none')+'"><label class="f" for="fo-m-prefix-text-'+mi+'">Ton texte personnalisé</label><input class="f" id="fo-m-prefix-text-'+mi+'" value="'+esc(m.prefixText||'')+'" placeholder="Ex. Chapitre 1 ·"></div>';
     html+='<div style="margin-top:12px;font-size:12px;color:var(--t3);font-weight:600">Blocs</div>';
     if(!m.blocs.length){html+='<p class="hint" style="margin:6px 0">Aucun bloc. Ajoute du texte, un audio, une vidéo, une image ou un exercice.</p>';}
     m.blocs.forEach(function(b,bi){
@@ -1872,6 +1877,7 @@ document.getElementById('login-password').addEventListener('keydown',function(e)
 <script src="/js/formation-format-toolbar.js?v=20261015"></script>
 </body>
 </html>
+
 
 
 
