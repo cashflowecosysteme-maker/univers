@@ -610,9 +610,10 @@ td strong{color:#fff}
 
         <div style="margin-top:18px;display:flex;align-items:center;justify-content:space-between">
           <div style="font-size:14px;font-weight:700;color:#fff">Modules</div>
-          <button class="btn btn-ghost" type="button" onclick="foAddModule()">➕ Ajouter un module</button>
+          <button class="btn btn-ghost" type="button" onclick="foAddModuleLive()">➕ Ajouter un module</button>
         </div>
         <div id="fo-modules" style="margin-top:12px;display:flex;flex-direction:column;gap:14px"></div>
+        <div style="margin-top:14px"><button id="fo-add-module-bottom" class="btn btn-ghost" type="button" onclick="foAddModuleLive()" style="background:rgba(6,10,24,.72);border:1px solid rgba(233,204,128,.4);color:#e9cc80;font-weight:400;backdrop-filter:blur(10px)">➕ Ajouter un module</button></div>
 
         <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn" type="button" onclick="foSave()">💾 Enregistrer la formation</button>
@@ -1877,6 +1878,7 @@ document.getElementById('login-password').addEventListener('keydown',function(e)
 <script src="/js/formation-format-toolbar.js?v=20261015"></script>
 </body>
 </html>
+
 
 
 
