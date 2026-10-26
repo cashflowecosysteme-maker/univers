@@ -724,6 +724,35 @@ function boutiqueVideoInfo(value){
  return null;
 }
 
+async function boutiqueVideoThumbnail(videoUrl, images = []) {
+  const video = boutiqueVideoInfo(videoUrl);
+  if (video && video.provider === 'YouTube') {
+    const id = new URL(video.src).pathname.split('/').pop();
+    return 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg';
+  }
+  if (video && video.provider === 'Vimeo') {
+    try {
+      const response = await fetch('https://vimeo.com/api/oembed.json?url=' + encodeURIComponent(videoUrl), {
+        signal: AbortSignal.timeout(4000)
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const thumbnail = boutiqueUrl(data.thumbnail_url);
+        if (thumbnail && !boutiqueVideoInfo(thumbnail)) return thumbnail;
+      }
+    } catch (_) {}
+  }
+  return images.map(boutiqueUrl).find(url => url && !boutiqueVideoInfo(url)) || '';
+}
+
+async function boutiqueProductWithThumbnail(product) {
+  const legacyVideo = boutiqueVideoInfo(product.imageMain);
+  if (product.imageMain && !legacyVideo) return product;
+  const videoUrl = product.videoUrl || (legacyVideo ? product.imageMain : '');
+  if (!videoUrl) return product;
+  return { ...product, videoUrl, imageMain: await boutiqueVideoThumbnail(videoUrl, product.images || []) };
+}
+
 async function handleBoutiqueProductSave(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const body = await request.json().catch(() => ({}));
@@ -744,6 +773,7 @@ async function handleBoutiqueProductSave(request, env) {
   let videoUrlRaw = boutiqueText(body.videoUrl !== undefined ? body.videoUrl : old && old.videoUrl, 2000);
   if (mainVideo) { videoUrlRaw = boutiqueText(body.videoUrl,2000) || imageMainRaw; imageMainRaw = ''; }
   if (videoUrlRaw && !boutiqueVideoInfo(videoUrlRaw)) return json({error:'Le lien vidéo doit être un MP4, un lien YouTube ou un lien Vimeo.'},400);
+  if (!imageMainRaw) imageMainRaw = await boutiqueVideoThumbnail(videoUrlRaw, imageValues);
   const ctaUrlRaw = boutiqueText(body.ctaUrl, 2000);
   const checkoutRaw = boutiqueText(body.systemeCheckoutUrl !== undefined ? body.systemeCheckoutUrl : old && old.systemeCheckoutUrl, 2000);
   if (checkoutRaw && !boutiqueUrl(checkoutRaw)) return json({ error: 'Le lien d’achat est invalide. Utilise une adresse https:// complète.' }, 400);
@@ -874,7 +904,10 @@ async function handleBoutiqueCatalog(request, env) {
     [product.title, product.shortDescription, product.description, product.category, product.type]
       .join(' ').toLowerCase().includes(q)
   );
-  return boutiqueCors(json({ products: products.map(boutiquePublicProduct), count: products.length }));
+  const publicProducts = await Promise.all(products.map(async product =>
+    boutiquePublicProduct(await boutiqueProductWithThumbnail(product))
+  ));
+  return boutiqueCors(json({ products: publicProducts, count: products.length }));
 }
 
 async function handleBoutiqueConfig(request, env) {
