@@ -1255,6 +1255,69 @@ async function handleCreatePortalClient(request, env) {
   return json({ success: true, email, products, merged: false });
 }
 
+// Modification sécurisée d'un client existant, sans suppression et sans changement de courriel.
+async function handleUpdatePortalClient(request, env) {
+  if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
+  const body = await request.json().catch(() => ({}));
+  const email = String(body.email || '').toLowerCase().trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Courriel invalide.' }, 400);
+  const key = 'client:' + email, raw = await env.CASHFLOW_KV.get(key);
+  if (!raw) return json({ error: 'Client introuvable.' }, 404);
+  let client;
+  try { client = JSON.parse(raw); } catch (_) { return json({ error: 'Fiche client illisible.' }, 500); }
+  if (String(client.email || email).toLowerCase() !== email) return json({ error: 'Identifiant de compte incohérent.' }, 409);
+  if (!Array.isArray(body.products) || body.products.length > 200 ||
+      body.products.some((id) => typeof id !== 'string' || !/^[a-z0-9_-]{1,100}$/i.test(id)))
+    return json({ error: 'Liste des portails invalide.' }, 400);
+  const products = [...new Set(body.products)];
+  const available = await getPortalsList(env);
+  const known = new Set(available.map((p) => String(p.id)));
+  const previous = new Set(Array.isArray(client.products) ? client.products.map(String) : []);
+  if (products.some((id) => !known.has(id) && !previous.has(id)))
+    return json({ error: 'Un portail sélectionné est inconnu.' }, 400);
+  const firstName = String(body.firstName == null ? '' : body.firstName).trim().slice(0, 100);
+  const lastName = String(body.lastName == null ? '' : body.lastName).trim().slice(0, 100);
+  if (!firstName) return json({ error: 'Prénom requis.' }, 400);
+  if (body.password != null && typeof body.password !== 'string')
+    return json({ error: 'Mot de passe invalide.' }, 400);
+  const password = body.password || '';
+  if (password && password.length < 8) return json({ error: 'Mot de passe : minimum 8 caractères.' }, 400);
+  if (password && password.length > 256) return json({ error: 'Mot de passe trop long.' }, 400);
+
+  // Synchronisation du compte D1 (Cercles / affiliation) lorsqu'il existe.
+  if (env.DB) {
+    try {
+      const existingD1 = await env.DB.prepare('SELECT id FROM users WHERE email = ? LIMIT 1').bind(email).first();
+      if (existingD1) {
+        const d1Password = password ? await hashPasswordAffil(password) : null;
+        await env.DB.prepare(
+          "UPDATE users SET full_name = ?, password_hash = COALESCE(?, password_hash), updated_at = datetime('now') WHERE id = ?"
+        ).bind((firstName + ' ' + lastName).trim(), d1Password, existingD1.id).run();
+      }
+    } catch (e) {
+      console.error('Synchronisation du client lié D1', e);
+      return json({ error: 'Synchronisation du compte lié impossible. Le compte portail n’a pas été modifié.' }, 500);
+    }
+  }
+  client.firstName = firstName;
+  client.lastName = lastName;
+  client.name = (firstName + ' ' + lastName).trim();
+  client.products = products;
+  if (password) {
+    client.salt = randomSalt();
+    client.passwordHash = await hashPassword(password, client.salt);
+    client.authVersion = randomToken();
+    delete client.password; // Aucun nouveau mot de passe en clair.
+  }
+  client.updatedAt = new Date().toISOString();
+  await env.CASHFLOW_KV.put(key, JSON.stringify(client));
+  if (password) {
+    try { await nyxResetRevoke(env, email); }
+    catch (e) { console.error('Révocation des sessions', e); }
+  }
+  return json({ success: true, email, products: client.products });
+}
+
 async function handleDeletePortalClient(request, env) {
   if (!(await requireAdmin(request, env))) return json({ error: 'Non autorisé.' }, 401);
   const body = await request.json();
@@ -2214,6 +2277,7 @@ export default {
       if (path === '/api/portals/cleanup-lena' && request.method === 'POST') return await handleCleanupLenaPortals(request, env);
       if (path === '/api/portal-clients' && request.method === 'GET') return await handleListPortalClients(request, env);
       if (path === '/api/portal-clients' && request.method === 'POST') return await handleCreatePortalClient(request, env);
+      if (path === '/api/portal-clients/update' && request.method === 'POST') return await handleUpdatePortalClient(request, env);
       if (path === '/api/portal-clients/delete' && request.method === 'POST') return await handleDeletePortalClient(request, env);
       if (path === '/api/messagerie/inbox' && request.method === 'GET') return await handleMessagerieInbox(request, env);
       if (path === '/api/messagerie/read' && request.method === 'POST') return await handleMessagerieRead(request, env);

@@ -408,6 +408,27 @@ td strong{color:#fff}
         <h3>Clients inscrits</h3>
         <div id="cl-list">—</div>
       </div>
+      <div class="panel" id="cl-edit-panel" hidden>
+        <h3>Modifier le compte client</h3>
+        <p class="hint">Le courriel est l'identifiant du compte. Pour préserver les accès, les achats et les dégustations, il n'est pas modifiable dans ce formulaire.</p>
+        <div class="grid2">
+          <div><label class="f" for="cle-prenom">Prénom</label><input class="f" id="cle-prenom"></div>
+          <div><label class="f" for="cle-nom">Nom</label><input class="f" id="cle-nom"></div>
+          <div><label class="f" for="cle-email">Courriel (lecture seule)</label><input class="f" id="cle-email" type="email" readonly></div>
+          <div><label class="f" for="cle-password">Nouveau mot de passe (facultatif)</label><input class="f" id="cle-password" type="password" autocomplete="new-password" placeholder="8 caractères minimum"></div>
+          <div><label class="f" for="cle-password-confirm">Confirmer le mot de passe</label><input class="f" id="cle-password-confirm" type="password" autocomplete="new-password"></div>
+        </div>
+        <div style="margin-top:12px">
+          <label class="f">Portails accessibles</label>
+          <div id="cle-portals-checks" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div>
+          <p class="hint">Les dégustations temporaires sont gérées séparément de ces accès permanents.</p>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px">
+          <button class="btn" type="button" onclick="savePortalClient()">Enregistrer les modifications</button>
+          <button class="btn btn-ghost" type="button" onclick="closePortalClientEdit()">Annuler</button>
+        </div>
+        <div class="msg" id="cle-msg"></div>
+      </div>
     </div>
 
 
@@ -1015,18 +1036,60 @@ async function cleanLenaDuplicates(){
     if(typeof degustationsLoad==='function')await degustationsLoad();
   }catch(e){showMsg('portal-clean-msg',e.message||String(e),false);}
 }
+var NYXIA_PORTAL_CLIENTS = [];
+function nyxiaPortalClientEmailArg(email){return encodeURIComponent(String(email||'')).replace(/'/g,'%27');}
 async function loadPortalClients(){
-  var box=document.getElementById('cl-list'); if(!box) return;
+  var box=document.getElementById('cl-list');if(!box)return;
   box.textContent='Chargement…';
   try{
     var out=await api('/api/portal-clients','GET');
-    var list=out.data.clients||[];
-    if(!list.length){ box.textContent='Aucun client.'; return; }
-    box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Portails</th><th>Depuis</th><th></th></tr>'+list.map(function(c){
+    if(!out.res.ok)throw Error(out.data.error||'Chargement impossible.');
+    var list=out.data.clients||[];NYXIA_PORTAL_CLIENTS=list;
+    if(!list.length){box.textContent='Aucun client.';return;}
+    box.innerHTML='<table><tr><th>Prénom</th><th>Courriel</th><th>Portails</th><th>Depuis</th><th>Actions</th></tr>'+list.map(function(c){
+      var arg=nyxiaPortalClientEmailArg(c.email);
       return '<tr><td><strong>'+esc(c.firstName||c.name||'—')+'</strong></td><td>'+esc(c.email)+'</td><td>'+esc((c.products||[]).join(', '))+'</td><td>'+esc((c.createdAt||'').slice(0,10))+'</td>'
-        +'<td><button class="btn btn-danger" type="button" onclick="delPortalClient(\''+esc(c.email)+'\')">Supprimer</button></td></tr>';
+      +'<td><button class="btn btn-ghost" type="button" onclick="editPortalClient(decodeURIComponent(\''+arg+'\'))">Modifier</button> '
+      +'<button class="btn btn-danger" type="button" onclick="delPortalClient(decodeURIComponent(\''+arg+'\'))">Supprimer</button></td></tr>';
     }).join('')+'</table>';
-  }catch(e){ box.textContent=e.message; }
+  }catch(e){box.textContent=e.message;}
+}
+function editPortalClient(email){
+  var c=NYXIA_PORTAL_CLIENTS.find(function(x){return x.email===email;});
+  if(!c){alert('Client introuvable. Actualise la liste.');return;}
+  document.getElementById('cle-prenom').value=c.firstName||'';
+  document.getElementById('cle-nom').value=c.lastName||'';
+  document.getElementById('cle-email').value=c.email;
+  document.getElementById('cle-password').value='';
+  document.getElementById('cle-password-confirm').value='';
+  var current=Array.isArray(c.products)?c.products:[];
+  var portals=(window._portals||[]).slice();
+  current.forEach(function(id){if(!portals.some(function(p){return String(p.id)===String(id);})){portals.push({id:id,name:id});}});
+  document.getElementById('cle-portals-checks').innerHTML=portals.map(function(p){
+    return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--t2)"><input type="checkbox" class="cle-portal-cb" value="'+esc(p.id)+'" '+(current.map(String).includes(String(p.id))?'checked':'')+'> '+esc(p.name||p.id)+'</label>';
+  }).join('')||'<span class="hint">Aucun portail disponible.</span>';
+  var msg=document.getElementById('cle-msg');msg.textContent='';msg.style.display='none';
+  var panel=document.getElementById('cl-edit-panel');panel.hidden=false;panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function closePortalClientEdit(){document.getElementById('cl-edit-panel').hidden=true;}
+async function savePortalClient(){
+  var password=document.getElementById('cle-password').value,confirm=document.getElementById('cle-password-confirm').value;
+  if(password!==confirm){showMsg('cle-msg','Les mots de passe ne correspondent pas.',false);return;}
+  if(password&&password.length<8){showMsg('cle-msg','Mot de passe : au moins 8 caractères.',false);return;}
+  var products=[];document.querySelectorAll('.cle-portal-cb:checked').forEach(function(cb){products.push(cb.value);});
+  try{
+    var out=await api('/api/portal-clients/update','POST',{
+      email:document.getElementById('cle-email').value.trim(),
+      firstName:document.getElementById('cle-prenom').value.trim(),
+      lastName:document.getElementById('cle-nom').value.trim(),
+      products:products,password:password
+    });
+    if(!out.res.ok||!out.data.success)throw Error(out.data.error||'Modification impossible.');
+    document.getElementById('cle-password').value='';
+    document.getElementById('cle-password-confirm').value='';
+    showMsg('cle-msg','Compte enregistré. '+(password?'Le mot de passe a été modifié.':''),true);
+    await loadPortalClients();
+  }catch(e){showMsg('cle-msg',e.message||String(e),false);}
 }
 async function createPortalClient(){
   var products=[];
